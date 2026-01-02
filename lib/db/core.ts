@@ -11,7 +11,7 @@ import type { Analysis } from "@/types/analysis";
 import type { AudioMetadata } from "@/types/audio";
 import type { Conversation } from "@/types/chat";
 import type { SavedRecording } from "@/types/recording";
-import type { RtassScorecard } from "@/types/rtass";
+import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
 
 /**
  * Custom error class for database operations.
@@ -64,6 +64,9 @@ export class MeetingTranscriberDB extends Dexie {
 
   /** RTASS scorecards table storing rubric-based scoring results */
   rtassScorecards!: Table<RtassScorecard, string>;
+
+  /** RTASS rubric templates table storing custom rubric templates */
+  rtassRubricTemplates!: Table<RtassRubricTemplate, string>;
 
   constructor() {
     super("MeetingTranscriberDB");
@@ -158,6 +161,19 @@ export class MeetingTranscriberDB extends Dexie {
       rtassScorecards: "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
     });
 
+    // Version 9 adds RTASS rubric templates (custom rubrics created by trainers)
+    this.version(9).stores({
+      transcripts:
+        "id, filename, createdAt, metadata.duration, metadata.fileSize, [filename+createdAt], fingerprint.fileHash",
+      templates: "id, category, isCustom, createdAt, name",
+      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      audioFiles: "transcriptId, storedAt",
+      conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
+      recordings: "++id, status, transcriptId, metadata.createdAt",
+      rtassScorecards: "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
+      rtassRubricTemplates: "id, jurisdiction, createdAt, name",
+    });
+
     // Map tables to classes for better type inference
     this.transcripts = this.table("transcripts");
     this.templates = this.table("templates");
@@ -166,6 +182,7 @@ export class MeetingTranscriberDB extends Dexie {
     this.conversations = this.table("conversations");
     this.recordings = this.table("recordings");
     this.rtassScorecards = this.table("rtassScorecards");
+    this.rtassRubricTemplates = this.table("rtassRubricTemplates");
   }
 }
 

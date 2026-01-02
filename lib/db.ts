@@ -61,6 +61,14 @@ export {
 } from "./db/rtass-scorecards";
 
 export {
+  saveRtassRubricTemplate,
+  getRtassRubricTemplate,
+  getAllRtassRubricTemplates,
+  deleteRtassRubricTemplate,
+  searchRtassRubricTemplates,
+} from "./db/rtass-rubrics";
+
+export {
   type RecordingStatus,
   type SavedRecording,
   type RecordingMetadata,

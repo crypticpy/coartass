@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
+import { useState } from "react";
 import {
   Alert,
   Badge,
   Box,
+  Button,
   Divider,
   Group,
   Paper,
@@ -13,8 +15,9 @@ import {
   Text,
   Title,
 } from "@mantine/core";
-import { AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
-import type { RtassScorecard } from "@/types/rtass";
+import { notifications } from "@mantine/notifications";
+import { AlertCircle, CheckCircle2, Clock, Download, XCircle } from "lucide-react";
+import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
 import { formatTimestamp } from "@/lib/transcript-utils";
 
 function formatPercent(score: number): string {
@@ -45,11 +48,71 @@ function statusIcon(status: RtassScorecard["overall"]["status"]) {
 
 export function ScorecardViewer({
   scorecard,
+  rubric,
+  transcriptFilename,
+  incidentInfo,
   onTimestampClick,
 }: {
   scorecard: RtassScorecard;
+  rubric?: RtassRubricTemplate;
+  transcriptFilename?: string;
+  incidentInfo?: {
+    incidentNumber?: string;
+    incidentDate?: Date;
+    location?: string;
+  };
   onTimestampClick?: (seconds: number) => void;
 }) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch("/api/pdf/scorecard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scorecard,
+          rubric,
+          transcriptFilename,
+          incidentInfo,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to generate PDF");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = transcriptFilename
+        ? `${transcriptFilename.replace(/\.[^/.]+$/, "")}-scorecard.pdf`
+        : `rtass-scorecard-${scorecard.id.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: "PDF Exported",
+        message: "Scorecard PDF has been downloaded",
+        color: "green",
+      });
+    } catch (error) {
+      console.error("PDF export error:", error);
+      notifications.show({
+        title: "Export Failed",
+        message: error instanceof Error ? error.message : "Failed to export PDF",
+        color: "red",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <Stack gap="lg">
       <Paper p="lg" radius="md" withBorder>
@@ -67,6 +130,15 @@ export function ScorecardViewer({
           </Stack>
 
           <Group gap="sm" align="center">
+            <Button
+              variant="light"
+              size="sm"
+              leftSection={<Download size={16} />}
+              loading={isExporting}
+              onClick={handleExportPDF}
+            >
+              Export PDF
+            </Button>
             <Badge
               color={statusColor(scorecard.overall.status)}
               leftSection={statusIcon(scorecard.overall.status)}

@@ -13,6 +13,9 @@ export type { TranscriptPDFDocumentProps } from "./transcript-pdf";
 export { AnalysisPDFDocument } from "./analysis-pdf";
 export type { AnalysisPDFDocumentProps } from "./analysis-pdf";
 
+export { ScorecardPDFDocument } from "./scorecard-pdf";
+export type { ScorecardPDFDocumentProps } from "./scorecard-pdf";
+
 // Export PDF generation utilities
 export {
   exportTranscriptToPDF,
