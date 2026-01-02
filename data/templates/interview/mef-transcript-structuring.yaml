@@ -1,0 +1,204 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: "MEF Transcript Structuring (Phase 1)"
+description: "Organize raw MEF interview transcript into navigable sections with speaker labels, timestamps, and topic indexing - does NOT answer questionnaire questions"
+icon: FileText
+category: interview
+outputs:
+  - summary
+
+sections:
+  - id: participant-identification
+    name: Participant Identification
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Identify all speakers in the transcript using dash bullets:
+      - Speaker: [name if introduced] | Role: [interviewer/interviewee/notetaker/SME/other] | Identifier: [how they're referenced in transcript, e.g., "Speaker 1", "Dr. Martinez"]
+
+      If speakers introduced themselves, capture their:
+      - Full name and title (if stated)
+      - Department or program area
+      - Their relationship to the MEF being discussed
+
+      Create a speaker key that can be used to label the structured transcript. Example:
+      - S1 = Maria Chen, MEF Owner, Immunizations Program Manager
+      - S2 = James Rodriguez, Interviewer, COOP Coordinator
+      - S3 = Unknown speaker (IT questions)
+
+      === SPECIAL CASES ===
+      Multiple MEFs: If the interview covers more than one MEF, note:
+      - MEF 1: [name] | Discussed at: [timestamp ranges]
+      - MEF 2: [name] | Discussed at: [timestamp ranges]
+      Flag this prominently: "WARNING: Multiple MEFs discussed - recommend separate analysis runs."
+
+      Transcription Quality: Note any audio/transcription issues observed:
+      - [timestamp]: Unclear audio - words may be incorrect
+      - [timestamp]: Possible transcription error (e.g., "Works" vs "Worx")
+      - [timestamp]: Speaker cut off or inaudible
+
+  - id: section-boundaries
+    name: Questionnaire Section Boundaries
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - participant-identification
+    prompt: |
+      Identify where in the transcript each MEF questionnaire section begins and ends.
+      Use the standard MEF questionnaire structure:
+
+      Map each section with timestamp ranges:
+      - Section: Ownership & Contacts | Start: [timestamp or "0:00"] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: Criticality & Impact Assessment | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: Legal/Regulatory Requirements | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: Continuity Objectives | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: Workarounds & Alternate Locations | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: Technology & Data Requirements | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: People & Roles | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: Process Dependencies | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+      - Section: Performance & Equity | Start: [timestamp] | End: [timestamp] | Coverage: [Complete/Partial/Not Covered]
+
+      Note: Some sections may be discussed out of order or revisited multiple times. Capture ALL occurrences.
+      If a section was not covered, mark as "Not Covered" with no timestamps.
+
+  - id: topic-index
+    name: Topic Index
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - section-boundaries
+    prompt: |
+      Create a topic index of all significant discussion topics with timestamps.
+      This helps interviewers and notetakers quickly find specific discussions.
+
+      Format using dash bullets organized by topic:
+
+      Systems & Applications Mentioned:
+      - [System name]: Discussed at [timestamp(s)] | Context: [brief what was said about it]
+
+      People & Roles Mentioned:
+      - [Name/Role]: Discussed at [timestamp(s)] | Context: [why they were mentioned]
+
+      Processes Described:
+      - [Process name]: Discussed at [timestamp(s)] | Description: [brief summary]
+
+      Concerns/Issues Raised:
+      - [Issue]: Raised at [timestamp(s)] | By: [speaker] | Resolution: [if any]
+
+      Follow-up Items:
+      - [Item]: Mentioned at [timestamp(s)] | Owner: [if assigned] | Priority: [if stated]
+
+      Include every named system, person, process, and concern. This is a reference index, not an analysis.
+
+  - id: discussion-flow
+    name: Discussion Flow Summary
+    extractEvidence: false
+    outputFormat: paragraph
+    dependencies:
+      - section-boundaries
+      - topic-index
+    prompt: |
+      Provide a narrative summary of how the interview flowed, NOT the content.
+      This helps orient someone reading the structured transcript.
+
+      Write 3-4 paragraphs covering:
+
+      Paragraph 1 - "Interview Opening:" Describe how the interview began, any introductions,
+      and the initial framing of the MEF discussion.
+
+      Paragraph 2 - "Flow of Discussion:" Describe the general path of the conversation.
+      Did they follow the questionnaire order? Were there tangents? Did they revisit topics?
+      Note any significant topic jumps or returns.
+
+      Paragraph 3 - "Notable Dynamics:" Describe any notable interaction patterns -
+      who spoke most, were there clarifying questions, did technical details prompt
+      follow-up discussions, were there disagreements or corrections between participants?
+
+      Paragraph 4 - "Closing:" How did the interview wrap up? Were next steps discussed?
+      Were there outstanding questions deferred to later?
+
+      Keep each paragraph under 60 words. Focus on STRUCTURE not content.
+
+  - id: transcript-annotations
+    name: Transcript Annotations
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - participant-identification
+      - section-boundaries
+      - topic-index
+    prompt: |
+      Create annotations that can be applied to the original transcript to make it navigable.
+      Do NOT reproduce the full transcript - instead, provide a structured annotation guide.
+
+      IMPORTANT: This is NOT analysis. You are creating reference markers, not summarizing.
+
+      === SECTION MARKERS TO INSERT ===
+      For each questionnaire section, provide the marker to insert:
+      - Insert at [MM:SS]: "=== SECTION: Ownership & Contacts ==="
+      - Insert at [MM:SS]: "=== SECTION: Technology & Data ==="
+      [continue for all sections discussed]
+
+      === SPEAKER KEY ===
+      Provide consistent labels for the transcript:
+      - "Speaker 1" or "[Unknown]" → [S1 - Maria Chen, MEF Owner]
+      - "Speaker 2" → [S2 - James, Interviewer]
+      [map all speakers]
+
+      === TOPIC TRANSITION MARKERS ===
+      - Insert at [MM:SS]: ">> Topic: Primary Systems <<"
+      - Insert at [MM:SS]: ">> Topic: Backup Procedures <<"
+      [list all topic transitions with timestamps]
+
+      === CLARIFICATION FLAGS ===
+      Mark unclear items for human review:
+      - At [MM:SS]: Flag "[unclear: acronym NEDSS - expansion needed?]"
+      - At [MM:SS]: Flag "[unclear: speaker interrupted, sentence incomplete]"
+      - At [MM:SS]: Flag "[unclear: possible transcription error - 'Works' vs 'Worx'?]"
+      [list all items needing clarification]
+
+      === OUT-OF-ORDER DISCUSSIONS ===
+      Note when topics were revisited or discussed out of questionnaire order:
+      - Technology (Q21-26) discussed at [MM:SS] AND [MM:SS] - recommend consolidating
+      - Criticality mentioned during technology discussion at [MM:SS] - cross-reference to Q5-8
+      [list all out-of-order or revisited topics]
+
+      === TANGENTS & INTERRUPTIONS ===
+      Note significant tangents or interruptions:
+      - At [MM:SS]-[MM:SS]: Off-topic discussion about [topic] - may contain useful context
+      - At [MM:SS]: Interview interrupted, resumed at [MM:SS]
+      [list any tangents or interruptions]
+
+  - id: navigation-guide
+    name: Navigation Guide
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - participant-identification
+      - section-boundaries
+      - topic-index
+      - transcript-annotations
+    prompt: |
+      Create a quick reference guide for navigating this structured transcript.
+
+      Table of Contents:
+      - Section 1: [name] | Page/Location: [marker] | Key Topics: [2-3 main topics]
+      - Section 2: [name] | Page/Location: [marker] | Key Topics: [2-3 main topics]
+      [continue for all sections]
+
+      Speaker Quick Reference:
+      - S1 = [Full identification]
+      - S2 = [Full identification]
+      [etc.]
+
+      Key Systems Mentioned (alphabetical):
+      - [System A]: See [timestamp/section]
+      - [System B]: See [timestamp/section]
+      [etc.]
+
+      Gaps/Missing Coverage:
+      - [Questionnaire section not covered or only partially covered]
+      - [Topics that may need follow-up interview]
+
+      This navigation guide should fit on one page and serve as a quick reference
+      for the interviewer and notetaker when reconciling notes.

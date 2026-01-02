@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Roadmap Planning Meeting
+description: Roadmap planning with priorities, sequencing, dependencies, and stakeholder commitments
+icon: Map
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: planning-horizon
+    name: Planning Horizon
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Timeframe:" specifying the planning period (e.g., Q1-Q4, 6 months, annual).
+      - Paragraph 2 must begin with "Context:" summarizing factors influencing this roadmap (budget cycle, market conditions, etc.) in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: strategic-priorities
+    name: Strategic Priorities
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document guiding priorities using dash bullets:
+      - Priority: [strategic objective] | Weight: [relative importance] | Rationale: [why this priority] | Sponsor: [executive owner]
+      Capture the strategic lens through which roadmap decisions are made.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: feature-initiative-candidates
+    name: Feature/Initiative Candidates
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document roadmap candidates using dash bullets:
+      - Item: [feature/initiative] | Type: [Feature/Improvement/Technical Debt/Infrastructure] | Value: [business benefit] | Effort: [T-shirt size or estimate] | Requester: [stakeholder]
+      List all items considered for the roadmap.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: sequencing-decisions
+    name: Sequencing Decisions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - feature-initiative-candidates
+      - strategic-priorities
+    prompt: |
+      Document timing decisions using dash bullets:
+      - Item: [feature/initiative] | Timing: [quarter/sprint/month] | Rationale: [why this timing] | Trade-off: [what it was prioritized over]
+      Capture what goes when and why.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: dependencies-constraints
+    name: "Dependencies & Constraints"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document limitations using dash bullets:
+      - Constraint: [limitation] | Type: [Resource/Technical/External/Timing] | Impact: [what it affects] | Mitigation: [how to address]
+      Capture factors limiting roadmap options.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: resource-considerations
+    name: Resource Considerations
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - feature-initiative-candidates
+      - dependencies-constraints
+    prompt: |
+      Document resource impacts using dash bullets:
+      - Resource: [team/budget/tool] | Capacity: [availability] | Roadmap Impact: [what it enables or limits] | Gap: [shortfall if any]
+      Assess resource implications of roadmap decisions.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: stakeholder-commitments
+    name: Stakeholder Commitment Actions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - feature-initiative-candidates
+      - strategic-priorities
+    prompt: |
+      Document commitments using dash bullets:
+      - Stakeholder: [person/team] | Commitment: [what was agreed] | Deliverable: [specific item] | Timeline: [when] | Contingency: [conditions if any]
+      Capture agreements made about roadmap items.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

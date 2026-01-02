@@ -1,0 +1,423 @@
+# ============================================================================
+# Azure Container Apps - CI/CD Pipeline
+# ============================================================================
+# This GitHub Actions workflow automates building, testing, and deploying
+# the Meeting Transcriber application to Azure Container Apps.
+#
+# Features:
+# - Multi-stage Docker build for production
+# - Push to Azure Container Registry
+# - Deploy to Azure Container Apps
+# - Environment-based deployments (staging/production)
+# - Automated rollback on failure
+# - Security scanning
+#
+# Prerequisites:
+# - Azure subscription
+# - Azure Container Registry
+# - Azure Container Apps Environment
+# - GitHub repository secrets configured (see below)
+# ============================================================================
+
+name: Deploy to Azure Container Apps
+
+on:
+  # Trigger on push to main branch
+  push:
+    branches:
+      - main
+      - develop
+
+  # Trigger on pull request to main
+  pull_request:
+    branches:
+      - main
+
+  # Manual trigger with environment selection
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+# Environment variables used across jobs
+env:
+  # Azure Container Registry name (without .azurecr.io)
+  ACR_NAME: meetingtranscriberacr
+
+  # Image name
+  IMAGE_NAME: meeting-transcriber
+
+  # Azure region
+  AZURE_REGION: eastus
+
+# Permissions required for GitHub Actions
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  # ==========================================================================
+  # Job 1: Build and Push Docker Image
+  # ==========================================================================
+  build:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+
+    # Output variables for other jobs
+    outputs:
+      image-tag: ${{ steps.image-tag.outputs.tag }}
+
+    steps:
+      # ----------------------------------------------------------------------
+      # Checkout code
+      # ----------------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------------
+      # Set up Docker Buildx
+      # ----------------------------------------------------------------------
+      # Buildx enables advanced build features and multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ----------------------------------------------------------------------
+      # Generate image tag
+      # ----------------------------------------------------------------------
+      # Use git SHA for unique, traceable image tags
+      - name: Generate image tag
+        id: image-tag
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            TAG="pr-${{ github.event.pull_request.number }}-$(echo ${{ github.sha }} | cut -c1-7)"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            TAG="prod-$(echo ${{ github.sha }} | cut -c1-7)"
+          else
+            TAG="dev-$(echo ${{ github.sha }} | cut -c1-7)"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Image tag: $TAG"
+
+      # ----------------------------------------------------------------------
+      # Login to Azure
+      # ----------------------------------------------------------------------
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ----------------------------------------------------------------------
+      # Login to Azure Container Registry
+      # ----------------------------------------------------------------------
+      - name: Login to ACR
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+
+      # ----------------------------------------------------------------------
+      # Build and push Docker image
+      # ----------------------------------------------------------------------
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_VERSION=20
+
+      # ----------------------------------------------------------------------
+      # Scan image for vulnerabilities
+      # ----------------------------------------------------------------------
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      # ----------------------------------------------------------------------
+      # Upload security scan results
+      # ----------------------------------------------------------------------
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ==========================================================================
+  # Job 2: Deploy to Staging
+  # ==========================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.app-url }}
+
+    steps:
+      # ----------------------------------------------------------------------
+      # Checkout code
+      # ----------------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------------
+      # Login to Azure
+      # ----------------------------------------------------------------------
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ----------------------------------------------------------------------
+      # Deploy to Azure Container Apps (Staging)
+      # ----------------------------------------------------------------------
+      - name: Deploy to Container Apps
+        id: deploy
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }}
+          containerAppName: meeting-transcriber-staging
+          containerAppEnvironment: meeting-transcriber-env-staging
+          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
+          targetPort: 3000
+          ingress: external
+          environmentVariables: |
+            NODE_ENV=production
+            PORT=3000
+            HOSTNAME=0.0.0.0
+            AZURE_OPENAI_API_VERSION=2024-08-01-preview
+            AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper-1
+            AZURE_OPENAI_GPT4_DEPLOYMENT=gpt-4
+            NEXT_TELEMETRY_DISABLED=1
+
+      # ----------------------------------------------------------------------
+      # Health check
+      # ----------------------------------------------------------------------
+      - name: Health check
+        run: |
+          APP_URL="${{ steps.deploy.outputs.app-url }}"
+          echo "Checking health at: $APP_URL/api/health"
+
+          # Wait for deployment to be ready
+          sleep 30
+
+          # Check health endpoint
+          for i in {1..10}; do
+            if curl -f -s "$APP_URL/api/health" > /dev/null; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "Health check failed after 10 attempts"
+          exit 1
+
+  # ==========================================================================
+  # Job 3: Deploy to Production
+  # ==========================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.app-url }}
+
+    steps:
+      # ----------------------------------------------------------------------
+      # Checkout code
+      # ----------------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------------
+      # Login to Azure
+      # ----------------------------------------------------------------------
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # ----------------------------------------------------------------------
+      # Deploy to Azure Container Apps (Production)
+      # ----------------------------------------------------------------------
+      - name: Deploy to Container Apps
+        id: deploy
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }}
+          containerAppName: meeting-transcriber-production
+          containerAppEnvironment: meeting-transcriber-env-production
+          imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
+          targetPort: 3000
+          ingress: external
+          environmentVariables: |
+            NODE_ENV=production
+            PORT=3000
+            HOSTNAME=0.0.0.0
+            AZURE_OPENAI_API_VERSION=2024-08-01-preview
+            AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper-1
+            AZURE_OPENAI_GPT4_DEPLOYMENT=gpt-4
+            NEXT_TELEMETRY_DISABLED=1
+
+      # ----------------------------------------------------------------------
+      # Health check
+      # ----------------------------------------------------------------------
+      - name: Health check
+        run: |
+          APP_URL="${{ steps.deploy.outputs.app-url }}"
+          echo "Checking health at: $APP_URL/api/health"
+
+          # Wait for deployment to be ready
+          sleep 30
+
+          # Check health endpoint
+          for i in {1..10}; do
+            if curl -f -s "$APP_URL/api/health" > /dev/null; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "Health check failed after 10 attempts"
+          exit 1
+
+      # ----------------------------------------------------------------------
+      # Notify on success
+      # ----------------------------------------------------------------------
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "✅ Successfully deployed to production!"
+          echo "🌐 Application URL: ${{ steps.deploy.outputs.app-url }}"
+
+      # ----------------------------------------------------------------------
+      # Rollback on failure
+      # ----------------------------------------------------------------------
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed, initiating rollback..."
+
+          # Get previous revision
+          PREV_REVISION=$(az containerapp revision list \
+            --name meeting-transcriber-production \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
+            --query "[?properties.active==true && properties.name != '${{ steps.deploy.outputs.revision-name }}'] | [0].name" \
+            -o tsv)
+
+          if [ -n "$PREV_REVISION" ]; then
+            echo "Rolling back to revision: $PREV_REVISION"
+            az containerapp revision set-mode \
+              --name meeting-transcriber-production \
+              --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
+              --mode single \
+              --revision $PREV_REVISION
+          else
+            echo "No previous revision found for rollback"
+          fi
+
+# ============================================================================
+# Required GitHub Secrets
+# ============================================================================
+#
+# Configure these secrets in GitHub repository settings:
+# Repository Settings > Secrets and variables > Actions > New repository secret
+#
+# 1. AZURE_CREDENTIALS
+#    Service principal credentials in JSON format
+#    Create with: az ad sp create-for-rbac --name "github-actions" --role contributor --scopes /subscriptions/{SUBSCRIPTION_ID} --sdk-auth
+#
+# 2. AZURE_RESOURCE_GROUP_STAGING
+#    Resource group name for staging environment
+#    Example: meeting-transcriber-staging-rg
+#
+# 3. AZURE_RESOURCE_GROUP_PRODUCTION
+#    Resource group name for production environment
+#    Example: meeting-transcriber-production-rg
+#
+# 4. AZURE_OPENAI_API_KEY (set in Container App secrets)
+#    Azure OpenAI API key
+#
+# 5. AZURE_OPENAI_ENDPOINT (set in Container App secrets)
+#    Azure OpenAI endpoint URL
+#
+# ============================================================================
+# Setup Instructions
+# ============================================================================
+#
+# 1. Create Azure Service Principal:
+#    az ad sp create-for-rbac --name "github-actions-meeting-transcriber" \
+#      --role contributor \
+#      --scopes /subscriptions/{SUBSCRIPTION_ID} \
+#      --sdk-auth
+#
+#    Copy the JSON output to AZURE_CREDENTIALS secret in GitHub
+#
+# 2. Create Container App Environments:
+#    # Staging
+#    az containerapp env create \
+#      --name meeting-transcriber-env-staging \
+#      --resource-group meeting-transcriber-staging-rg \
+#      --location eastus
+#
+#    # Production
+#    az containerapp env create \
+#      --name meeting-transcriber-env-production \
+#      --resource-group meeting-transcriber-production-rg \
+#      --location eastus
+#
+# 3. Set secrets in Container Apps:
+#    az containerapp secret set \
+#      --name meeting-transcriber-production \
+#      --resource-group meeting-transcriber-production-rg \
+#      --secrets \
+#        azure-openai-api-key={YOUR_API_KEY} \
+#        azure-openai-endpoint={YOUR_ENDPOINT}
+#
+# 4. Push to GitHub:
+#    git add .github/workflows/deploy-azure.yml
+#    git commit -m "Add Azure deployment workflow"
+#    git push origin main
+#
+# ============================================================================
+# Workflow Triggers
+# ============================================================================
+#
+# Automatic triggers:
+# - Push to 'main' branch → Deploy to production
+# - Push to 'develop' branch → Deploy to staging
+# - Pull request to 'main' → Build only (no deployment)
+#
+# Manual trigger:
+# - Go to Actions tab in GitHub
+# - Select "Deploy to Azure Container Apps"
+# - Click "Run workflow"
+# - Select environment (staging/production)
+# - Click "Run workflow"
+#
+# ============================================================================

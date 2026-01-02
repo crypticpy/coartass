@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Release Planning Meeting
+description: Release planning with scope, milestones, resources, risks, and go/no-go criteria
+icon: Rocket
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: release-scope
+    name: Release Scope
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Release Overview:" describing the release version, theme, and key features targeted.
+      - Paragraph 2 must begin with "Scope Boundaries:" clarifying what is explicitly out of scope in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: timeline-milestones
+    name: "Timeline & Milestones"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List milestones using dash bullets:
+      - Milestone: [name] | Date: [target date] | Owner: [responsible party] | Dependency: [prerequisite or "None"]
+      Include code freeze, testing phases, and deployment dates.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: resource-requirements
+    name: Resource Requirements
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document resource needs using dash bullets:
+      - Resource: [person/team/tool] | Role: [function] | Availability: [status] | Gap: [shortfall or "None"]
+      Include development, QA, DevOps, and support resources.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: risk-assessment
+    name: Risk Assessment
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - release-scope
+      - timeline-milestones
+    prompt: |
+      Capture risks using dash bullets:
+      - Risk: [description] | Category: [Technical/Schedule/Resource/External] | Likelihood: [High/Medium/Low] | Impact: [High/Medium/Low] | Mitigation: [plan]
+      Focus on risks that could affect the release date or quality.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: go-no-go-criteria
+    name: Go/No-Go Criteria
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List release criteria using dash bullets:
+      - Criterion: [requirement] | Category: [Quality/Feature/Compliance/Business] | Status: [Met/Not Met/TBD] | Owner: [responsible party]
+      Include test coverage, performance, and business approval requirements.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: communication-plan
+    name: Communication Plan
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document communication items using dash bullets:
+      - Audience: [stakeholder group] | Message: [key communication] | Channel: [method] | Timing: [when] | Owner: [person]
+      Include internal and external communications planned.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

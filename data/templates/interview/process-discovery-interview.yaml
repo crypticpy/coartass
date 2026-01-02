@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Process Discovery Interview
+description: Stakeholder interview to understand existing processes, systems, pain points, and improvements
+icon: Search
+category: interview
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: interviewee-context
+    name: Interviewee Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two concise paragraphs:
+      - Paragraph 1 must begin with "Role & Experience:" describing the interviewee's position, tenure, and involvement with the process.
+      - Paragraph 2 must begin with "Process Relationship:" explaining how they interact with this process daily in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: process-overview
+    name: Process Overview
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Process Purpose:" describing what the process accomplishes and why it exists.
+      - Paragraph 2 must begin with "Scope & Boundaries:" clarifying where the process starts, ends, and what's excluded in <=70 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: steps-activities
+    name: "Steps & Activities"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - process-overview
+    prompt: |
+      Document process steps using dash bullets:
+      - Step: [sequence number] | Activity: [what happens] | Actor: [who does it] | Trigger: [what initiates this step] | Output: [result]
+      Capture the process in sequential order as described by the interviewee.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: systems-tools
+    name: "Systems & Tools"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List systems and tools using dash bullets:
+      - System/Tool: [name] | Purpose: [how it's used in process] | Users: [who uses it] | Satisfaction: [High/Medium/Low] | Issues: [problems or "None"]
+      Include software, spreadsheets, paper forms, and other tools mentioned.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: pain-points-bottlenecks
+    name: "Pain Points & Bottlenecks"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - steps-activities
+    prompt: |
+      Capture pain points using dash bullets:
+      - Pain Point: [issue] | Location: [where in process] | Frequency: [how often] | Impact: [effect on work] | Workaround: [current solution or "None"]
+      Include delays, rework, frustrations, and inefficiencies mentioned.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: improvement-suggestions
+    name: Improvement Suggestions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - pain-points-bottlenecks
+    prompt: |
+      Document suggestions using dash bullets:
+      - Suggestion: [idea] | Problem Addressed: [pain point it solves] | Feasibility: [Easy/Medium/Hard or "Unknown"] | Benefit: [expected improvement]
+      Include both explicit suggestions and implied improvements.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

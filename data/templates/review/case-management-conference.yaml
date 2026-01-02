@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Case Management Conference
+description: Coordinate services, needs, and commitments for complex case management
+icon: Home
+category: review
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: case-overview
+    name: Case Overview
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Client/Household:" covering demographics and status.
+      - Sentence 2 begins with "Case Status:" summarizing current placement, risks, and time in program in <=55 words.
+
+  - id: needs-assessment
+    name: Needs Assessment
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List needs via dash bullets:
+      - Need: [service/support] | Urgency: [High/Medium/Low] | Current Support: [provider or "None"] | Gap: [what's missing]
+      Include housing, health, employment, and legal needs as relevant.
+
+  - id: service-coordination
+    name: Service Coordination
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture coordination steps using dash bullets:
+      - Provider: [agency] | Service: [offering] | Status: [Pending/In Progress/Complete] | Next Step: [action]
+      Highlight interagency dependencies.
+
+  - id: client-voice
+    name: Client Voice
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document client quotes via dash bullets:
+      - Speaker: [name or "Client"] | Quote: "[<=30 words]" | Priority: [need they emphasized] | Follow-up: [action or "Hear back"]
+      Use direct quotes only.
+
+  - id: next-steps-and-owners
+    name: "Next Steps & Owners"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Record commitments with checkbox bullets:
+      - [ ] Action: [task] | Lead Agency: [department/nonprofit] | Due: [date/timeframe] | Outcome Measure: [indicator]
+      Only include items approved during the conference.
+

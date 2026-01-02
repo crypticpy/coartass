@@ -1,0 +1,238 @@
+{
+  "$schema": "./rtass-rubric.schema.json",
+  "id": "rtass-afd-a1016-radio-compliance",
+  "name": "AFD A101.6 Radio Compliance (MVP)",
+  "description": "Scores fireground radio traffic for compliance with core A101.6 communication elements (size-up, command, CAN reports, accountability/safety, and key benchmark announcements). Uses transcript evidence; if not present in the audio, criteria should be marked not_observed rather than guessed.",
+  "version": "1.0.0",
+  "jurisdiction": "AFD",
+  "tags": ["afd", "a101-6", "radio", "training", "structure-fire"],
+  "createdAt": "2026-01-02T00:00:00.000Z",
+  "sections": [
+    {
+      "id": "arrival-size-up",
+      "title": "Arrival / Initial Radio Report (Size-Up)",
+      "description": "Evaluate first-arriving unit’s initial size-up and arrival practices. Score only what is explicitly communicated.",
+      "weight": 0.22,
+      "criteria": [
+        {
+          "id": "announce-arrival",
+          "title": "Announces arrival / on scene",
+          "description": "The first-arriving unit explicitly announces arrival/on scene.",
+          "required": true,
+          "type": "boolean",
+          "evidenceRules": { "minEvidence": 1, "requireVerbatimQuote": true }
+        },
+        {
+          "id": "assume-command",
+          "title": "Assumes command",
+          "description": "The first-arriving officer assumes command (or clearly states who has command).",
+          "required": true,
+          "type": "boolean",
+          "evidenceRules": { "minEvidence": 1, "requireVerbatimQuote": true }
+        },
+        {
+          "id": "declare-tac-channel",
+          "title": "Declares tactical channel",
+          "description": "Mentions the tactical channel / confirms operations are on the assigned tactical channel.",
+          "required": false,
+          "type": "boolean",
+          "evidenceRules": { "minEvidence": 1 }
+        },
+        {
+          "id": "describe-structure",
+          "title": "Describes structure / occupancy",
+          "description": "Describes building (stories/occupancy/construction/roof) as part of size-up.",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "describe-conditions",
+          "title": "Describes fire/smoke conditions",
+          "description": "Describes visible fire/smoke location/extent or conditions (e.g., Alpha/Bravo corner, attic, heavy smoke).",
+          "required": true,
+          "type": "boolean"
+        },
+        {
+          "id": "declare-strategy",
+          "title": "Declares strategy / mode of operation",
+          "description": "Declares strategy (investigation/offensive/defensive) or mode of operation early.",
+          "required": true,
+          "type": "boolean"
+        },
+        {
+          "id": "announce-360",
+          "title": "Announces 360 (attempted/complete/not complete)",
+          "description": "Announces intent to conduct a 360, or reports 360 complete/not complete with updates/corrections.",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "id": "command-control",
+      "title": "Command Establishment & Transfer",
+      "description": "Evaluate clarity of command establishment, command post, and command transfer communications.",
+      "weight": 0.18,
+      "criteria": [
+        {
+          "id": "command-established-timely",
+          "title": "Command established promptly",
+          "description": "Command is established promptly after first unit arrival (use transcript evidence; otherwise mark not_observed).",
+          "required": true,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "command_established", "targetSeconds": 180, "maxSeconds": 300 },
+          "notes": "Clock starts at first unit arrival. If the radio traffic does not include explicit arrival and command timing, mark not_observed."
+        },
+        {
+          "id": "command-post-location",
+          "title": "Command post location announced",
+          "description": "Command post location is announced and identifiable (e.g., 'command post on the west side behind...').",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "alpha-side-designation",
+          "title": "Alpha side designation confirmed",
+          "description": "Alpha side is designated/confirmed when relevant.",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "command-transfer-structured",
+          "title": "Command transfer is structured",
+          "description": "When command is transferred, the transfer includes assignment/status context (e.g., strategy confirmation, divisions/groups, key hazards).",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "id": "can-reports",
+      "title": "CAN Reports (Conditions / Actions / Needs)",
+      "description": "Evaluate whether CAN reports are used and complete enough to support incident coordination.",
+      "weight": 0.18,
+      "criteria": [
+        {
+          "id": "can-reports-issued",
+          "title": "CAN reports issued",
+          "description": "One or more CAN-style updates are transmitted (explicit CAN or equivalent structure).",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "can-conditions",
+          "title": "CAN: conditions communicated",
+          "description": "CAN reports include conditions (location/heat/fire/smoke/visibility).",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "can-actions",
+          "title": "CAN: actions communicated",
+          "description": "CAN reports include actions being performed (e.g., advancing line, searching, ventilation).",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "can-needs",
+          "title": "CAN: needs communicated",
+          "description": "CAN reports include needs (resources required) or explicitly state no needs.",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "id": "benchmarks-to-dispatch",
+      "title": "Benchmark Announcements",
+      "description": "Evaluate whether key benchmark events are announced over the radio (as heard in the transcript).",
+      "weight": 0.22,
+      "criteria": [
+        {
+          "id": "primary-search-complete-announced",
+          "title": "Primary search complete announced",
+          "description": "Primary search completion is announced (including victim status if mentioned).",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "secondary-search-complete-announced",
+          "title": "Secondary search complete announced",
+          "description": "Secondary search completion is announced (including victim status if mentioned).",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "fire-knocked-down-announced",
+          "title": "Fire knocked down announced",
+          "description": "Fire knocked down (including blitz if applicable) is announced.",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "fire-under-control-announced",
+          "title": "Fire under control announced",
+          "description": "Fire under control is announced.",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "fire-extinguished-announced",
+          "title": "Fire extinguished announced",
+          "description": "Fire extinguished is announced.",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "utilities-shutoff-announced",
+          "title": "Utilities shutoff announced",
+          "description": "Utility shutoff (power/gas) is announced if applicable.",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    },
+    {
+      "id": "safety-accountability",
+      "title": "Safety & Accountability Messaging",
+      "description": "Evaluate presence/clarity of safety-critical radio messaging (RIC, safety officer, MAYDAY readiness if present).",
+      "weight": 0.20,
+      "criteria": [
+        {
+          "id": "ric-established",
+          "title": "RIC established/announced",
+          "description": "RIC team is assigned/announced with unit identification (as heard in transcript).",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "safety-officer-assigned",
+          "title": "Safety officer assigned/announced",
+          "description": "Safety officer role is assigned/announced (as heard in transcript).",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "id": "mayday-handling",
+          "title": "MAYDAY handled correctly (if it occurs)",
+          "description": "If a MAYDAY occurs in the audio, the radio traffic shows clear MAYDAY declaration and disciplined command response. If no MAYDAY occurs, mark not_applicable.",
+          "required": false,
+          "type": "enum",
+          "enumOptions": ["not_applicable", "met", "missed", "partial"],
+          "notes": "This criterion is conditional: if no MAYDAY is present, it should be scored as not_applicable with no penalty."
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "method": "weighted_average",
+    "thresholds": { "pass": 0.85, "needsImprovement": 0.7 },
+    "requiredNotObservedBehavior": "treat_as_missed"
+  },
+  "llm": {
+    "concurrency": 5,
+    "maxRetries": 2,
+    "evidenceQuoteMaxChars": 240
+  }
+}
+

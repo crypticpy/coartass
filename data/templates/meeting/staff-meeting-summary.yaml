@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Staff Meeting Summary
+description: Team/staff meeting summary with announcements, discussions, updates, and action items
+icon: Users
+category: meeting
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: meeting-overview
+    name: Meeting Overview
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Purpose:" stating why the meeting was held.
+      - Sentence 2 begins with "Attendance:" noting who participated in <=30 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: announcements
+    name: Announcements
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document announcements using dash bullets:
+      - Announcement: [information shared] | Source: [who announced] | Effective: [when applicable] | Action Required: [what staff should do or "Informational"]
+      Capture organizational updates and news.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: discussion-topics
+    name: Discussion Topics
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document discussions using dash bullets:
+      - Topic: [subject discussed] | Key Points: [main takeaways] | Outcome: [conclusion reached or "Ongoing"] | Follow-up: [next step if any]
+      Summarize substantive conversations.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: team-updates
+    name: Team Updates
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document team member updates using dash bullets:
+      - Person: [name] | Update: [what they shared] | Help Needed: [request or "None"]
+      Keep updates brief and action-focused.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: staff-action-items
+    name: Action Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document tasks with checkbox bullets:
+      - [ ] Task: [what needs to be done] | Owner: [person] | Due: [date/timeframe] | Status: [New/Carry-over]
+      Track commitments and follow-ups from the meeting.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: next-steps
+    name: Next Steps
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Next Meeting:" noting when the team will reconvene.
+      - Sentence 2 begins with "Focus:" identifying key priorities before next meeting in <=30 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

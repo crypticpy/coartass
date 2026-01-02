@@ -1,0 +1,96 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Requirements Gathering Session
+description: Requirements elicitation with functional and non-functional requirements, user stories, and priorities
+icon: ClipboardList
+category: interview
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: business-context
+    name: Business Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Initiative:" describing the project or feature being scoped and its business driver.
+      - Paragraph 2 must begin with "Stakeholders:" identifying key stakeholders and their interests in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: functional-requirements
+    name: Functional Requirements
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document functional requirements using dash bullets:
+      - Requirement: [capability] | Category: [feature area] | Priority: [Must/Should/Could/Won't] | Rationale: [why needed]
+      Capture what the system must do to meet business needs.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: non-functional-requirements
+    name: Non-Functional Requirements
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document non-functional requirements using dash bullets:
+      - Requirement: [quality attribute] | Category: [Performance/Security/Usability/Scalability/Compliance] | Target: [specific metric or standard] | Priority: [Critical/Important/Desired]
+      Capture how the system should perform.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: user-stories
+    name: User Stories
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - functional-requirements
+    prompt: |
+      Document user stories using dash bullets:
+      - Story: "As a [user], I want [capability] so that [benefit]" | Priority: [High/Medium/Low] | Size: [Small/Medium/Large or points] | Dependencies: [related stories or "None"]
+      Capture user-centered requirements in story format.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: acceptance-criteria
+    name: Acceptance Criteria
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - user-stories
+    prompt: |
+      Document acceptance criteria using dash bullets:
+      - Story/Requirement: [reference] | Criterion: [specific testable condition] | Type: [Given-When-Then/Checklist/Metric]
+      Define how we'll know requirements are met.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: constraints-assumptions
+    name: "Constraints & Assumptions"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document constraints and assumptions using dash bullets:
+      - Type: [Constraint/Assumption] | Description: [detail] | Impact: [effect on solution] | Risk if Wrong: [consequence]
+      Capture limitations and things taken as given.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: priority-ranking
+    name: Priority Ranking
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - functional-requirements
+      - user-stories
+    prompt: |
+      Summarize priorities using dash bullets:
+      - Priority Tier: [Must Have/Should Have/Could Have/Won't Have] | Items: [list of requirements in this tier] | Rationale: [why this prioritization]
+      Provide MoSCoW or similar prioritization summary.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

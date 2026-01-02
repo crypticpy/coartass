@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Public Safety Incident Review
+description: Review significant incidents, response actions, community impact, and corrective measures
+icon: Shield
+category: review
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: incident-summary
+    name: Incident Summary
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences for structured parsing.
+      - Sentence 1 begins with "Overview:" describing incident type, location, and scale.
+      - Sentence 2 begins with "Timeline:" highlighting critical timestamps and escalation in <=60 words.
+
+  - id: response-actions
+    name: Response Actions
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List each major response using dash bullets:
+      - Unit: [team/division] | Action: [tactic] | Timing: [timestamp or window] | Outcome: [result]
+      Include coordination with partner agencies when mentioned.
+
+  - id: policy-and-training-gaps
+    name: "Policy & Training Gaps"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document any gaps discussed using dash bullets:
+      - Gap: [issue] | Risk: [impact] | Required Fix: [policy/training change] | Owner: [office]
+      Focus on actionable systemic improvements.
+
+  - id: community-impact-notes
+    name: Community Impact Notes
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture community-facing effects using dash bullets:
+      - Population: [group/neighborhood] | Concern: [<=12 words] | Engagement: [outreach taken] | Follow-up: [next step or "Pending"]
+      Center impacted residents or businesses.
+
+  - id: corrective-actions
+    name: Corrective Actions
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List corrective commitments with checkbox bullets:
+      - [ ] Action: [change to implement] | Owner: [unit] | Due: [date/timeframe] | Metric: [success indicator]
+      Only include approved actions, not suggestions.
+

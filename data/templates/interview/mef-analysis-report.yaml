@@ -1,0 +1,344 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: "MEF Analysis Report (Phase 3)"
+description: "Synthesize MEF interview findings into executive-ready analysis with improved quote quality - supports supplementary notetaker notes"
+icon: FileBarChart
+category: interview
+supportsSupplementalMaterial: true
+outputs:
+  - summary
+  - action_items
+  - decisions
+  - quotes
+
+sections:
+  - id: executive-summary
+    name: Executive Summary
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Write a 3-paragraph executive summary of this MEF interview.
+
+      IMPORTANT: Only state facts that are EXPLICITLY mentioned in the transcript.
+      Do NOT make inferences about system capabilities, requirements, or configurations
+      unless the interviewee specifically stated them.
+
+      Paragraph 1 - "MEF Overview:" Identify the Mission Essential Function, its criticality tier,
+      the program/service area it supports, and the primary owner. State maximum tolerable
+      downtime if discussed.
+
+      Paragraph 2 - "Key Findings:" Summarize the 3-4 most significant findings from the interview.
+      Focus on: continuity posture strengths, critical dependencies, and notable risks or gaps.
+      Be specific - cite actual systems, timeframes, or processes mentioned.
+
+      Paragraph 3 - "Recommended Actions:" List the 2-3 highest priority actions based on the
+      interview. These should be concrete next steps that emerged from the discussion.
+
+      Keep each paragraph under 80 words. Use precise language - avoid vague statements like
+      "various systems" or "multiple dependencies."
+
+  - id: mef-profile
+    name: MEF Profile
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - executive-summary
+    prompt: |
+      Create a structured profile of this Mission Essential Function using dash bullets:
+
+      === IDENTIFICATION ===
+      - MEF ID: [from master list, or "Not captured"]
+      - MEF Name: [as described in interview]
+      - Program/Division: [organizational unit]
+      - Service Area: [what public health function this supports]
+
+      === OWNERSHIP ===
+      - Primary Owner: [name] | Title: [role]
+      - Backup Owner: [name] | Title: [role]
+      - Operational Contact: [name] | Role: [function] | Contact: [info or "Not provided"]
+
+      === CRITICALITY ===
+      - Criticality Tier: [Mission Critical/Business Critical/Business Operational/Administrative]
+      - Maximum Tolerable Downtime (MTD): [timeframe]
+      - Recovery Time Objective (RTO): [timeframe]
+      - Recovery Point Objective (RPO): [data loss tolerance]
+
+      === OPERATING PARAMETERS ===
+      - Primary Location: [site]
+      - Alternate Locations: [list or "None identified"]
+      - Remote Capability: [Fully/Partially/Not remote-capable]
+      - Normal Hours: [schedule]
+      - Emergency Hours: [extended coverage if any]
+
+      Only include information explicitly stated in the transcript.
+
+  - id: criticality-analysis
+    name: Criticality Analysis
+    extractEvidence: true
+    outputFormat: paragraph
+    dependencies:
+      - mef-profile
+    prompt: |
+      Analyze the criticality and impact assessment for this MEF.
+
+      Write 3 paragraphs:
+
+      Paragraph 1 - "Impact Assessment:" Summarize the impact ratings discussed:
+      - Public Health Impact: [rating and explanation]
+      - Legal/Regulatory Impact: [rating and explanation]
+      - Financial Impact: [rating and explanation]
+      - Reputational/Political Impact: [rating and explanation]
+      If any category was not discussed, explicitly note it.
+
+      Paragraph 2 - "Risk Analysis:" Discuss the overall risk rating and the reasoning
+      behind it. Consider both likelihood of disruption and severity of impact.
+      Note any specific scenarios or past incidents mentioned.
+
+      Paragraph 3 - "Criticality Justification:" Explain why the stated criticality tier
+      is appropriate (or flag if it seems inconsistent with the impact assessment).
+
+      Keep paragraphs under 70 words each. Be specific about what was stated vs. what
+      was implied or not discussed.
+
+  - id: continuity-posture
+    name: Continuity Posture Assessment
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - criticality-analysis
+    prompt: |
+      Assess the current continuity posture for this MEF using dash bullets:
+
+      === STRENGTHS ===
+      List continuity capabilities that are already in place:
+      - Strength: [capability] | Evidence: [what was described] | Coverage: [what it protects]
+
+      === MANUAL WORKAROUNDS ===
+      - Workaround Available: [Yes/No]
+      - Description: [how it works]
+      - Sustainability: [how long it can be maintained]
+      - Limitations: [constraints or gaps]
+      - Staff Trained: [Yes/No/Unknown]
+
+      === MINIMUM SERVICE LEVEL ===
+      During an emergency, what level of service is acceptable?
+      - Must Continue: [critical activities]
+      - Can Reduce: [activities that can scale back]
+      - Can Pause: [activities that can temporarily stop]
+
+      === GAP ANALYSIS ===
+      Where RTO/RPO requirements may not be met:
+      - Gap: [specific issue] | Impact: [consequence] | Current Mitigation: [if any]
+
+      Focus on facts from the transcript, not assumptions.
+
+  - id: technology-dependencies
+    name: Technology Dependencies
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - mef-profile
+    prompt: |
+      Document all technology dependencies identified in the interview:
+
+      === PRIMARY SYSTEMS (Required) ===
+      - System: [name] | Vendor: [provider] | Purpose: [function] | Hosting: [model if known]
+
+      === SECONDARY SYSTEMS (Supporting) ===
+      - System: [name] | Purpose: [function] | Workaround if unavailable: [alternative]
+
+      === DATA STORAGE ===
+      - Location: [database/drive/cloud/paper] | Content: [what data] | Sensitivity: [classification]
+
+      === NETWORK REQUIREMENTS ===
+      - Connectivity: [type] | Purpose: [what it enables]
+
+      === DEVICES & PERIPHERALS ===
+      - Device: [type] | Purpose: [function] | Quantity: [if mentioned]
+
+      === SYSTEM INTERFACES ===
+      - Interface: [source] → [target] | Data: [what flows] | Frequency: [timing]
+
+      === SECURITY CONTROLS ===
+      - Control: [MFA/RBAC/encryption/backups/etc.] | Coverage: [what it protects]
+
+      IMPORTANT: Capture system names exactly as stated. Do NOT assume capabilities
+      (e.g., if someone says "we use Worx for access," do NOT assume it requires MFA
+      unless they explicitly said so).
+
+  - id: risk-findings
+    name: Risk Findings
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - continuity-posture
+      - technology-dependencies
+    prompt: |
+      Document all risks, vulnerabilities, and concerns identified in the interview:
+
+      === SINGLE POINTS OF FAILURE ===
+      - Risk: [specific vulnerability] | Impact: [consequence if it fails] | Mitigation: [current or planned]
+
+      === DOCUMENTATION GAPS ===
+      - Gap: [what's missing] | Impact: [why it matters]
+
+      === STAFFING RISKS ===
+      - Risk: [key person dependency, cross-training gaps, etc.] | Impact: [consequence]
+
+      === TECHNOLOGY RISKS ===
+      - Risk: [unsupported systems, outdated software, capacity constraints] | Impact: [consequence]
+
+      === PROCESS RISKS ===
+      - Risk: [manual processes, handoff failures, timing dependencies] | Impact: [consequence]
+
+      === COMPLIANCE RISKS ===
+      - Risk: [regulatory exposure, grant requirements at risk] | Impact: [consequence]
+
+      === CONFLICTING STATEMENTS ===
+      If speakers disagreed or provided conflicting information:
+      - Topic: [what they disagreed about]
+      - Speaker A: [name] said: "[statement]"
+      - Speaker B: [name] said: "[statement]"
+      - Resolution Status: [resolved during interview / needs clarification / deferred to SME]
+      - Recommended Action: [who should verify correct answer]
+
+      For each risk, only include what was actually discussed. Add:
+      - Severity: [High/Medium/Low]
+      - Likelihood: [High/Medium/Low] if discussed
+      - Source: [who raised this concern]
+
+  - id: notable-quotes
+    name: Notable Quotes
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - risk-findings
+    prompt: |
+      Extract significant, verbatim quotes that capture key insights, concerns, or institutional knowledge.
+
+      QUOTE QUALITY REQUIREMENTS:
+      1. VERBATIM ONLY: Use exact words from the transcript. Do NOT paraphrase or combine statements.
+      2. CONTEXT REQUIRED: Explain what prompted the quote and why it matters.
+      3. ATTRIBUTION: Identify the speaker by name/role.
+      4. TIMESTAMP: Include timestamp if available.
+      5. SIGNIFICANCE: Explain why this quote is notable.
+
+      Format each quote as:
+      - Quote: "[EXACT words from transcript, under 40 words]"
+        Speaker: [Name or role]
+        Context: [What question or topic prompted this statement]
+        Timestamp: [HH:MM:SS or "Not available"]
+        Significance: [Why this quote matters - what insight it provides]
+        Category: [Pain Point / Workaround / Risk / Institutional Knowledge / Past Incident / Political Sensitivity]
+
+      FOCUS ON QUOTES THAT REVEAL:
+      - Frustrations with current systems or processes
+      - How things "really work" vs. official procedures
+      - Concerns about risks or vulnerabilities
+      - Knowledge that would be lost if not documented
+      - Past incidents or near-misses
+      - Political or organizational sensitivities
+
+      AVOID:
+      - Generic or procedural statements
+      - Quotes that don't add insight beyond factual Q&A
+      - Paraphrased or reconstructed statements
+      - Combining multiple statements into one "quote"
+
+      Include 5-8 notable quotes if available. If the conversation was primarily
+      factual Q&A without memorable statements, note "Limited notable quotes -
+      interview was primarily factual/procedural."
+
+  - id: recommendations
+    name: Recommendations
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - risk-findings
+      - continuity-posture
+    prompt: |
+      Based on the risks and gaps identified, provide prioritized recommendations:
+
+      === IMMEDIATE (within 30 days) ===
+      - [ ] Recommendation: [specific action] | Owner: [suggested role] | Rationale: [why urgent]
+
+      === SHORT-TERM (1-3 months) ===
+      - [ ] Recommendation: [specific action] | Owner: [suggested role] | Rationale: [benefit]
+
+      === LONG-TERM (3-12 months) ===
+      - [ ] Recommendation: [specific action] | Owner: [suggested role] | Rationale: [strategic value]
+
+      For each recommendation:
+      - Be SPECIFIC (not "improve documentation" but "document the manual workaround process for [specific system]")
+      - Link to a specific finding from the interview
+      - Consider resource constraints mentioned
+
+      If the interviewee mentioned specific improvement ideas or next steps,
+      prioritize those over analyst-generated recommendations.
+
+  - id: gaps-followups
+    name: Gaps & Follow-ups
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - executive-summary
+      - technology-dependencies
+      - risk-findings
+    prompt: |
+      Document all items requiring follow-up:
+
+      === UNANSWERED QUESTIONS ===
+      Questions asked during the interview that could not be answered:
+      - Question: [what was asked] | Response: [what they said] | Follow-up With: [suggested contact]
+
+      === INFORMATION GAPS ===
+      MEF questionnaire areas that were not covered or incomplete:
+      - Gap: [topic/question] | Priority: [High/Medium/Low] | Source: [who might know]
+
+      === ACTION ITEMS FROM INTERVIEW ===
+      Commitments made during the interview:
+      - [ ] Action: [task] | Owner: [person] | Due: [timeframe if stated] | Purpose: [why needed]
+
+      === VERIFICATION NEEDED ===
+      Technical details that should be confirmed with IT or other SMEs:
+      - Item: [specific detail] | Stated By: [who] | Verify With: [suggested contact]
+
+      === INCONSISTENCIES TO RESOLVE ===
+      Any conflicting information from the interview:
+      - Conflict: [description] | Resolution: [what to clarify]
+
+      This section is critical for data completeness. Every "I don't know,"
+      "we'd need to check," or skipped topic should be captured here.
+
+  - id: notes-reconciliation
+    name: Notes Reconciliation
+    extractEvidence: false
+    outputFormat: paragraph
+    dependencies:
+      - executive-summary
+      - mef-profile
+      - technology-dependencies
+      - gaps-followups
+    prompt: |
+      If supplementary notetaker notes are provided, reconcile them with the transcript analysis.
+
+      Write 2-3 paragraphs:
+
+      Paragraph 1 - "Notes Summary:" Summarize key points from the notetaker's notes
+      that add to or clarify the transcript. Highlight any details captured in notes
+      that were unclear in the audio.
+
+      Paragraph 2 - "Discrepancies:" Note any differences between the transcript analysis
+      and the notetaker's notes. These may indicate:
+      - Transcription errors (notetaker heard differently)
+      - Context the notetaker captured that wasn't in audio
+      - Different interpretations of the same statement
+
+      Paragraph 3 - "Integrated Findings:" Provide any corrections or additions to
+      the analysis based on the notes. Flag high-confidence corrections vs.
+      items that need clarification with the interviewee.
+
+      If no supplementary notes are available, write:
+      "No supplementary notetaker notes were provided for this analysis.
+      Consider requesting notes from the designated notetaker to verify
+      technical details and capture any information not in the audio recording."

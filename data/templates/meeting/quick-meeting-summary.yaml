@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Quick Meeting Summary
+description: Concise meeting summary for short meetings with purpose, key points, decisions, and actions
+icon: Zap
+category: meeting
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: meeting-purpose
+    name: Meeting Purpose
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide 1-2 sentences beginning with "Purpose:" explaining why the meeting was held and what it aimed to accomplish. Keep under 40 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: key-points
+    name: Key Points
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document 3-5 main takeaways using dash bullets:
+      - Point: [key information or discussion outcome]
+      Keep each bullet concise and impactful. Focus on what attendees need to remember.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: decisions
+    name: Decisions
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document decisions using dash bullets:
+      - Decision: [what was decided] | Owner: [who's responsible] | Effective: [when]
+      Only include concrete decisions made. If no decisions, state "No formal decisions made."
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: action-items
+    name: Action Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document actions with checkbox bullets:
+      - [ ] Action: [task] | Owner: [person] | Due: [date/timeframe]
+      Keep focused on concrete, trackable commitments.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: next-meeting
+    name: Next Meeting
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      If a follow-up was scheduled, provide one sentence beginning with "Next Meeting:" noting the date/time and focus. If no follow-up, state "No follow-up meeting scheduled."
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Brainstorming Session
+description: Brainstorming session capturing ideas, themes, top candidates, and validation next steps
+icon: Sparkles
+category: meeting
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: session-focus
+    name: Session Focus
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Challenge:" clearly stating the problem or opportunity being explored.
+      - Paragraph 2 must begin with "Constraints:" noting any boundaries, requirements, or assumptions in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: ideas-generated
+    name: Ideas Generated
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document all ideas using dash bullets:
+      - Idea: [concept] | Proposer: [person or "Group"] | Description: [brief explanation in <=20 words]
+      Capture all ideas proposed without filtering. Aim to document every concept mentioned.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: idea-categories
+    name: Idea Categories
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - ideas-generated
+    prompt: |
+      Group ideas into themes using dash bullets:
+      - Category: [theme name] | Ideas: [list of related ideas] | Common Thread: [what unifies them]
+      Cluster related ideas to identify patterns.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: top-candidates
+    name: Top Candidates
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - ideas-generated
+    prompt: |
+      Document highest-potential ideas using dash bullets:
+      - Idea: [concept] | Why Selected: [strengths] | Potential Impact: [expected benefit] | Feasibility: [High/Medium/Low] | Votes/Support: [if voting occurred]
+      Highlight the most promising ideas from the session.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: feasibility-notes
+    name: Feasibility Notes
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - top-candidates
+    prompt: |
+      Document feasibility considerations using dash bullets:
+      - Idea: [concept] | Challenge: [feasibility concern] | Requirement: [what would be needed] | Unknown: [what we don't know yet]
+      Capture practical considerations discussed.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: next-steps
+    name: Next Steps
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - top-candidates
+    prompt: |
+      Document follow-up actions with checkbox bullets:
+      - [ ] Action: [task] | Idea: [which concept it supports] | Owner: [person] | Due: [timeframe] | Output: [expected deliverable]
+      Include research, validation, and development tasks.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

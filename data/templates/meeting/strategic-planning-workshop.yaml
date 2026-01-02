@@ -1,0 +1,111 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Strategic Planning Workshop
+description: Strategic planning with vision, SWOT analysis, initiatives, resources, and implementation roadmap
+icon: Target
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: current-state-assessment
+    name: Current State Assessment
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Current Position:" summarizing where the organization/team stands today.
+      - Paragraph 2 must begin with "Key Challenges:" outlining the main obstacles and pressures being faced in <=70 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: vision-goals
+    name: "Vision & Goals"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document vision and goals using dash bullets:
+      - Type: [Vision/Goal/Objective] | Statement: [the aspiration] | Timeframe: [horizon] | Measure: [how success is defined]
+      Capture the desired future state and strategic goals.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: strategic-options
+    name: Strategic Options
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document options considered using dash bullets:
+      - Option: [strategic approach] | Pros: [advantages] | Cons: [disadvantages] | Recommendation: [Pursue/Consider/Reject]
+      Include different approaches discussed, not just the chosen one.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: swot-analysis
+    name: SWOT Analysis
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - current-state-assessment
+    prompt: |
+      Document SWOT using dash bullets:
+      - Category: [Strength/Weakness/Opportunity/Threat] | Item: [specific factor] | Impact: [significance] | Strategy: [how to leverage or address]
+      Capture internal and external factors discussed.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: prioritized-initiatives
+    name: Prioritized Initiatives
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - vision-goals
+      - swot-analysis
+    prompt: |
+      Document initiatives using dash bullets:
+      - Initiative: [strategic action] | Goal Supported: [which goal] | Priority: [1/2/3 or High/Medium/Low] | Owner: [accountable party] | Horizon: [timeline]
+      List strategic initiatives in priority order.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: resource-allocation
+    name: Resource Allocation
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - prioritized-initiatives
+    prompt: |
+      Document resource decisions using dash bullets:
+      - Resource: [budget/people/technology] | Allocation: [where it goes] | Amount: [quantity or %] | Rationale: [why this allocation]
+      Capture how resources will be deployed to support strategy.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: success-metrics
+    name: Success Metrics
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - vision-goals
+    prompt: |
+      Document KPIs using dash bullets:
+      - Metric: [measure] | Target: [goal value] | Baseline: [current value or "TBD"] | Frequency: [how often measured] | Owner: [who tracks it]
+      Define how strategic progress will be measured.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: implementation-roadmap
+    name: Implementation Roadmap
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - prioritized-initiatives
+    prompt: |
+      Document roadmap with checkbox bullets:
+      - [ ] Milestone: [deliverable] | Initiative: [which strategic initiative] | Target: [date/quarter] | Dependencies: [prerequisites] | Owner: [responsible party]
+      Outline the timeline for executing the strategy.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

@@ -1,0 +1,85 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# test coverage
+coverage/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE and editor folders
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# VS Code local history
+.history/
+
+# Media files (test recordings)
+*.mp4
+*.mp3
+*.wav
+*.webm
+*.ogg
+*.m4a
+
+# Claude/AI planning files
+.claude/
+
+# Previous repo history backup (created during RTASS conversion)
+.git-original-*/
+
+# Old prototypes (kept locally; not tracked in RTASS repo)
+OLD_Sites/
+
+# Local research materials (kept locally; not tracked by default)
+MEF_Interviews/
+
+# Generated files (rebuilt at dev/build time)
+lib/generated/
+
+# Generated worker assets (copied at dev/build time)
+public/workers/pdf.worker*.mjs
+public/workers/pdf.worker*.mjs.map
+
+# Local deployment docs (not for repo)
+*.local.md
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini

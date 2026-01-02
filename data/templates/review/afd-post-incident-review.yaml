@@ -1,0 +1,129 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: AFD Post-Incident Review (Narrative)
+description: Structured post-incident narrative aligned to AFD training review practices (incident overview, benchmarks, compliance, improvements, recommendations). Produces evidence-linked sections with timestamps.
+icon: ClipboardCheck
+category: review
+outputs:
+  - summary
+  - action_items
+  - decisions
+  - quotes
+
+sections:
+  - id: incident-overview
+    name: Incident Overview
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Write a concise incident overview in 6–10 sentences based ONLY on what is stated in the radio traffic.
+      Include (if present):
+      - Incident type (structure fire, MVC, rescue, etc.)
+      - Primary TAC / channel references
+      - First-arriving unit actions and initial conditions (Alpha/Bravo, smoke/fire location)
+      - Strategy/mode of operation (offensive/defensive/investigation)
+
+      Rules:
+      - Do not speculate. If unknown, state "Not stated in radio traffic."
+      - Use plain language suitable for training documentation.
+
+  - id: key-actions-and-timeline
+    name: Key Actions & Timeline
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Extract a time-ordered list of key operational events as dash bullets.
+      Each bullet MUST follow this format:
+      - [timestamp] Event: <short label> | Unit(s): <if known> | Notes: <1 sentence>
+
+      Focus on events that are commonly benchmarked or trained:
+      - arrival/on scene, command established, 360, mode/strategy declared
+      - water on fire, knockdown, under control, extinguished
+      - primary/secondary search complete, RIC established, safety officer assigned
+      - utilities shutoff, rehab, mayday (if any)
+
+      If timestamps are missing for an event, omit it rather than guessing.
+
+  - id: benchmark-observations
+    name: Benchmark Observations (Transcript-Only)
+    extractEvidence: true
+    outputFormat: table
+    prompt: |
+      Create a table with columns:
+      - Benchmark (label)
+      - Observed? (Yes/No)
+      - Evidence (short quote + [timestamp])
+      - Notes (1 sentence)
+
+      Include these benchmark labels (even if not observed):
+      - Command established
+      - First water on fire
+      - Primary search complete
+      - Secondary search complete
+      - Fire knocked down
+      - Fire under control
+      - Fire extinguished
+      - Water supply established
+      - Utilities shutoff
+
+      Rules:
+      - Mark "Observed? = No" if not explicitly stated in the transcript.
+      - Do not infer from context; rely on explicit radio statements.
+
+  - id: a1016-compliance-observations
+    name: A101.6 Compliance Observations (Transcript-Only)
+    extractEvidence: true
+    outputFormat: table
+    prompt: |
+      Create a table with columns:
+      - Policy Element (label)
+      - Observed? (Yes/No/Partial)
+      - Evidence (short quote + [timestamp])
+      - Notes (1 sentence)
+
+      Evaluate these elements ONLY using the radio traffic:
+      - Initial size-up includes structure/conditions
+      - Strategy/mode declared
+      - 360 attempted/complete/not complete reported
+      - Command transfer (if any) is structured
+      - CAN reports used (conditions/actions/needs)
+      - Divisions/groups announced (if any)
+      - RIC established (if any)
+      - Safety officer assigned (if any)
+
+      Rules:
+      - If an element is not present, mark Observed? = No.
+      - If partially present (e.g., conditions but no structure details), mark Partial.
+
+  - id: strengths-and-improvements
+    name: Strengths & Areas for Improvement
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Provide two subsections using dash bullets:
+
+      Strengths:
+      - <bullet>
+      - <bullet>
+
+      Areas for Improvement:
+      - <bullet>
+      - <bullet>
+
+      Rules:
+      - Keep each bullet to one sentence.
+      - Tie claims to what was said on the radio (no speculation).
+
+  - id: training-recommendations
+    name: Training Recommendations
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Provide 5–10 actionable training recommendations as dash bullets.
+      Each bullet must follow:
+      - Recommendation: <action> | Why: <brief> | Suggested drill: <brief>
+
+      Rules:
+      - Base recommendations only on observed communications and gaps.
+      - Do not recommend policy changes unless the transcript clearly indicates a recurring protocol miss.
+

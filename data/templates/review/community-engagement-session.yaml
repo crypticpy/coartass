@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Community Engagement Session
+description: Summarize resident priorities, concerns, quotes, and commitments from outreach events
+icon: Users2
+category: review
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: session-overview
+    name: Session Overview
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Session Context:" covering neighborhood, host, and purpose.
+      - Sentence 2 begins with "Attendance & Tone:" describing turnout, demographics, and overall sentiment in <=35 words.
+
+  - id: resident-priorities
+    name: Resident Priorities
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List priorities using dash bullets:
+      - Priority: [topic] | Neighborhood: [area] | Desired Outcome: [<=12 words] | Urgency: [High/Medium/Low]
+      Reflect the language residents used wherever possible.
+
+  - id: barriers-and-concerns
+    name: "Barriers & Concerns"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document barriers via dash bullets:
+      - Concern: [issue] | Impacted Group: [community] | Root Cause: [factor] | Severity: [High/Medium/Low]
+      Focus on obstacles the city must address.
+
+  - id: representative-quotes
+    name: Representative Quotes
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Provide quotes using dash bullets that respect this pattern:
+      - Speaker: [name or "Resident"] | Affiliation: [group/district] | Quote: "[<=30 words]" | Sentiment: [Support/Concern]
+      Quotes must be verbatim excerpts from the transcript.
+
+  - id: commitments-and-follow-ups
+    name: "Commitments & Follow-ups"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Record commitments with checkbox bullets:
+      - [ ] Owner: [department] | Follow-up: [task] | Due: [date/timeframe] | Community Contact: [person or "TBD"]
+      Ensure every item is actionable and time-bound.
+

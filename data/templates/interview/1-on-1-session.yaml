@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: "1-on-1 Session"
+description: Document manager-employee 1-on-1 discussions including feedback, goals, and development topics
+icon: User2
+category: interview
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: discussion-topics
+    name: Discussion Topics
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      List every topic discussed using dash bullets formatted as:
+      - Topic: [subject] | Summary: [1 sentence insight] | Sentiment: [Positive/Neutral/Concern]
+      Stick to one topic per bullet and keep the summary under 20 words.
+
+  - id: feedback-given
+    name: Feedback Given
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document manager-to-employee feedback with dash bullets using this structure:
+      - Type: [Positive/Constructive] | Feedback: [core message] | Example: [situation reference or "None"] | Importance: [Reason why it matters]
+      Quotes may appear inside the Feedback field but keep the overall line concise.
+
+  - id: feedback-received
+    name: Feedback Received
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture employee-to-manager feedback using dash bullets formatted as:
+      - Topic: [area of feedback] | Message: [concise statement] | Concern Level: [High/Medium/Low] | Manager Response: [commitment or "Not recorded"]
+      Only include substantive feedback that needs follow-up or acknowledgement.
+
+  - id: goals-and-development
+    name: "Goals & Development"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture growth objectives with dash bullets following this structure:
+      - Goal: [objective] | Horizon: [Short-term/Long-term] | Skill Focus: [skills/competencies] | Support Needed: [resources/mentorship or "None"]
+      Include both performance and career goals.
+
+  - id: commitments-and-next-steps
+    name: "Commitments & Next Steps"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List every commitment with dash bullets formatted as:
+      - Owner: [Manager/Team Member/Joint] | Commitment: [specific action] | Due: [date/timeframe or "TBD"] | Status: [New/Follow-up]
+      Only include concrete, trackable actions.
+

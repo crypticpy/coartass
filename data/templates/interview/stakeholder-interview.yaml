@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Stakeholder Interview
+description: Capture stakeholder insights, requirements, pain points, and goals from discovery interviews
+icon: Users
+category: interview
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: participant-background
+    name: Background/Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Summarize the stakeholder's background and context in two concise paragraphs that we can parse reliably.
+      - Paragraph 1 must begin with "Stakeholder:" and describe role, department, responsibilities, and relationship to the initiative.
+      - Paragraph 2 must begin with "Current Context:" and describe status quo, relevant history, past attempts, and situational factors.
+      Keep each paragraph under 80 words and avoid bullet lists or headings beyond the specified openers.
+
+  - id: research-questions
+    name: Requirements
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Extract every requirement mentioned. Use a single dash "-" bullet per requirement with this exact structure:
+      - Category: [Functional/Non-Functional/Business] | Priority: [Must-have/Should-have/Nice-to-have/Unstated] | Requirement: [concise description under 20 words]
+      Include both explicit and implied requirements. Do not use numbered lists or additional headings.
+
+  - id: key-findings
+    name: Pain Points
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - research-questions
+    prompt: |
+      Identify every pain point or frustration. Use dash bullets with the following structure:
+      - Pain Point: [problem] | Impact: [business effect] | Workaround: [current workaround or "None"] | Urgency: [High/Medium/Low or inferred]
+      Keep each field brief so downstream parsers can split on the pipe character.
+
+  - id: quotes
+    name: "Goals & Success Criteria"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - key-findings
+    prompt: |
+      Capture all goals and definitions of success. Use dash bullets with this structure:
+      - Goal: [objective] | KPI: [metric or "Not specified"] | Success Definition: [how they measure completion] | Horizon: [Short-term/Long-term/Both]
+      Include explicit statements first, then inferred goals.
+
+  - id: analysis
+    name: "Budget & Timeline"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - key-findings
+      - quotes
+    prompt: |
+      Capture all constraints using dash bullets with this structure:
+      - Budget: [range or "Not discussed"] | Timeline: [date/frame] | Resources: [availability] | Flexibility: [Budget/TIme/Scope priority or "Rigid"]
+      Mention any trade-offs directly in the field text; do not add extra bullets.
+
+  - id: follow-up-items
+    name: Follow-up Items
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      List every follow-up or open question using dash bullets formatted as:
+      - Type: [Question/Stakeholder/Data/Prototype/Decision] | Description: [specific ask] | Owner: [person/team or "Unassigned"] | Due: [date/timeframe or "TBD"]
+      Only include actionable, concrete items.
+

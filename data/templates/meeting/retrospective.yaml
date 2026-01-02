@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Retrospective
+description: "Analyze what went well, what didn't go well, lessons learned, and improvement actions"
+icon: RefreshCw
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: what-went-well
+    name: What Went Well
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List the wins using dash bullets with this structure:
+      - Item: [success] | Why: [reason it worked] | Impact: [team/project effect] | Repeatable: [Yes/No]
+      Include process, technical, and team highlights alike.
+
+  - id: what-didnt-go-well
+    name: "What Didn't Go Well"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document problems using dash bullets formatted as:
+      - Issue: [problem] | Impact: [effect] | Root Cause: [factor or "Unknown"] | Pattern: [Single/Recurring]
+      Keep language blameless and system-focused.
+
+  - id: lessons-learned
+    name: Lessons Learned
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture insights using dash bullets with:
+      - Lesson: [insight] | Evidence: [observation leading to it] | Application: [how to use it next time]
+      Focus on actionable guidance, not generic statements.
+
+  - id: action-items-for-improvement
+    name: Action Items for Improvement
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List committed improvements using checkbox bullets that mirror Meeting Minutes:
+      - [ ] Action: [change to implement] | Owner: [person/team] | Due: [date/timeframe] | Success Metric: [measurement] | Priority: [High/Medium/Low]
+      Only include concrete commitments.
+
+  - id: team-feedback
+    name: Team Feedback
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two short paragraphs so we can parse labeled sentiment:
+      - Paragraph 1 must start with "Morale:" and summarize energy, recognition, and appreciation signals.
+      - Paragraph 2 must start with "Collaboration:" and cover communication themes, concerns, and feedback on the retro itself.
+      Keep paragraphs under 70 words each.
+

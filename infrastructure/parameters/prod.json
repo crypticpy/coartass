@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "value": "prod"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "baseName": {
+      "value": "mtranscriber"
+    },
+    "imageTag": {
+      "value": "latest"
+    },
+    "enableKeyVault": {
+      "value": true
+    },
+    "azureOpenAIApiVersion": {
+      "value": "2024-08-01-preview"
+    },
+    "azureOpenAIWhisperDeployment": {
+      "value": "whisper-1"
+    },
+    "azureOpenAIGPTDeployment": {
+      "value": "gpt-4o"
+    },
+    "tags": {
+      "value": {
+        "project": "meeting-transcriber",
+        "environment": "prod",
+        "managedBy": "bicep",
+        "criticality": "high"
+      }
+    }
+  }
+}

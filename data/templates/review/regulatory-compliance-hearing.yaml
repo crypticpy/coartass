@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Regulatory Compliance Hearing
+description: Capture findings, testimony, and orders from compliance hearings
+icon: Scale
+category: review
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: case-overview
+    name: Case Overview
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Subject/Site:" noting operator, site, and permit context.
+      - Sentence 2 begins with "Issue Summary:" describing violations and inspection dates in <=60 words.
+
+  - id: regulatory-findings
+    name: Regulatory Findings
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List findings using dash bullets:
+      - Finding: [violation] | Citation: [code/reference] | Severity: [High/Medium/Low] | Evidence Ref: [timestamp or exhibit]
+      Include each discrete violation cited.
+
+  - id: mitigation-plans
+    name: Mitigation Plans
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document mitigation steps via dash bullets:
+      - Plan: [action] | Responsible Party: [entity] | Timeline: [date/window] | Status: [Proposed/Approved/In Progress]
+      Capture both immediate and long-term remedies.
+
+  - id: testimony-highlights
+    name: Testimony Highlights
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Summarize testimony with dash bullets:
+      - Speaker: [name/role] | Position: [support/concern] | Quote: "[<=25 words]" | Key Point: [<=10 words]
+      Include city staff, residents, and regulated parties.
+
+  - id: orders-and-deadlines
+    name: "Orders & Deadlines"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture formal orders via dash bullets:
+      - Order: [requirement] | Due Date: [date] | Penalty: [amount/consequence or "Warning"] | Monitoring: [responsible unit]
+      Only include directives issued during the hearing.
+

@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Process Mapping Workshop
+description: Collaborative workshop to map current state processes, roles, handoffs, and improvement opportunities
+icon: GitBranch
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: process-scope
+    name: Process Scope
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Process Name & Purpose:" identifying the process being mapped and its business objective.
+      - Paragraph 2 must begin with "Boundaries:" defining the trigger event, end state, and what's excluded in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: current-state-map
+    name: Current State Map
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - process-scope
+    prompt: |
+      Document the as-is process using dash bullets:
+      - Step: [number] | Activity: [description] | Actor: [role/department] | System: [tool used or "Manual"] | Duration: [time if mentioned] | Notes: [observations]
+      Capture the process as it currently operates, not the ideal state.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: roles-responsibilities
+    name: "Roles & Responsibilities"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document roles using dash bullets:
+      - Role: [title/department] | Responsibilities: [what they do in process] | Authority: [decisions they can make] | RACI: [Responsible/Accountable/Consulted/Informed]
+      Clarify who does what and who has decision authority.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: handoffs-decision-points
+    name: "Handoffs & Decision Points"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - current-state-map
+      - roles-responsibilities
+    prompt: |
+      Identify critical junctures using dash bullets:
+      - Type: [Handoff/Decision] | Location: [between which steps] | Participants: [roles involved] | Criteria: [rules for decisions or "Informal"] | Risk: [potential issues]
+      Focus on points where work transfers between people or decisions branch the process.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: metrics-kpis
+    name: "Metrics & KPIs"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List process metrics using dash bullets:
+      - Metric: [name] | Current Value: [measurement or "Not tracked"] | Target: [goal or "Not defined"] | Owner: [who tracks it]
+      Include cycle time, volume, quality, and cost metrics discussed.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: gaps-opportunities
+    name: "Gaps & Improvement Opportunities"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - current-state-map
+      - roles-responsibilities
+    prompt: |
+      Document improvement opportunities using dash bullets:
+      - Gap/Opportunity: [issue or improvement] | Type: [Automation/Elimination/Simplification/Integration] | Priority: [High/Medium/Low] | Effort: [estimate or "TBD"]
+      Capture inefficiencies, redundancies, and improvement ideas identified.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

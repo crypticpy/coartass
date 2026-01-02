@@ -1,0 +1,96 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Meeting Minutes
+description: Comprehensive meeting documentation with attendees, agenda items, discussions, decisions, and action items
+icon: FileText
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: attendees
+    name: Attendees
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Extract all meeting attendees from the transcript. List each person who participated in the meeting, including their name and role if mentioned. Format as a bullet list with the following structure:
+      - [Name] - [Role/Title] (if mentioned)
+
+      If multiple speakers are identified, include them all. If roles are not explicitly stated, just list the names.
+
+  - id: agenda-items
+    name: Agenda Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Identify and list all agenda items or topics discussed during the meeting. Extract the main topics that were covered, presented, or brought up for discussion. Format as a numbered list with brief descriptions:
+      1. [Topic Name]: [Brief one-sentence description]
+
+      Focus on the planned or stated agenda items, as well as any emergent topics that received significant discussion time.
+
+  - id: key-discussions
+    name: Key Discussions
+    extractEvidence: true
+    outputFormat: paragraph
+    dependencies:
+      - agenda-items
+    prompt: |
+      Summarize the key discussions and deliberations from the meeting. For each major topic, provide:
+      - The main points raised
+      - Different perspectives or opinions expressed
+      - Important context or background information shared
+      - Questions asked and answers provided
+
+      Structure this as paragraphs organized by topic. Focus on substance over procedural matters. Include who said what when it adds important context.
+
+  - id: decisions-made
+    name: Decisions Made
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - agenda-items
+      - key-discussions
+    prompt: |
+      Extract the most important decisions, resolutions, or conclusions reached during the meeting. Focus on high-impact choices or policy changes rather than minor acknowledgements. For each decision, specify:
+      - What was decided
+      - Who made or approved the decision (if mentioned)
+      - Any conditions, caveats, or timeline associated with the decision
+      - The reasoning or justification provided (if any)
+
+      Output no more than 6 decisions for meetings under 45 minutes and no more than 10 for longer sessions unless the transcript clearly documents a larger number of discrete decisions. If many trivial acknowledgements occur, summarize them in one bullet rather than listing each individually. Format as a bullet list and ignore vague commitments like "we should look into" unless a concrete decision was made.
+
+  - id: action-items
+    name: Action Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - decisions-made
+      - agenda-items
+    prompt: |
+      Identify all action items, tasks, and commitments from the meeting. For each action item, extract:
+      - The specific task or action to be taken
+      - Who is responsible (assignee)
+      - Deadline or timeframe (if mentioned)
+      - Any dependencies or prerequisites
+
+      Format as a checklist with clear ownership:
+      - [ ] [Task description] - Assigned to: [Person] - Due: [Date/Timeframe]
+
+      Only include concrete, actionable tasks with clear owners when possible. If no owner is specified, note "Unassigned".
+
+  - id: next-steps
+    name: Next Steps
+    extractEvidence: false
+    outputFormat: paragraph
+    dependencies:
+      - action-items
+    prompt: |
+      Summarize the next steps and future plans discussed. This should include:
+      - Upcoming meetings or follow-up sessions planned
+      - Topics to be revisited or continued in future discussions
+      - Information that needs to be gathered before next meeting
+      - Any parking lot items or deferred topics
+
+      Write as a concise paragraph focusing on forward-looking commitments and continuity.

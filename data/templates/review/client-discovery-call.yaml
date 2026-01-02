@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Client Discovery Call
+description: Capture client business context, challenges, requirements, and success criteria from discovery calls
+icon: Phone
+category: review
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: business-context
+    name: Business Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Summarize the client's business context in two short paragraphs so downstream systems can parse labels.
+      - Paragraph 1 must start with "Company Snapshot:" and describe industry, scale, current model, and market position.
+      - Paragraph 2 must start with "Strategic Context:" and cover initiatives, transformation efforts, and forces shaping their direction.
+      Keep each paragraph under 80 words.
+
+  - id: current-challenges
+    name: Current Challenges
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Extract every challenge using dash bullets formatted as:
+      - Challenge: [problem] | Impact: [business effect] | Duration: [timeframe or "Unknown"] | Attempts: [previous solutions or "None"] | Urgency: [High/Medium/Low]
+      Use direct language from the client when available.
+
+  - id: requirements-and-needs
+    name: "Requirements & Needs"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document every requirement with dash bullets using this structure:
+      - Requirement: [capability] | Priority: [Must-have/Important/Nice-to-have] | Type: [Feature/Integration/Support/Scale/etc.] | Detail: [concise qualifier]
+      Include inferred needs after explicit ones, but keep the same format.
+
+  - id: constraints-and-considerations
+    name: "Constraints & Considerations"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Identify every constraint with dash bullets formatted as:
+      - Constraint: [description] | Type: [Budget/Timeline/Technical/Org/Compliance/Risk] | Detail: [specifics] | Flexibility: [High/Medium/Low]
+      Include decision-making or approval considerations under the Type that best fits.
+
+  - id: success-criteria
+    name: Success Criteria
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture success definitions using dash bullets structured as:
+      - Criterion: [metric/outcome] | Target: [quantified goal or "Qualitative"] | Evaluation: [how they'll judge success] | Win Definition: [what makes it a win]
+      Reference any ROI expectations within the Target field.
+
+  - id: next-steps
+    name: Next Steps
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List all follow-up steps using dash bullets formatted as:
+      - Owner: [Our Team/Client/Joint] | Action: [specific task] | Deliverable: [artifact/meeting or "N/A"] | Timing: [date/timeframe] | Dependency: [prereq or "None"]
+      Ensure every action is concrete and time-bound.
+

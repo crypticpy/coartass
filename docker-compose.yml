@@ -1,0 +1,222 @@
+# ============================================================================
+# Meeting Transcriber - Docker Compose Configuration
+# ============================================================================
+# Purpose: Local development and testing with Docker
+# Usage: docker-compose up
+# ============================================================================
+# NOTE: 'version' field is deprecated in Docker Compose V2 and removed
+
+services:
+  # ==========================================================================
+  # Main Application Service
+  # ==========================================================================
+  app:
+    # Build configuration
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Build for local architecture (ARM64 for M1/M2, x86_64 for Intel)
+      # Uncomment platform to force x86_64 for Azure compatibility testing
+      # platform: linux/amd64
+
+    # Container name
+    container_name: meeting-transcriber
+
+    # Image name and tag
+    image: meeting-transcriber:local
+
+    # Port mapping: host:container
+    # Access application at http://localhost:3000
+    ports:
+      - "3000:3000"
+
+    # Environment variables
+    # IMPORTANT: For security, use .env file instead of hardcoding values here
+    environment:
+      # Node environment
+      - NODE_ENV=production
+
+      # Application settings
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+
+      # Azure OpenAI Configuration (Option 1 - Recommended)
+      # Uncomment and fill in your Azure OpenAI credentials
+      # Or use env_file to load from .env.local
+      # - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      # - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      # - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-08-01-preview}
+      # - AZURE_OPENAI_WHISPER_DEPLOYMENT=${AZURE_OPENAI_WHISPER_DEPLOYMENT:-whisper-1}
+      # - AZURE_OPENAI_GPT4_DEPLOYMENT=${AZURE_OPENAI_GPT4_DEPLOYMENT:-gpt-4}
+
+      # Standard OpenAI Configuration (Option 2 - Alternative)
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - OPENAI_ORGANIZATION_ID=${OPENAI_ORGANIZATION_ID}
+
+    # Load environment variables from file
+    # Create .env.local with your actual credentials
+    env_file:
+      - .env.local
+
+    # Volume mounts (optional, for development)
+    # Uncomment to enable hot-reload during development
+    # Note: This requires running 'npm run dev' instead of production build
+    # volumes:
+    #   - ./app:/app/app:ro
+    #   - ./components:/app/components:ro
+    #   - ./lib:/app/lib:ro
+    #   - ./public:/app/public:ro
+
+    # Restart policy
+    # always: restart on failure and Docker daemon restart
+    # on-failure: only restart on failure
+    # unless-stopped: restart unless explicitly stopped
+    restart: unless-stopped
+
+    # Security options - prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+
+    # Drop all capabilities (container doesn't need special permissions)
+    cap_drop:
+      - ALL
+
+    # Health check configuration
+    # Docker will monitor application health
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits (optional, recommended for production-like testing)
+    # Uncomment to limit container resources
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2'
+    #       memory: 2G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Network configuration
+    networks:
+      - meeting-transcriber-network
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  meeting-transcriber-network:
+    driver: bridge
+    name: meeting-transcriber-network
+
+# ==========================================================================
+# Volumes (if needed for persistent data)
+# ==========================================================================
+# Uncomment if you need persistent storage
+# volumes:
+#   app-data:
+#     name: meeting-transcriber-data
+
+# ============================================================================
+# Usage Instructions
+# ============================================================================
+#
+# 1. Setup Environment Variables:
+#    cp .env.local.example .env.local
+#    # Edit .env.local with your API credentials
+#
+# 2. Build and Start:
+#    docker-compose up --build
+#
+# 3. Start (without rebuilding):
+#    docker-compose up
+#
+# 4. Start in Background:
+#    docker-compose up -d
+#
+# 5. View Logs:
+#    docker-compose logs -f
+#
+# 6. Stop:
+#    docker-compose down
+#
+# 7. Stop and Remove Volumes:
+#    docker-compose down -v
+#
+# 8. Rebuild from Scratch:
+#    docker-compose build --no-cache
+#    docker-compose up
+#
+# ============================================================================
+# Development Mode
+# ============================================================================
+#
+# To run in development mode with hot-reload:
+#
+# 1. Create docker-compose.dev.yml:
+#    version: '3.8'
+#    services:
+#      app:
+#        build:
+#          target: deps
+#        command: npm run dev
+#        volumes:
+#          - ./app:/app/app
+#          - ./components:/app/components
+#          - ./lib:/app/lib
+#        environment:
+#          - NODE_ENV=development
+#
+# 2. Run with development override:
+#    docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# ============================================================================
+# Testing Azure Build
+# ============================================================================
+#
+# To test Azure-compatible build (x86_64 platform):
+#
+# 1. Update docker-compose.yml:
+#    Uncomment: platform: linux/amd64
+#
+# 2. Build and run:
+#    docker-compose up --build
+#
+# 3. Verify architecture:
+#    docker-compose exec app uname -m
+#    # Should output: x86_64
+#
+# ============================================================================
+# Troubleshooting
+# ============================================================================
+#
+# Issue: "Cannot connect to Docker daemon"
+# Solution: Ensure Docker Desktop is running
+#
+# Issue: "Port 3000 already in use"
+# Solution: Change port mapping to "3001:3000" or stop other service
+#
+# Issue: "Build fails with platform error"
+# Solution: Install buildx: docker buildx install
+#
+# Issue: "Environment variables not loading"
+# Solution: Ensure .env.local exists and has correct format
+#
+# Issue: "Health check failing"
+# Solution: Check application logs: docker-compose logs app
+#
+# Issue: "Container restarts continuously"
+# Solution: Check logs for errors: docker-compose logs -f app
+#
+# ============================================================================

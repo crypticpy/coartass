@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Council/City Manager Briefing
+description: Executive briefing for council and city manager with policy implications and strategic decisions
+icon: Building2
+category: meeting
+outputs:
+  - summary
+  - decisions
+
+sections:
+  - id: executive-summary
+    name: Executive Summary
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide 3-5 sentences capturing the essential information an executive needs:
+      Begin with "Summary:" and include the meeting purpose, key outcomes, and most important decision or issue requiring attention. Keep under 100 words and focus on strategic significance.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: policy-implications
+    name: Policy Implications
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document policy impacts using dash bullets:
+      - Policy Area: [domain affected] | Implication: [how policy is impacted] | Action Needed: [legislative/administrative action or "Informational only"] | Timeline: [urgency]
+      Focus on items that affect city policy or direction.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: key-decisions-required
+    name: Key Decisions Required
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document decisions needing executive action using dash bullets:
+      - Decision: [what needs to be decided] | Options: [choices available] | Recommendation: [staff recommendation] | Deadline: [when decision needed] | Impact: [consequence of delay]
+      Focus on items requiring council or city manager authorization.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: budget-resource-impact
+    name: Budget/Resource Impact
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document financial implications using dash bullets:
+      - Item: [expenditure or resource] | Amount: [$ or FTE] | Source: [fund/budget line] | Timing: [when needed] | Approval Required: [Yes/No and level]
+      Include both immediate and long-term financial impacts.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: community-impact
+    name: Community Impact
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document constituent considerations using dash bullets:
+      - Stakeholder: [community group] | Impact: [how they're affected] | Sentiment: [expected reaction] | Communication: [outreach needed or "None"]
+      Highlight impacts on residents, businesses, and community groups.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: recommended-actions
+    name: Recommended Actions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - key-decisions-required
+      - budget-resource-impact
+    prompt: |
+      Document recommended executive actions using dash bullets:
+      - Action: [what leadership should do] | Rationale: [why recommended] | Timeline: [when] | Owner: [responsible department]
+      Provide clear, actionable recommendations for leadership.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

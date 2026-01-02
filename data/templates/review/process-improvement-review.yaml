@@ -1,0 +1,87 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Process Improvement Review
+description: Review of process improvement initiatives with root cause analysis, proposals, and implementation plans
+icon: TrendingUp
+category: review
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: process-overview
+    name: Process Overview
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Process Under Review:" identifying the process and why improvement is needed.
+      - Paragraph 2 must begin with "Improvement Goals:" stating the desired outcomes and success criteria in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: current-performance
+    name: Current Performance
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document baseline metrics using dash bullets:
+      - Metric: [name] | Current: [value] | Target: [goal] | Gap: [difference] | Trend: [Improving/Stable/Declining]
+      Include quantitative measures of current process performance.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: root-cause-analysis
+    name: Root Cause Analysis
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - current-performance
+    prompt: |
+      Document root causes using dash bullets:
+      - Problem: [symptom observed] | Root Cause: [underlying reason] | Evidence: [how we know] | Category: [People/Process/Technology/Policy]
+      Focus on systemic causes rather than symptoms.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: proposed-changes
+    name: Proposed Changes
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - root-cause-analysis
+    prompt: |
+      Document recommendations using dash bullets:
+      - Change: [proposed modification] | Addresses: [root cause it solves] | Type: [Quick Win/Medium/Major] | Owner: [responsible party]
+      Include both approved and discussed-but-pending proposals.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: impact-assessment
+    name: Impact Assessment
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - proposed-changes
+    prompt: |
+      Assess impacts using dash bullets:
+      - Change: [proposed modification] | Benefit: [expected improvement] | Risk: [potential downside] | Affected Areas: [departments/systems impacted]
+      Evaluate both positive impacts and implementation risks.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: implementation-plan
+    name: Implementation Plan
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - proposed-changes
+      - impact-assessment
+    prompt: |
+      Document implementation steps with checkbox bullets:
+      - [ ] Action: [task] | Owner: [person/team] | Due: [date/timeframe] | Dependency: [prerequisite or "None"] | Status: [Not Started/In Progress]
+      Include sequenced actions for implementing approved changes.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

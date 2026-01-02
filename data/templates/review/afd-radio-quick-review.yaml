@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: AFD Radio Quick Review
+description: Fast, trainer-friendly review of fireground radio traffic focused on command, CAN, and benchmark announcements. Designed for quick classroom playback and discussion.
+icon: Radio
+category: review
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: quick-summary
+    name: Quick Summary
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Write a concise 4–6 sentence summary of what happened based ONLY on the radio traffic.
+      Include: initial conditions, command/strategy, major milestones (if stated), and overall communication quality.
+      Do not speculate.
+
+  - id: compliance-checklist
+    name: Compliance Checklist (Transcript-Only)
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Produce a checklist using dash bullets with this format:
+      - [Met/Missed/Not Observed] <item> — Evidence: "<short quote>" [timestamp]
+
+      Checklist items:
+      - Arrival/on scene announced
+      - Command assumed
+      - Strategy/mode declared
+      - 360 reported (attempted/complete/not complete)
+      - CAN report(s) present
+      - Primary search complete announced
+      - Knockdown announced
+      - Under control announced
+
+      Rules:
+      - Use Not Observed if not explicitly stated.
+      - Evidence is required for Met/Missed whenever possible.
+
+  - id: coaching-points
+    name: Coaching Points
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Provide 5 coaching points as dash bullets.
+      Each bullet must be phrased as a coaching statement (what to do next time), and should reference an observed example or gap.
+

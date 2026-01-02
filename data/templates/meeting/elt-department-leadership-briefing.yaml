@@ -1,0 +1,81 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: ELT/Department Leadership Briefing
+description: Leadership briefing with department updates, cross-functional issues, and operational decisions
+icon: Briefcase
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: briefing-overview
+    name: Briefing Overview
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Purpose:" stating the briefing objective and key topics covered.
+      - Paragraph 2 must begin with "Attendees:" listing leadership present and their departments in <=50 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: department-updates
+    name: Department Updates
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document department status using dash bullets:
+      - Department: [name] | Presenter: [person] | Key Update: [main point] | Status: [Green/Yellow/Red] | Support Needed: [request or "None"]
+      Summarize each department's status report.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: cross-functional-issues
+    name: Cross-Functional Issues
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document cross-departmental items using dash bullets:
+      - Issue: [problem or opportunity] | Departments Involved: [list] | Status: [current state] | Resolution Path: [approach] | Owner: [lead department]
+      Capture items spanning multiple departments.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: resource-requests
+    name: Resource Requests
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document resource asks using dash bullets:
+      - Request: [what's needed] | Requesting Dept: [who] | Amount: [quantity/$] | Justification: [why needed] | Decision: [Approved/Pending/Denied]
+      Include budget, staffing, and equipment requests.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: decisions-made
+    name: Decisions Made
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document leadership decisions using dash bullets:
+      - Decision: [what was decided] | Owner: [accountable party] | Timeline: [implementation date] | Communication: [who needs to know]
+      Capture operational decisions finalized at this level.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: elt-action-items
+    name: Action Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - decisions-made
+      - cross-functional-issues
+    prompt: |
+      Document follow-up tasks with checkbox bullets:
+      - [ ] Action: [task] | Owner: [department/person] | Due: [date] | Escalate To: [if needed or "N/A"]
+      Track commitments made during the briefing.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

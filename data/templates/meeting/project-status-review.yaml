@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Project Status Review
+description: Track project progress, completed work, blockers, risks, and upcoming milestones
+icon: CheckCircle2
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: project-overview
+    name: Completed Work
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List every significant completion using dash bullets with strict structure:
+      - Item: [deliverable] | Owner: [person/team or "Multiple"] | Outcome: [result or impact] | Timeliness: [On track/Delayed/Early]
+      Only capture meaningful milestones or features.
+
+  - id: progress-report
+    name: In Progress Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - project-overview
+    prompt: |
+      Capture all active work using dash bullets with this format:
+      - Item: [workstream/task] | Owner: [person/team] | Status: [progress % or descriptor] | ETA: [date or timeframe] | Dependencies: [blocking item or "None"]
+      Indicate delays or risks inside the Status or Dependencies fields.
+
+  - id: challenges
+    name: "Blockers & Challenges"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - progress-report
+    prompt: |
+      Identify every blocker or challenge using dash bullets:
+      - Blocker: [issue] | Impact: [timeline/scope/quality] | Blocked: [team/task] | Mitigation: [plan or "Pending"] | Escalation: [decision needed or "None"]
+      Mark hard stops vs. friction in the Impact or Mitigation text.
+
+  - id: solutions-proposed
+    name: "Risks & Issues"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - challenges
+    prompt: |
+      Record every risk with dash bullets formatted as:
+      - Risk: [description] | Likelihood: [High/Medium/Low] | Impact: [High/Medium/Low] | Mitigation: [plan or "None"] | Owner: [person/team]
+      If an issue has already occurred, set Likelihood to "Occurred" and capture context in Mitigation.
+
+  - id: action-items-review
+    name: Next Milestones
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - solutions-proposed
+    prompt: |
+      List future milestones using dash bullets with this structure:
+      - Milestone: [name] | Target Date: [date] | Dependency: [prereq or "None"] | Confidence: [High/Medium/Low] | Notes: [risk or highlight]
+      Highlight slipping items explicitly in the Notes field.
+

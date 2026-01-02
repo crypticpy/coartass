@@ -1,0 +1,65 @@
+import type { TourConfig } from './types';
+
+export const analysisTour: TourConfig = {
+  id: 'analysis',
+  name: 'Run AI Analysis',
+  description: 'Learn how to get AI-powered insights from your transcripts',
+  steps: [
+    {
+      id: 'analysis-nav',
+      target: 'nav-transcripts',
+      title: 'Start from Transcripts',
+      content: 'First, go to your transcripts to select one for analysis.',
+      placement: 'bottom',
+      route: '/',
+    },
+    {
+      id: 'analysis-open',
+      target: 'transcript-card',
+      title: 'Select a Transcript',
+      content: 'Click on a transcript to open it. You can run analysis on any completed transcription.',
+      placement: 'right',
+      route: '/transcripts',
+    },
+    {
+      id: 'analysis-button',
+      target: 'analyze-button',
+      title: 'Start Analysis',
+      content: 'Click the Analyze button to begin AI-powered analysis of your transcript.',
+      placement: 'bottom',
+      route: '/transcripts',
+    },
+    {
+      id: 'analysis-template',
+      target: 'template-selector',
+      title: 'Choose a Template',
+      content: 'Select an analysis template that matches your meeting type. Different templates extract different insights.',
+      placement: 'bottom',
+      route: '/transcripts',
+    },
+    {
+      id: 'analysis-strategy',
+      target: 'strategy-selector',
+      title: 'Select Strategy',
+      content: 'Choose an analysis strategy based on your transcript length. Auto-select is recommended for most cases.',
+      placement: 'top',
+      route: '/transcripts',
+    },
+    {
+      id: 'analysis-run',
+      target: 'run-analysis-button',
+      title: 'Run Analysis',
+      content: 'Click to start the analysis. This may take 1-3 minutes depending on transcript length.',
+      placement: 'top',
+      route: '/transcripts',
+    },
+    {
+      id: 'analysis-results',
+      target: 'analysis-tab',
+      title: 'View Results',
+      content: 'Once complete, your analysis appears in a new tab. View summaries, action items, decisions, and key quotes.',
+      placement: 'bottom',
+      route: '/transcripts',
+    },
+  ],
+};

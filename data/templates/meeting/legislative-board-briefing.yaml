@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: "Legislative & Board Briefing"
+description: Capture council/board briefing highlights, public comment themes, motions, and directives
+icon: Gavel
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: briefing-overview
+    name: Briefing Overview
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two concise paragraphs for deterministic parsing.
+      - Paragraph 1 must begin with "Meeting Focus:" and summarize agenda scope, presenters, and policy areas.
+      - Paragraph 2 must begin with "Key Outcomes:" and highlight overall tone plus top results in under 80 words.
+
+  - id: department-highlights
+    name: Department Highlights
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List every department briefing using dash bullets with this structure:
+      - Department: [name] | Topic: [subject] | Highlight: [<=15 words] | Follow-up: [needed action or "None"]
+      Include only substantive updates delivered to council/board.
+
+  - id: public-comment-themes
+    name: Public Comment Themes
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Summarize public comment trends using dash bullets:
+      - Theme: [topic] | Concern: [brief detail] | District/Area: [identifier or "Citywide"] | Frequency: [High/Medium/Low]
+      Capture recurring sentiments rather than individual anecdotes.
+
+  - id: motions-and-votes
+    name: "Motions & Votes"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document every motion considered using dash bullets:
+      - Motion: [title] | Sponsor: [member] | Vote: [result or tally] | Follow-up: [implementation step or "None"]
+      Only include motions that reached deliberation.
+
+  - id: action-directives
+    name: Action Directives
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture directives assigned by council/board using checkbox bullets:
+      - [ ] Directive: [task] | Owner: [department/office] | Due: [date/timeframe] | Status: [New/Extended]
+      Ensure each directive is concrete and traceable.
+
+  - id: announcements-and-next-session
+    name: "Announcements & Next Session"
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two labeled sentences for clarity.
+      - Sentence 1 must start with "Announcements:" and note key reminders or proclamations.
+      - Sentence 2 must start with "Next Session:" and mention planned date/themes in <=30 words.
+

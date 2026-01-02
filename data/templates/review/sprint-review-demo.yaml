@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Sprint Review / Demo
+description: Sprint review with demo highlights, stakeholder feedback, and backlog updates
+icon: Presentation
+category: review
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: sprint-summary
+    name: Sprint Summary
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two concise paragraphs:
+      - Paragraph 1 must begin with "Completed:" summarizing what was delivered this sprint vs. what was planned.
+      - Paragraph 2 must begin with "Velocity:" noting points completed, carry-over items, and any significant variances in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: demo-highlights
+    name: Demo Highlights
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document demonstrated features using dash bullets:
+      - Feature: [name] | Demo'd By: [person] | Status: [Complete/Partial/In Progress] | Reaction: [stakeholder response summary]
+      Focus on features that were shown during the demo.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: stakeholder-feedback
+    name: Stakeholder Feedback
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - demo-highlights
+    prompt: |
+      Capture stakeholder feedback using dash bullets:
+      - Stakeholder: [name/role] | Feedback: [comment] | Type: [Praise/Concern/Request/Question] | Action Needed: [Yes/No]
+      Include both positive feedback and concerns raised.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: backlog-updates
+    name: Backlog Updates
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - stakeholder-feedback
+    prompt: |
+      Record backlog changes using dash bullets:
+      - Change: [addition/reprioritization/removal] | Item: [story/feature] | Reason: [rationale] | Priority: [new priority or "TBD"]
+      Include new items added and any reprioritization decisions.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: review-action-items
+    name: Action Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - stakeholder-feedback
+      - backlog-updates
+    prompt: |
+      List follow-up actions with checkbox bullets:
+      - [ ] Action: [task] | Owner: [person] | Due: [date/timeframe] | Source: [feedback item or discussion]
+      Only include concrete, actionable follow-ups from the review.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

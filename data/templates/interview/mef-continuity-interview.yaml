@@ -1,0 +1,275 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: MEF Continuity Interview
+description: Capture Mission Essential Function details including criticality, dependencies, technology, continuity objectives, and operational resilience
+icon: ShieldCheck
+category: interview
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: interview-context
+    name: Interview Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two labeled paragraphs summarizing the interview context:
+      - Paragraph 1 must begin with "MEF Overview:" and identify the Mission Essential Function being documented, the MEF ID from the master list (if mentioned), and the program/service area it supports.
+      - Paragraph 2 must begin with "Participants:" and list who participated in the interview, their roles/titles, and the interview format (in-person, virtual, etc.).
+      Keep each paragraph under 60 words. If the MEF ID is not explicitly stated, note "MEF ID: Not captured."
+
+  - id: ownership-contacts
+    name: "Ownership & Contacts"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Extract ownership and contact information using dash bullets with this structure:
+      - Primary Owner: [name] | Title: [role] | Department: [unit]
+      - Backup Owner: [name] | Title: [role] | Department: [unit]
+      - Operational Contact: [name] | Role: [function] | Contact: [email/phone or "Not provided"]
+      
+      If any contact is not specified, note "Not captured" in the relevant field. Include succession or escalation path if mentioned.
+
+  - id: criticality-assessment
+    name: Criticality Assessment
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - interview-context
+    prompt: |
+      Document the criticality assessment using dash bullets:
+      - Criticality Tier: [Mission Critical/Business Critical/Business Operational/Administrative Services] | Justification: [brief reason]
+      - Maximum Tolerable Downtime (MTD): [timeframe, e.g., "4 hours", "24 hours", "3 days"] | Context: [why this threshold]
+      - Public Health Impact: [High/Medium/Low] | Detail: [brief explanation]
+      - Legal/Regulatory Impact: [High/Medium/Low] | Detail: [brief explanation]
+      - Financial Impact: [High/Medium/Low] | Detail: [brief explanation]
+      - Reputational/Political Impact: [High/Medium/Low] | Detail: [brief explanation]
+      - Overall Risk Rating: [High/Medium/Low] | Rationale: [considering likelihood and impact]
+      
+      If any assessment is not discussed, note "Not assessed" rather than guessing.
+
+  - id: compliance-partners
+    name: "Compliance & External Dependencies"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - criticality-assessment
+    prompt: |
+      Document regulatory and external dependencies using dash bullets:
+      - Laws/Regulations: List each applicable law, regulation, grant requirement, or policy governing this MEF
+        Format: - Regulation: [name/code] | Type: [Federal/State/Local/Grant/Contract] | Requirement: [brief description]
+      - External Partners: List each external partner this MEF depends on
+        Format: - Partner: [organization] | Type: [State Agency/Vendor/Hospital/Lab/Community Org/Other] | Dependency: [what they provide] | Criticality: [High/Medium/Low]
+      - Citywide Services: List any City-wide services (CTM/network, HR, Finance, Fleet, Facilities) this MEF depends on
+        Format: - Service: [name] | Department: [provider] | Dependency: [what it provides]
+      
+      If no dependencies exist in a category, explicitly state "None identified."
+
+  - id: continuity-objectives
+    name: Continuity Objectives
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - criticality-assessment
+    prompt: |
+      Document recovery and service level objectives using dash bullets:
+      - Recovery Time Objective (RTO): [timeframe] | Context: [what "acceptable level" means for this MEF]
+      - Recovery Point Objective (RPO): [data loss tolerance, e.g., "no data loss", "up to 4 hours", "1 day"] | Impact: [what data loss means]
+      - Minimum Service Level: Describe the reduced operating mode acceptable during emergencies:
+        Format: - Must Continue: [critical activities that cannot stop]
+        Format: - Can Reduce: [activities that can be scaled back]
+        Format: - Can Pause: [activities that can temporarily stop]
+      
+      Be specific about what "minimum acceptable" means for this MEF. If not discussed, note "Not defined."
+
+  - id: operational-resilience
+    name: Operational Resilience
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - continuity-objectives
+    prompt: |
+      Document workarounds, locations, and operating parameters using dash bullets:
+      - Manual Workaround: [Yes/No] | Description: [how it works] | Sustainability: [how long it can be sustained] | Limitations: [constraints]
+      - Primary Location: [building/floor/clinic/site] | Type: [Office/Clinic/Field/Other]
+      - Alternate Locations: List backup locations if primary is unavailable
+        Format: - Location: [site] | Capability: [what can be done there] | Limitations: [constraints]
+      - Operating Hours: [normal hours] | Emergency Hours: [extended/on-call requirements]
+      - Remote Capability: [Fully remote-capable/Partially remote-capable/Not remote-capable] | Detail: [what can/cannot be done remotely]
+      
+      If no manual workaround exists, state "No workaround available - requires immediate system restoration."
+
+  - id: technology-stack
+    name: Technology Stack
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - operational-resilience
+    prompt: |
+      Document all technology dependencies using dash bullets:
+      Primary Systems (required to perform the MEF):
+      - System: [name] | Vendor: [provider or "Internal"] | Purpose: [function] | Criticality: [Required/Important]
+      
+      Secondary/Supporting Systems (enhance but not strictly required):
+      - System: [name] | Purpose: [function] | Workaround if unavailable: [alternative or "None"]
+      
+      Data Storage:
+      - Data Store: [database/drive/SharePoint/cloud app/paper] | Content: [what data] | Sensitivity: [Public/Non-Public/Restricted]
+      
+      Network Requirements:
+      - Connectivity: [City network/VPN/Internet/Secure state-federal connection] | Purpose: [what it enables]
+      
+      Devices & Peripherals:
+      - Device: [laptops/tablets/printers/scanners/phones/card readers/etc.] | Purpose: [function] | Quantity: [if mentioned]
+      
+      System Interfaces:
+      - Interface: [source system] → [target system] | Data: [what flows] | Frequency: [real-time/daily/weekly/etc.]
+      
+      Capture every system, app, portal, or technology mentioned. If uncertain about a system name, note exactly what was said.
+
+  - id: security-data
+    name: "Security & Data Classification"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - technology-stack
+    prompt: |
+      Document security posture and data classification using dash bullets:
+      - Hosting Model: [On-premise/Vendor SaaS/Cloud IaaS-PaaS/Hybrid/Unknown] | Detail: [specifics if known]
+      - Data Sensitivity: [Public/Non-Public/Restricted/Unknown] | Categories if Restricted: [PII/PHI/PCI/NDA/Other federal category]
+      - Existing Security Controls: List protections currently in place
+        Format: - Control: [MFA/role-based access/backups/DR environment/logging/encryption/etc.] | Coverage: [what it protects]
+      - Known Gaps/Weaknesses: List vulnerabilities or concerns
+        Format: - Gap: [single point of failure/unsupported system/no documentation/capacity constraint/etc.] | Risk: [potential impact] | Mitigation Status: [plan or "None"]
+      
+      Be thorough in capturing both protections and vulnerabilities. If security was not discussed, note "Security controls not reviewed."
+
+  - id: people-process
+    name: "People & Process Dependencies"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - interview-context
+    prompt: |
+      Document staffing and process dependencies using dash bullets:
+      Required Roles:
+      - Role: [job type/title] | Function: [what they do for this MEF] | Minimum Staffing: [count if mentioned] | Cross-trained: [Yes/No/Unknown]
+      
+      Process Inputs (what this MEF needs from others):
+      - Input: [data/approval/supplies/lab results/etc.] | Source: [internal unit/external partner] | Frequency: [real-time/daily/weekly/etc.] | Impact if Missing: [consequence]
+      
+      Process Outputs (who depends on this MEF):
+      - Consumer: [other APH program/City department/State agency/public] | Output: [what they receive] | Frequency: [how often] | Impact if Delayed: [consequence]
+      
+      Capture the complete service map: who feeds this MEF and who depends on it.
+
+  - id: performance-improvement
+    name: "Performance & Improvement"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - people-process
+    prompt: |
+      Document performance metrics and improvement priorities using dash bullets:
+      Performance Measures:
+      - Metric: [clients served/response time/turnaround/error rate/etc.] | Target (Normal): [value] | Target (Emergency): [value if different] | Recent Baseline: [actual performance]
+      
+      Equity Considerations:
+      - Concern: [vulnerable population impact/language access/accessibility/transportation/digital divide] | Risk if Disrupted: [specific impact]
+      
+      Modernization Priority: [High/Medium/Low] | Rationale: [why this priority]
+      Last Formal Review: [date or "Unknown"] | Type: [COOP/Audit/Process improvement/etc.]
+      
+      Additional Context: Capture any other notes about this MEF not covered in other sections.
+      
+      If performance metrics are not tracked, note "No formal metrics in place."
+
+  - id: notable-quotes
+    name: "Notable Quotes & Insights"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - criticality-assessment
+      - technology-stack
+    prompt: |
+      Extract significant, VERBATIM quotes that reveal important context, concerns, or institutional knowledge.
+
+      QUOTE QUALITY REQUIREMENTS:
+      1. VERBATIM ONLY: Use EXACT words from the transcript. Do NOT paraphrase, combine statements, or "clean up" language.
+      2. ATTRIBUTION: Identify the speaker by name or role.
+      3. CONTEXT: Explain what question or topic prompted the quote.
+      4. SIGNIFICANCE: Explain why this quote matters.
+      5. TIMESTAMP: Include [MM:SS] marker if available in transcript.
+
+      Format each quote as dash bullets:
+      - Quote: "[EXACT words from transcript, max 40 words]"
+        Speaker: [Name or role]
+        Context: [What prompted this statement]
+        Significance: [Why this quote matters]
+        Category: [Pain Point / Workaround / Risk / Institutional Knowledge / Past Incident / Political Sensitivity]
+
+      FOCUS ON QUOTES THAT REVEAL:
+      - Frustrations with current systems or processes
+      - How things "really work" vs. official procedures
+      - Concerns about risks or vulnerabilities
+      - Institutional knowledge that would be lost if not documented
+      - Past incidents or near-misses
+      - Political or organizational sensitivities
+
+      AVOID:
+      - Generic or procedural statements
+      - Quotes that don't add insight beyond factual Q&A
+      - Paraphrased or reconstructed statements
+      - Combining multiple statements into one "quote"
+
+      Include 3-5 notable quotes if available. If the conversation was primarily factual Q&A without memorable statements, note "Limited notable quotes - interview was primarily factual/procedural."
+
+  - id: unknowns-followups
+    name: "Unknowns & Follow-ups"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - technology-stack
+      - security-data
+      - performance-improvement
+    prompt: |
+      Document all items requiring follow-up using dash bullets:
+      Unknown Items (where stakeholder could not provide information):
+      - Question/Topic: [what was asked] | Response: [I don't know/IT would know/Need to check/etc.] | Follow-up With: [person or role to ask] | Priority: [High/Medium/Low]
+      
+      Action Items from Interview:
+      - [ ] Action: [task to complete] | Owner: [person/team] | Due: [timeframe] | Purpose: [why needed]
+      
+      Information Gaps:
+      - Gap: [missing data element] | Section: [which MEF section] | Required For: [what decision/analysis needs this]
+      
+      This section is critical for ensuring data completeness. Every "I'm not sure" or "we'd need to check" should be captured here.
+
+  - id: cross-validation-flags
+    name: Cross-Validation Flags
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - criticality-assessment
+      - continuity-objectives
+      - operational-resilience
+      - technology-stack
+      - security-data
+    prompt: |
+      Identify potential inconsistencies or items requiring validation using dash bullets:
+      - Inconsistency: [describe the conflicting information] | Source A: [what was said in one context] | Source B: [what was said in another context] | Resolution Needed: [what to clarify]
+      
+      Look for conflicts such as:
+      - Stated criticality tier vs. described impact severity (e.g., "low criticality" but "lives at risk within 24 hours")
+      - RTO/RPO vs. manual workaround sustainability (e.g., 4-hour RTO but manual process only sustainable for 1 hour)
+      - System dependencies mentioned in different sections that don't match
+      - Ownership or contact information that conflicts
+      - Performance targets that seem misaligned with stated priorities
+      
+      Also flag items to verify against human notes:
+      - Data Point: [specific fact or figure] | Confidence: [High/Medium/Low] | Verify: [what to check]
+      
+      If no inconsistencies detected, state "No cross-validation issues identified."
+

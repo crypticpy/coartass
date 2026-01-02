@@ -1,0 +1,352 @@
+# ============================================================================
+# Azure Container Apps - Deployment Configuration
+# ============================================================================
+# This file defines the Azure Container Apps configuration for the
+# Meeting Transcriber application.
+#
+# Prerequisites:
+# - Azure subscription
+# - Azure Container Registry (ACR)
+# - Azure Container Apps Environment
+# - Azure CLI installed and authenticated
+#
+# Documentation:
+# https://learn.microsoft.com/en-us/azure/container-apps/
+# ============================================================================
+
+# ============================================================================
+# Container App Configuration
+# ============================================================================
+properties:
+  # Environment configuration
+  environmentId: /subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP}/providers/Microsoft.App/managedEnvironments/{ENVIRONMENT_NAME}
+
+  # Container configuration
+  configuration:
+    # Ingress configuration (HTTP/HTTPS traffic)
+    ingress:
+      # Enable external ingress (public access)
+      external: true
+
+      # Target port inside the container
+      targetPort: 3000
+
+      # Traffic distribution (100% to latest revision)
+      traffic:
+        - weight: 100
+          latestRevision: true
+
+      # Transport protocol
+      transport: auto
+
+      # Allow insecure connections (HTTP)
+      # Set to false in production to enforce HTTPS only
+      allowInsecure: false
+
+      # CORS configuration (optional)
+      # corsPolicy:
+      #   allowedOrigins:
+      #     - "*"
+      #   allowedMethods:
+      #     - GET
+      #     - POST
+      #     - PUT
+      #     - DELETE
+      #   allowedHeaders:
+      #     - "*"
+
+    # Secrets configuration
+    # Secrets are securely stored and injected as environment variables
+    secrets:
+      - name: azure-openai-api-key
+        value: "" # Set via Azure Portal or CLI
+      - name: azure-openai-endpoint
+        value: "" # Set via Azure Portal or CLI
+      - name: openai-api-key
+        value: "" # Set via Azure Portal or CLI (if using standard OpenAI)
+
+    # Active revisions mode
+    # Single: only one revision active at a time
+    # Multiple: can have multiple revisions for traffic splitting
+    activeRevisionsMode: Single
+
+    # Maximum inactive revisions to keep
+    maxInactiveRevisions: 5
+
+  # Template configuration
+  template:
+    # Container definition
+    containers:
+      - name: meeting-transcriber
+        # Image from Azure Container Registry
+        image: {ACR_NAME}.azurecr.io/meeting-transcriber:latest
+
+        # Resource allocation
+        resources:
+          # CPU cores (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0)
+          cpu: 1.0
+
+          # Memory in GB (0.5Gi, 1.0Gi, 1.5Gi, 2.0Gi, 3.0Gi, 4.0Gi)
+          memory: 2.0Gi
+
+        # Environment variables
+        env:
+          # Node environment
+          - name: NODE_ENV
+            value: "production"
+
+          # Application settings
+          - name: PORT
+            value: "3000"
+
+          - name: HOSTNAME
+            value: "0.0.0.0"
+
+          # Azure OpenAI Configuration (Option 1 - Recommended)
+          - name: AZURE_OPENAI_API_KEY
+            secretRef: azure-openai-api-key
+
+          - name: AZURE_OPENAI_ENDPOINT
+            secretRef: azure-openai-endpoint
+
+          - name: AZURE_OPENAI_API_VERSION
+            value: "2024-08-01-preview"
+
+          - name: AZURE_OPENAI_WHISPER_DEPLOYMENT
+            value: "whisper-1"
+
+          - name: AZURE_OPENAI_GPT4_DEPLOYMENT
+            value: "gpt-4"
+
+          # Standard OpenAI Configuration (Option 2 - Alternative)
+          # Uncomment if using standard OpenAI instead of Azure
+          # - name: OPENAI_API_KEY
+          #   secretRef: openai-api-key
+
+          # Telemetry
+          - name: NEXT_TELEMETRY_DISABLED
+            value: "1"
+
+        # Probes for health monitoring
+        probes:
+          # Liveness probe - determines if container should be restarted
+          - type: liveness
+            httpGet:
+              path: /api/health
+              port: 3000
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+
+          # Readiness probe - determines if container can receive traffic
+          - type: readiness
+            httpGet:
+              path: /api/health
+              port: 3000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+
+          # Startup probe - gives app time to start before health checks begin
+          - type: startup
+            httpGet:
+              path: /api/health
+              port: 3000
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 12
+
+    # Scaling configuration
+    scale:
+      # Minimum number of replicas (0 for scale-to-zero)
+      minReplicas: 1
+
+      # Maximum number of replicas
+      maxReplicas: 10
+
+      # Scaling rules
+      rules:
+        # HTTP-based scaling
+        - name: http-scaling-rule
+          http:
+            metadata:
+              # Concurrent requests per replica before scaling
+              concurrentRequests: "50"
+
+        # CPU-based scaling
+        - name: cpu-scaling-rule
+          custom:
+            type: cpu
+            metadata:
+              # Scale when CPU usage exceeds 70%
+              type: Utilization
+              value: "70"
+
+        # Memory-based scaling
+        - name: memory-scaling-rule
+          custom:
+            type: memory
+            metadata:
+              # Scale when memory usage exceeds 80%
+              type: Utilization
+              value: "80"
+
+# ============================================================================
+# Deployment Commands
+# ============================================================================
+#
+# Prerequisites:
+# 1. Install Azure CLI:
+#    https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+#
+# 2. Login to Azure:
+#    az login
+#
+# 3. Set subscription:
+#    az account set --subscription {SUBSCRIPTION_ID}
+#
+# 4. Create resource group:
+#    az group create \
+#      --name meeting-transcriber-rg \
+#      --location eastus
+#
+# 5. Create Container Registry:
+#    az acr create \
+#      --resource-group meeting-transcriber-rg \
+#      --name meetingtranscriberacr \
+#      --sku Basic
+#
+# 6. Create Container Apps Environment:
+#    az containerapp env create \
+#      --name meeting-transcriber-env \
+#      --resource-group meeting-transcriber-rg \
+#      --location eastus
+#
+# Build and Push Image:
+# ----------------------
+# 1. Login to ACR:
+#    az acr login --name meetingtranscriberacr
+#
+# 2. Build and push image:
+#    docker buildx build --platform linux/amd64 \
+#      -t meetingtranscriberacr.azurecr.io/meeting-transcriber:latest \
+#      --push .
+#
+# Create Container App:
+# ---------------------
+# az containerapp create \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --environment meeting-transcriber-env \
+#   --image meetingtranscriberacr.azurecr.io/meeting-transcriber:latest \
+#   --target-port 3000 \
+#   --ingress external \
+#   --min-replicas 1 \
+#   --max-replicas 10 \
+#   --cpu 1.0 \
+#   --memory 2.0Gi \
+#   --secrets \
+#     azure-openai-api-key={YOUR_API_KEY} \
+#     azure-openai-endpoint={YOUR_ENDPOINT} \
+#   --env-vars \
+#     NODE_ENV=production \
+#     PORT=3000 \
+#     HOSTNAME=0.0.0.0 \
+#     AZURE_OPENAI_API_KEY=secretref:azure-openai-api-key \
+#     AZURE_OPENAI_ENDPOINT=secretref:azure-openai-endpoint \
+#     AZURE_OPENAI_API_VERSION=2024-08-01-preview \
+#     AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper-1 \
+#     AZURE_OPENAI_GPT4_DEPLOYMENT=gpt-4 \
+#     NEXT_TELEMETRY_DISABLED=1 \
+#   --registry-server meetingtranscriberacr.azurecr.io
+#
+# Update Container App:
+# ---------------------
+# az containerapp update \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --image meetingtranscriberacr.azurecr.io/meeting-transcriber:latest
+#
+# Update Secrets:
+# ---------------
+# az containerapp secret set \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --secrets \
+#     azure-openai-api-key={NEW_API_KEY} \
+#     azure-openai-endpoint={NEW_ENDPOINT}
+#
+# View Logs:
+# ----------
+# az containerapp logs show \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --follow
+#
+# Get Application URL:
+# -------------------
+# az containerapp show \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --query properties.configuration.ingress.fqdn \
+#   --output tsv
+#
+# ============================================================================
+# Monitoring and Troubleshooting
+# ============================================================================
+#
+# View Revisions:
+# az containerapp revision list \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --output table
+#
+# View Replicas:
+# az containerapp replica list \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --output table
+#
+# Restart Container App:
+# az containerapp revision restart \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg
+#
+# Delete Container App:
+# az containerapp delete \
+#   --name meeting-transcriber \
+#   --resource-group meeting-transcriber-rg \
+#   --yes
+#
+# ============================================================================
+# Cost Estimation
+# ============================================================================
+#
+# Azure Container Apps Pricing (as of 2024):
+# - Consumption plan (pay per use)
+# - vCPU: $0.000024/vCPU-second
+# - Memory: $0.0000025/GiB-second
+# - HTTP requests: first 2M free, then $0.40 per million
+#
+# Example calculation (1 vCPU, 2GB memory, 1M requests/month):
+# - vCPU: 730 hours × 3600 seconds × 1 vCPU × $0.000024 = ~$63/month
+# - Memory: 730 hours × 3600 seconds × 2GB × $0.0000025 = ~$13/month
+# - Requests: Free (under 2M)
+# - Total: ~$76/month
+#
+# With auto-scaling (avg 2 replicas during business hours):
+# - Estimated: $100-150/month
+#
+# Use Azure Pricing Calculator for accurate estimates:
+# https://azure.microsoft.com/en-us/pricing/calculator/
+#
+# ============================================================================

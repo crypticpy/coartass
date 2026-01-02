@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Emergency Operations Briefing
+description: Summarize incident status, operational priorities, resources, and immediate tasks
+icon: AlertTriangle
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: incident-status
+    name: Incident Status
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Situation:" outlining hazard type, affected geography, and severity.
+      - Sentence 2 begins with "Operational Period:" covering current objectives and time window in <=50 words.
+
+  - id: operational-priorities
+    name: Operational Priorities
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List priorities as dash bullets:
+      - Priority: [objective] | Lead Agency: [department] | Status: [Not Started/In Progress/Complete] | Note: [<=12 words]
+      Focus on life safety, incident stabilization, and property conservation goals.
+
+  - id: resource-deployment
+    name: Resource Deployment
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document resource posture via dash bullets:
+      - Resource: [asset/team] | Quantity: [number] | Location: [site/EOC] | Sufficiency: [Adequate/Limited/Critical]
+      Include mutual aid assets when present.
+
+  - id: critical-risks
+    name: Critical Risks
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Describe risks using dash bullets:
+      - Risk: [threat] | Probability: [High/Medium/Low] | Impact: [High/Medium/Low] | Mitigation: [planned action]
+      Emphasize risks needing leadership decisions.
+
+  - id: immediate-actions
+    name: Immediate Actions
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Record immediate tasks with checkbox bullets:
+      - [ ] Action: [task] | Owner: [section chief/agency] | Start: [time] | Completion Criteria: [measure]
+      Limit to actions due in the current operational period.
+
+  - id: next-operational-period-plan
+    name: Next Operational Period Plan
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 starts with "Next Period Goals:" summarizing objectives for the upcoming period.
+      - Sentence 2 starts with "Coordination Notes:" highlighting interagency dependencies in <=45 words.
+

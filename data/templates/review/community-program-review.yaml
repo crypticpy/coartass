@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Community Program Review
+description: Evaluate program performance, community feedback, resource needs, and improvement actions
+icon: TreePine
+category: review
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: program-snapshot
+    name: Program Snapshot
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Program Focus:" describing objectives, period, and participants.
+      - Sentence 2 begins with "Status:" covering current phase, capacity, and notable context in <=55 words.
+
+  - id: participation-metrics
+    name: Participation Metrics
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List metrics via dash bullets:
+      - Metric: [name] | Value: [number/%] | Trend: [Up/Flat/Down] | Equity Focus: [group impacted]
+      Include attendance, waitlists, or volunteer hours as discussed.
+
+  - id: facility-and-resource-needs
+    name: "Facility & Resource Needs"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document needs with dash bullets:
+      - Facility/Location: [name] | Need: [equipment/staff/etc.] | Urgency: [High/Medium/Low] | Interim Measure: [workaround or "None"]
+      Capture both capital and operational gaps.
+
+  - id: community-feedback
+    name: Community Feedback
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Summarize feedback using dash bullets:
+      - Segment: [youth/seniors/etc.] | Feedback: [<=15 words] | Sentiment: [Positive/Neutral/Concern] | Requested Change: [action]
+      Represent diverse voices noted in the meeting.
+
+  - id: approvals-and-decisions
+    name: "Approvals & Decisions"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Record the most impactful approvals or decisions as dash bullets:
+      - Decision: [approval/action] | Approver: [title] | Condition: [if any] | Effective Date: [date]
+      Limit to the top 8 items unless the transcript explicitly confirms more. When the team rubber-stamps a batch of minor adjustments, summarize them instead of listing each individually. Include grant submissions, schedule changes, or fee adjustments that materially affect operations.
+
+  - id: improvement-actions
+    name: Improvement Actions
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List improvement tasks with checkbox bullets:
+      - [ ] Action: [task] | Owner: [division] | Due: [date/timeframe] | Success Metric: [indicator]
+      Only include actions committed to during the review.
+

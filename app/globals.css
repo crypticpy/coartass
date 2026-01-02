@@ -1,0 +1,328 @@
+/**
+ * Global Styles for Meeting Transcriber
+ * Mantine v7 + Custom Branding
+ */
+
+/* Mantine Core CSS - REQUIRED */
+@import '@mantine/core/styles.css';
+@import '@mantine/notifications/styles.css';
+
+/* Austin Public Health Brand Colors */
+:root {
+  /* Primary Brand Colors */
+  --color-aph-blue: #44499C;
+  --color-aph-blue-dark: #22254E;
+  --color-aph-sea: #00A7B5;
+  --color-aph-sea-dark: #0084A7;
+  --color-aph-green: #94C83D;
+  --color-aph-green-dark: #6FA424;
+
+  /* Accent Colors */
+  --color-aph-orange: #F7941D;
+  --color-aph-pink: #E6007E;
+  --color-aph-purple: #702F8A;
+  --color-aph-yellow: #FFC72C;
+
+  /* Legacy aliases (used by components) */
+  --logo-blue: #44499C;
+  --compliant-green: #94C83D;
+
+  /* Semantic highlight backgrounds for progress states */
+  --aph-highlight-current: rgba(68, 73, 156, 0.08);
+  --aph-highlight-complete: rgba(76, 175, 80, 0.05);
+  --aph-highlight-saving: rgba(68, 73, 156, 0.05);
+
+  /* Background - warm eggshell to make containers pop */
+  --background: #FAF9F6;
+  --foreground: #1a1a1a;
+
+  /* Mantine color overrides */
+  --mantine-color-primary: var(--color-aph-blue);
+  --mantine-color-body: var(--background);
+}
+
+[data-mantine-color-scheme='dark'] {
+  --background: #1a1a1a;
+  --foreground: #f5f5f5;
+}
+
+/* Global Resets */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Touch Targets (minimum 44x44px) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.touch-target-sm {
+  min-height: 36px;
+  min-width: 36px;
+}
+
+/* Utilities */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Smooth transitions */
+@media (prefers-reduced-motion: no-preference) {
+  * {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Focus indicators */
+:focus-visible {
+  outline: 2px solid var(--color-aph-blue);
+  outline-offset: 2px;
+}
+
+/* Print styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Sticky tabs with shadow on scroll */
+.sticky-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: #ffffff;
+  padding: 1rem;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid var(--mantine-color-gray-2);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.sticky-tabs.scrolled {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--mantine-color-gray-3);
+}
+
+[data-mantine-color-scheme='dark'] .sticky-tabs {
+  background: var(--mantine-color-dark-7);
+  border-color: var(--mantine-color-dark-4);
+}
+
+[data-mantine-color-scheme='dark'] .sticky-tabs.scrolled {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border-color: var(--mantine-color-dark-3);
+}
+
+/* Horizontal tab scrolling */
+.mantine-Tabs-list {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.mantine-Tabs-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.mantine-Tabs-list::-webkit-scrollbar-track {
+  background: var(--mantine-color-gray-1);
+}
+
+.mantine-Tabs-list::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-gray-4);
+  border-radius: 2px;
+}
+
+.mantine-Tabs-list::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-gray-5);
+}
+
+/* Dark mode scrollbar */
+[data-mantine-color-scheme='dark'] .mantine-Tabs-list::-webkit-scrollbar-track {
+  background: var(--mantine-color-dark-6);
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Tabs-list::-webkit-scrollbar-thumb {
+  background: var(--mantine-color-dark-3);
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Tabs-list::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-color-dark-2);
+}
+
+/* Page transition animation (replaces framer-motion) */
+.page-transition {
+  animation: pageEnter 0.2s ease-out;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hero section animations */
+.hero-animate {
+  animation: heroEnter 0.5s ease-out forwards;
+}
+
+@keyframes heroEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.hero-item-animate {
+  opacity: 0;
+  animation: heroItemEnter 0.4s ease-out forwards;
+}
+
+@keyframes heroItemEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Staggered list animations */
+.stagger-animate {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.stagger-item {
+  opacity: 0;
+  animation: staggerItemEnter 0.4s ease-out forwards;
+}
+
+@keyframes staggerItemEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Spinner animation (matches Tailwind's animate-spin) */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .page-transition,
+  .hero-animate,
+  .hero-item-animate,
+  .stagger-animate,
+  .stagger-item,
+  .animate-spin {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Timestamp Link Styles */
+.timestamp-link {
+  font-family: var(--mantine-font-family-monospace);
+  font-weight: 500;
+}
+
+.timestamp-link:hover {
+  background: var(--mantine-color-blue-light-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.timestamp-link:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.timestamp-link:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 1px;
+}
+
+[data-mantine-color-scheme='dark'] .timestamp-link {
+  background: var(--mantine-color-blue-light);
+}
+
+[data-mantine-color-scheme='dark'] .timestamp-link:hover {
+  background: var(--mantine-color-blue-filled-hover) !important;
+}

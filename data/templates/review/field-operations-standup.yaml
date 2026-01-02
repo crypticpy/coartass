@@ -1,0 +1,56 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Field Operations Standup
+description: Monitor daily field performance, disruptions, maintenance, and assignments
+icon: Bus
+category: review
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: performance-snapshot
+    name: Performance Snapshot
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two sentences:
+      - Sentence 1 begins with "Service Volume/Utilization:" sharing notable metrics or capacity insights.
+      - Sentence 2 begins with "On-Time Performance:" summarizing OTP percentages and trends in <=40 words.
+
+  - id: service-disruptions
+    name: Service Disruptions
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List disruptions as dash bullets:
+      - Route/Area/Zone: [identifier] | Issue: [cause] | Start Time: [HH:MM] | Status: [Active/Resolved] | Impact: [brief note or "None"]
+      Include impacts to normal operations.
+
+  - id: maintenance-flags
+    name: Maintenance Flags
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document maintenance needs via dash bullets:
+      - Asset/Equipment: [name/ID] | Condition: [rating] | Required Work: [task] | ETA: [timeframe]
+      Highlight items affecting service availability.
+
+  - id: customer-feedback-trends
+    name: Customer Feedback Trends
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture feedback trends with dash bullets:
+      - Trend: [topic] | Source: [311/app/social] | Volume: [count or High/Med/Low] | Sentiment: [Positive/Neutral/Negative]
+      Group similar comments into single bullets.
+
+  - id: assignments-and-owners
+    name: "Assignments & Owners"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List assignments with checkbox bullets:
+      - [ ] Task: [action] | Owner: [supervisor/team] | Location/Route: [identifier] | Due: [time]
+      Use this to track daily accountability.
+

@@ -1,0 +1,44 @@
+# ============================================================================
+# Meeting Transcriber - Development Docker Compose
+# ============================================================================
+# Extends docker-compose.yml for development with hot-reload
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================================
+
+services:
+  app:
+    # Override build to use development stage
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+
+    # Override command for development
+    command: npm run dev
+
+    # Development environment
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+
+    # Mount source code for hot-reload
+    volumes:
+      - ./app:/app/app:cached
+      - ./components:/app/components:cached
+      - ./lib:/app/lib:cached
+      - ./types:/app/types:cached
+      - ./public:/app/public:cached
+      - ./styles:/app/styles:cached
+      - ./.env.local:/app/.env.local:ro
+      # Exclude node_modules from mount
+      - /app/node_modules
+      - /app/.next
+
+    # Development-specific settings
+    restart: "no"
+
+    # Remove health check for faster startup in dev
+    healthcheck:
+      disable: true

@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Steering Committee
+description: Capture governance discussions, status reviews, strategic decisions, resource allocation, and committee directives
+icon: Crown
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: meeting-context
+    name: Meeting Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two concise paragraphs:
+      - Paragraph 1 must begin with "Committee:" describing the committee name, members present, and quorum status.
+      - Paragraph 2 must begin with "Purpose:" summarizing the meeting objectives and key agenda themes in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: status-updates
+    name: Status Updates
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document status reports presented to the committee using dash bullets:
+      - Initiative: [project/program name] | Owner: [responsible party] | Status: [On Track/At Risk/Delayed/Complete] | Highlight: [<=15 words key update]
+      Focus on substantive updates that required committee attention.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: governance-decisions
+    name: Governance Decisions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - status-updates
+    prompt: |
+      Document strategic decisions, approvals, and policy changes using dash bullets:
+      - Decision: [what was decided] | Type: [Approval/Policy/Strategic/Operational] | Vote: [Unanimous/Majority/Consensus or tally] | Effective: [date or "Immediate"]
+      Include conditions, caveats, or amendments if mentioned. Focus on consequential decisions.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: resource-allocation
+    name: Resource Allocation Decisions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - status-updates
+    prompt: |
+      Document budget, staffing, and resource discussions using dash bullets:
+      - Resource: [budget/staff/equipment] | Request: [what was requested] | Decision: [Approved/Denied/Deferred/Modified] | Amount: [value or "TBD"] | Conditions: [stipulations or "None"]
+      Include reallocations and priority shifts.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: risks-escalations
+    name: "Risks & Escalations"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document items escalated for committee attention using dash bullets:
+      - Issue: [problem or risk] | Source: [who escalated] | Impact: [High/Medium/Low] | Committee Response: [guidance provided or decision made] | Owner: [assigned party]
+      Include both resolved escalations and items requiring follow-up.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: action-directives
+    name: Action Directives
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - governance-decisions
+      - risks-escalations
+    prompt: |
+      Capture tasks and follow-ups assigned by the committee using checkbox bullets:
+      - [ ] Directive: [task] | Owner: [person/team] | Due: [date/timeframe] | Report Back: [next meeting or specific date] | Priority: [High/Medium/Low]
+      Only include concrete, trackable commitments with clear ownership.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

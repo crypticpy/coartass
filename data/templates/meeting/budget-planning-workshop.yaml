@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Budget Planning Workshop
+description: Facilitate fiscal planning by logging funding requests, tradeoffs, and allocations
+icon: Calculator
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: fiscal-context
+    name: Fiscal Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 starts with "Revenue Outlook:" summarizing projected revenue drivers or constraints.
+      - Paragraph 2 starts with "Cost Pressures:" outlining major obligations and trendlines in <=70 words.
+
+  - id: funding-requests
+    name: Funding Requests
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document requests using dash bullets:
+      - Department: [name] | Request: [program/equipment] | Amount: [$ value or range] | Priority: [Mandated/Core/Discretionary]
+      Only include requests discussed in detail.
+
+  - id: tradeoffs-and-scenarios
+    name: "Tradeoffs & Scenarios"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List scenarios via dash bullets:
+      - Scenario: [name] | Assumption: [key variable] | Impact: [service effect] | Feasibility: [High/Medium/Low]
+      Capture both adopted and discarded scenarios.
+
+  - id: decisions-and-allocations
+    name: "Decisions & Allocations"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture the most consequential budget decisions or allocations. Use at most 8 bullets unless the transcript explicitly records a longer list of discrete votes. When dozens of minor adjustments occur, summarize them together. Format each bullet as:
+      - Allocation: [program/project] | Amount: [$] | Condition: [contingency or "None"] | Vote: [consensus/rollcall result]
+      Only include confirmed decisions.
+
+  - id: action-items
+    name: Action Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List follow-ups using checkbox bullets:
+      - [ ] Task: [action] | Owner: [finance lead/department] | Due: [date/timeframe] | Dependency: [prerequisite or "None"]
+      Ensure every task advances the budget process.
+

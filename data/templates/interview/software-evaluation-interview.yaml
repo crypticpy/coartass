@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Software Evaluation Interview
+description: Stakeholder interview about software usage, satisfaction, pain points, and improvement needs
+icon: Monitor
+category: interview
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: application-context
+    name: Application Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Application:" identifying the software name, vendor (if external), and primary purpose.
+      - Paragraph 2 must begin with "User Base:" describing who uses it, how many users, and their roles in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: business-criticality
+    name: Business Criticality
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document criticality using dash bullets:
+      - Function: [business capability supported] | Criticality: [Mission Critical/Important/Nice to Have] | Downtime Impact: [effect of outage] | Alternatives: [backup options or "None"]
+      Assess how important this software is to operations.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: current-usage-patterns
+    name: Current Usage Patterns
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document usage using dash bullets:
+      - Use Case: [how it's used] | Frequency: [Daily/Weekly/Monthly/Ad-hoc] | Users: [who does this] | Volume: [transactions/records if mentioned]
+      Capture the main ways stakeholders interact with the software.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: strengths-satisfaction
+    name: "Strengths & Satisfaction"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document positives using dash bullets:
+      - Strength: [what works well] | Benefit: [value it provides] | User Sentiment: [specific feedback or "General satisfaction"]
+      Include features, performance, and capabilities users appreciate.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: pain-points-limitations
+    name: "Pain Points & Limitations"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document problems using dash bullets:
+      - Pain Point: [issue] | Impact: [effect on work] | Frequency: [how often encountered] | Workaround: [current solution or "None"] | Severity: [High/Medium/Low]
+      Capture bugs, missing features, performance issues, and usability problems.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: feature-requests
+    name: Feature Requests
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - pain-points-limitations
+    prompt: |
+      Document requested improvements using dash bullets:
+      - Request: [feature or enhancement] | Use Case: [why it's needed] | Priority: [Must Have/Should Have/Nice to Have] | Business Value: [expected benefit]
+      Include both explicit requests and implied needs.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: integration-needs
+    name: Integration Needs
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document integration requirements using dash bullets:
+      - Integration: [system to connect with] | Data Flow: [what data needs to move] | Current State: [Manual/Partial/None] | Priority: [High/Medium/Low]
+      Capture connections with other systems and data exchange needs.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: support-vendor-experience
+    name: "Support & Vendor Experience"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document support experience using dash bullets:
+      - Aspect: [support area] | Rating: [Excellent/Good/Fair/Poor] | Feedback: [specific comment] | Improvement Needed: [suggestion or "None"]
+      Include vendor responsiveness, documentation quality, and training support.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

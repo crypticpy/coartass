@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Daily Standup Summary
+description: Quick daily standup with team updates, blockers, and coordination needs
+icon: Coffee
+category: meeting
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: team-updates
+    name: Team Updates
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document each team member's update using dash bullets:
+      - Person: [name] | Yesterday: [<=15 words] | Today: [<=15 words] | Status: [On Track/Blocked/Need Help]
+      Keep updates concise and action-focused.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: blockers-raised
+    name: Blockers Raised
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List blockers using dash bullets:
+      - Blocker: [issue] | Affected: [person/task] | Duration: [how long blocked] | Help Needed: [type of assistance]
+      Only include actual blockers preventing progress.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: parking-lot-items
+    name: Parking Lot Items
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Capture parking lot topics using dash bullets:
+      - Topic: [subject] | Raised By: [person] | Participants Needed: [who should discuss] | Urgency: [High/Medium/Low]
+      Include topics deferred from standup for separate discussion.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: coordination-needs
+    name: Coordination Needs
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - team-updates
+    prompt: |
+      Document coordination items using dash bullets:
+      - Need: [collaboration required] | Between: [people involved] | Topic: [what to coordinate] | When: [timing]
+      Focus on hand-offs, pairing needs, and sync-ups mentioned.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

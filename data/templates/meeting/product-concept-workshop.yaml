@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Product Concept Workshop
+description: Workshop exploring product ideas with problem definition, users, feasibility, and next steps
+icon: Lightbulb
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: problem-statement
+    name: Problem Statement
+    extractEvidence: true
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Problem:" clearly articulating the problem or opportunity being addressed.
+      - Paragraph 2 must begin with "Impact:" describing who is affected and the consequences of not solving it in <=70 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: target-users
+    name: Target Users
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document target users using dash bullets:
+      - User Segment: [persona or group] | Size: [estimate if known] | Current Behavior: [how they solve problem today] | Adoption Likelihood: [High/Medium/Low]
+      Identify who would benefit from this product concept.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: concept-overview
+    name: Concept Overview
+    extractEvidence: true
+    outputFormat: paragraph
+    dependencies:
+      - problem-statement
+      - target-users
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Solution Concept:" describing the proposed product or feature at a high level.
+      - Paragraph 2 must begin with "Key Capabilities:" listing the core functionality that addresses the problem in <=70 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: value-proposition
+    name: Value Proposition
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - concept-overview
+    prompt: |
+      Document value using dash bullets:
+      - Benefit: [value delivered] | For: [user segment] | Differentiation: [why better than alternatives] | Evidence: [data or assumption]
+      Capture why users would adopt this solution.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: competitive-landscape
+    name: Competitive Landscape
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document alternatives using dash bullets:
+      - Alternative: [competing solution] | Type: [Direct/Indirect/Status Quo] | Strengths: [what it does well] | Weaknesses: [limitations] | Our Advantage: [differentiation]
+      Include existing solutions users might use instead.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: feasibility-assessment
+    name: Feasibility Assessment
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Assess feasibility using dash bullets:
+      - Dimension: [Technical/Resource/Time/Budget/Organizational] | Assessment: [feasible/challenging/uncertain] | Key Constraint: [main limitation] | Mitigation: [approach or "Needs investigation"]
+      Evaluate what's required to build this concept.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: open-questions
+    name: Open Questions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - concept-overview
+      - feasibility-assessment
+    prompt: |
+      List unknowns using dash bullets:
+      - Question: [what we need to learn] | Category: [User/Technical/Business/Market] | Priority: [High/Medium/Low] | Research Method: [how to answer it]
+      Capture uncertainties that need investigation.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: next-steps
+    name: Next Steps
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - open-questions
+    prompt: |
+      Document follow-ups with checkbox bullets:
+      - [ ] Action: [validation activity] | Owner: [person] | Due: [timeframe] | Output: [expected deliverable]
+      Include research, prototyping, and decision checkpoints.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

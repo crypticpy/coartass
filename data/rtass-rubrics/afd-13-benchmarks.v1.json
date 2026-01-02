@@ -1,0 +1,143 @@
+{
+  "$schema": "./rtass-rubric.schema.json",
+  "id": "rtass-afd-13-timing-benchmarks",
+  "name": "AFD 13 Timing Benchmarks (Transcript-First MVP)",
+  "description": "Represents the AFD 13 timing benchmarks as an auditable scorecard. For MVP, benchmarks are scored only when the transcript contains explicit radio evidence; otherwise mark not_observed (do not guess). Later phases can add optional manual inputs from CAD/VisiNet.",
+  "version": "1.0.0",
+  "jurisdiction": "AFD",
+  "tags": ["afd", "benchmarks", "timing", "training"],
+  "createdAt": "2026-01-02T00:00:00.000Z",
+  "sections": [
+    {
+      "id": "clock-and-evidence",
+      "title": "Clocking & Evidence Rules",
+      "description": "Clock starts when the first unit arrives (per AFD guidance). If the transcript does not include explicit statements for a benchmark, mark not_observed.",
+      "weight": 0.15,
+      "criteria": [
+        {
+          "id": "arrival-time-identifiable",
+          "title": "First unit arrival time identifiable in transcript",
+          "description": "The radio traffic includes an explicit 'on scene/arrived' statement that can anchor timing benchmarks.",
+          "required": true,
+          "type": "boolean",
+          "notes": "If arrival is not identifiable, timing benchmarks should generally be not_observed to avoid fabricated timing."
+        }
+      ]
+    },
+    {
+      "id": "incident-stabilization",
+      "title": "Incident Stabilization Benchmarks",
+      "description": "Benchmarks related to fire control/stabilization. Score only if explicitly stated.",
+      "weight": 0.45,
+      "criteria": [
+        {
+          "id": "command-established",
+          "title": "Command established (< 3 minutes)",
+          "description": "Command established within 3 minutes of arrival (if both events are observable).",
+          "required": true,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "command_established", "targetSeconds": 180, "maxSeconds": 180 }
+        },
+        {
+          "id": "first-water-on-fire",
+          "title": "First water on fire (< 2 minutes from arrival)",
+          "description": "First water on fire within 2 minutes of arrival (if the transcript explicitly indicates 'water on the fire' or equivalent).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "first_water_on_fire", "targetSeconds": 120, "maxSeconds": 120 }
+        },
+        {
+          "id": "fire-knocked-down",
+          "title": "Fire knocked down (< 20 minutes)",
+          "description": "Fire knocked down is announced within 20 minutes of arrival (if observable).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "fire_knocked_down", "targetSeconds": 1200, "maxSeconds": 1200 }
+        },
+        {
+          "id": "fire-under-control",
+          "title": "Fire under control (< 30 minutes)",
+          "description": "Fire under control is announced within 30 minutes of arrival (if observable).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "fire_under_control", "targetSeconds": 1800, "maxSeconds": 1800 }
+        },
+        {
+          "id": "fire-extinguished",
+          "title": "Fire extinguished (< 1 hour)",
+          "description": "Fire extinguished is announced within 1 hour of arrival (if observable).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "fire_extinguished", "targetSeconds": 3600, "maxSeconds": 3600 }
+        }
+      ]
+    },
+    {
+      "id": "life-safety",
+      "title": "Life Safety Benchmarks",
+      "description": "Benchmarks related to search completion and safety-critical reporting. Score only if explicitly stated.",
+      "weight": 0.25,
+      "criteria": [
+        {
+          "id": "primary-search-complete",
+          "title": "Primary search complete (< 10 minutes)",
+          "description": "Primary search completion is announced within 10 minutes of arrival (if observable).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "primary_search_complete", "targetSeconds": 600, "maxSeconds": 600 }
+        },
+        {
+          "id": "secondary-search-complete",
+          "title": "Secondary search complete (< 20 minutes post-knockdown)",
+          "description": "Secondary search completion is announced within 20 minutes after knockdown (if observable).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "fire_knocked_down", "endEvent": "secondary_search_complete", "targetSeconds": 1200, "maxSeconds": 1200 },
+          "notes": "This benchmark depends on knockdown being observable; otherwise mark not_observed."
+        }
+      ]
+    },
+    {
+      "id": "support-benchmarks",
+      "title": "Support / Property Conservation Benchmarks",
+      "description": "Water supply, utilities, salvage. These are often not explicitly stated in radio traffic; use not_observed when missing.",
+      "weight": 0.15,
+      "criteria": [
+        {
+          "id": "water-supply-established",
+          "title": "Water supply established (< 5 minutes)",
+          "description": "Water supply established within 5 minutes of arrival (if observable).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "water_supply_established", "targetSeconds": 300, "maxSeconds": 300 }
+        },
+        {
+          "id": "utility-shutoff",
+          "title": "Utility shutoff (< 10 minutes)",
+          "description": "Utility shutoff is announced within 10 minutes of arrival (if observable).",
+          "required": false,
+          "type": "timing",
+          "timing": { "startEvent": "first_unit_arrival", "endEvent": "utilities_shutoff", "targetSeconds": 600, "maxSeconds": 600 }
+        },
+        {
+          "id": "salvage-complete",
+          "title": "Salvage complete (as soon as possible after knockdown)",
+          "description": "Salvage completion is announced (if observable). Timing target is informational; mark not_observed if not present.",
+          "required": false,
+          "type": "boolean"
+        }
+      ]
+    }
+  ],
+  "scoring": {
+    "method": "weighted_average",
+    "thresholds": { "pass": 0.85, "needsImprovement": 0.7 },
+    "requiredNotObservedBehavior": "exclude_with_warning"
+  },
+  "llm": {
+    "concurrency": 5,
+    "maxRetries": 2,
+    "evidenceQuoteMaxChars": 240
+  }
+}
+

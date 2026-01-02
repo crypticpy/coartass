@@ -1,0 +1,86 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Workflow Analysis Session
+description: Detailed workflow walkthrough capturing steps, decision logic, exceptions, and automation opportunities
+icon: Workflow
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: workflow-context
+    name: Workflow Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Workflow Purpose:" describing what this workflow accomplishes and its business value.
+      - Paragraph 2 must begin with "Analysis Scope:" clarifying what aspects are being examined and why in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: step-by-step-walkthrough
+    name: Step-by-Step Walkthrough
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - workflow-context
+    prompt: |
+      Document workflow steps using dash bullets:
+      - Step: [number] | Name: [activity name] | Description: [what happens] | Performer: [role] | Time: [duration if mentioned] | Input/Output: [data flow]
+      Capture each step in execution order with sufficient detail.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: decision-logic
+    name: Decision Logic
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - step-by-step-walkthrough
+    prompt: |
+      Document decision points using dash bullets:
+      - Decision: [what's being decided] | Location: [after which step] | Criteria: [rules/conditions] | Outcomes: [possible paths] | Authority: [who decides]
+      Capture business rules and branching logic.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: exceptions-edge-cases
+    name: "Exception Handling & Edge Cases"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - step-by-step-walkthrough
+    prompt: |
+      Document exceptions using dash bullets:
+      - Exception: [scenario] | Frequency: [how often] | Handling: [current approach] | Pain Level: [High/Medium/Low] | Improvement: [suggested fix or "None"]
+      Capture non-standard paths and how they're handled.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: automation-opportunities
+    name: Automation Opportunities
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - step-by-step-walkthrough
+    prompt: |
+      Identify automation candidates using dash bullets:
+      - Opportunity: [what could be automated] | Current Effort: [manual time spent] | Automation Type: [RPA/Integration/AI/Rule-based] | Complexity: [High/Medium/Low] | ROI: [expected value]
+      Focus on repetitive, rule-based, or high-volume activities.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: documentation-needs
+    name: Documentation Needs
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      List documentation gaps using dash bullets:
+      - Gap: [what's missing] | Type: [SOP/Training/Reference/System doc] | Priority: [High/Medium/Low] | Owner: [who should create it]
+      Include missing procedures, outdated docs, and tribal knowledge that needs capturing.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

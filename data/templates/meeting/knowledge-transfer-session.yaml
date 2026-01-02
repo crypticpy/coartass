@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Knowledge Transfer Session
+description: Knowledge transfer with subject overview, processes, tribal knowledge, and documentation gaps
+icon: Share2
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - quotes
+
+sections:
+  - id: transfer-context
+    name: Transfer Context
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Knowledge Area:" describing what knowledge is being transferred and why.
+      - Paragraph 2 must begin with "Participants:" identifying the knowledge source (outgoing/expert) and recipients in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: subject-matter-overview
+    name: Subject Matter Overview
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document the domain using dash bullets:
+      - Topic: [knowledge area] | Scope: [what it covers] | Importance: [why it matters] | Dependencies: [related knowledge needed]
+      Provide a high-level map of the knowledge being transferred.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: key-processes
+    name: Key Processes
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document critical processes using dash bullets:
+      - Process: [name] | Purpose: [what it accomplishes] | Frequency: [how often done] | Steps: [high-level flow] | Owner: [who should know this]
+      Capture essential procedures that must be transferred.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: tribal-knowledge
+    name: Tribal Knowledge
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document undocumented insights using dash bullets:
+      - Insight: [knowledge shared] | Context: [when it applies] | Source: [how it was learned] | Risk if Lost: [consequence of not capturing]
+      Capture tips, tricks, history, and unwritten rules.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: systems-access
+    name: Systems Access
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document access needs using dash bullets:
+      - System: [name] | Access Level: [what's needed] | Current Status: [who has access] | Action: [what to do for transfer]
+      Identify accounts, permissions, and credentials to transfer.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: documentation-gaps
+    name: Documentation Gaps
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - key-processes
+      - tribal-knowledge
+    prompt: |
+      Identify missing documentation using dash bullets:
+      - Gap: [what's undocumented] | Type: [SOP/Guide/Reference/Training] | Priority: [Critical/High/Medium/Low] | Effort: [estimate to create]
+      Capture documentation that needs to be created.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: follow-up-training
+    name: Follow-up Training
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document additional training needs with checkbox bullets:
+      - [ ] Topic: [what else to cover] | Format: [Session/Shadowing/Self-study] | Timing: [when] | Owner: [who will provide]
+      Identify remaining knowledge gaps to address.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

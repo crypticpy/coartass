@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Training Session Notes
+description: "Training session capture with concepts, procedures, examples, Q&A, and practice exercises"
+icon: GraduationCap
+category: meeting
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: training-overview
+    name: Training Overview
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Topic:" identifying the training subject, instructor(s), and learning objectives.
+      - Paragraph 2 must begin with "Audience:" describing attendees, their roles, and prerequisite knowledge assumed in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: key-concepts-taught
+    name: Key Concepts Taught
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document key concepts using dash bullets:
+      - Concept: [topic/term] | Definition: [explanation] | Importance: [why it matters] | Application: [how to use it]
+      Capture the main learning points covered.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: procedures-demonstrated
+    name: Procedures Demonstrated
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document procedures using dash bullets:
+      - Procedure: [name] | Steps: [high-level sequence] | Tips: [instructor advice] | Common Mistakes: [pitfalls mentioned]
+      Capture step-by-step processes that were taught.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: examples-scenarios
+    name: "Examples & Scenarios"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - key-concepts-taught
+    prompt: |
+      Document examples using dash bullets:
+      - Example: [case or scenario] | Concept Illustrated: [what it teaches] | Key Takeaway: [main lesson] | Variation: [related scenarios mentioned]
+      Capture case studies, demonstrations, and illustrative scenarios.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: qa-highlights
+    name: "Q&A Highlights"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document Q&A using dash bullets:
+      - Question: [what was asked] | Asker: [role or "Attendee"] | Answer: [response summary] | Follow-up Needed: [Yes/No]
+      Capture important questions and answers from the session.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: resources-references
+    name: "Resources & References"
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      List resources using dash bullets:
+      - Resource: [name] | Type: [Document/Video/Tool/Website] | Location: [where to find it] | Use: [what it's for]
+      Include materials, documentation, and references mentioned.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: practice-exercises
+    name: Practice Exercises
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document exercises using dash bullets:
+      - Exercise: [activity name] | Objective: [learning goal] | Instructions: [what to do] | Completion: [done in session or "Homework"]
+      Capture hands-on activities and practice assignments.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

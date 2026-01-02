@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Sprint Planning Session
+description: Agile sprint planning with goals, capacity, backlog commitments, and team agreements
+icon: CalendarCheck
+category: meeting
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: sprint-goal
+    name: Sprint Goal
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two concise paragraphs:
+      - Paragraph 1 must begin with "Sprint Objective:" describing the primary goal and business value targeted for this sprint.
+      - Paragraph 2 must begin with "Success Criteria:" outlining how the team will know the sprint goal is achieved in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: capacity-availability
+    name: "Capacity & Availability"
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document team capacity using dash bullets:
+      - Team Member: [name] | Availability: [% or days] | Constraints: [PTO/meetings/other or "None"] | Focus Area: [specialty or "General"]
+      Include any team-wide capacity factors at the end.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: backlog-items-committed
+    name: Backlog Items Committed
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - capacity-availability
+    prompt: |
+      List committed backlog items using dash bullets:
+      - Item: [story/task title] | Type: [Story/Bug/Task/Spike] | Points: [estimate or "Unestimated"] | Owner: [assignee or "Unassigned"] | Priority: [P1/P2/P3]
+      Only include items the team committed to for this sprint.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: acceptance-criteria
+    name: Acceptance Criteria
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - backlog-items-committed
+    prompt: |
+      Document acceptance criteria discussed for key items using dash bullets:
+      - Item: [story title] | Criteria: [specific acceptance condition] | Verified By: [test type or "Manual review"]
+      Focus on items where acceptance criteria were explicitly discussed or clarified.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: risks-dependencies
+    name: "Risks & Dependencies"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Identify risks and dependencies using dash bullets:
+      - Type: [Risk/Dependency] | Description: [issue] | Impact: [affected items] | Mitigation: [plan or "Needs discussion"] | Owner: [person]
+      Include external dependencies, technical risks, and blockers.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: sprint-commitments
+    name: Sprint Commitments
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - backlog-items-committed
+    prompt: |
+      Record team commitments with checkbox bullets:
+      - [ ] Commitment: [agreement] | Owner: [team/individual] | Due: [date or "End of sprint"] | Type: [Process/Technical/Communication]
+      Include process agreements, ceremonies, and team working agreements.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

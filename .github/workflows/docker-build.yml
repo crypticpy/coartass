@@ -1,0 +1,287 @@
+# ============================================================================
+# Docker Build and Test Workflow
+# ============================================================================
+# This workflow builds and tests Docker images on pull requests
+# Ensures Docker configuration remains valid without deploying
+# ============================================================================
+
+name: Docker Build and Test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'next.config.mjs'
+      - '.github/workflows/docker-build.yml'
+
+  # Manual trigger
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: meeting-transcriber
+  TEST_TAG: test
+
+permissions:
+  contents: read
+
+jobs:
+  # ==========================================================================
+  # Build Docker Image
+  # ==========================================================================
+  build:
+    name: Build and Test Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----------------------------------------------------------------------
+      # Checkout code
+      # ----------------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------------
+      # Set up Docker Buildx
+      # ----------------------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ----------------------------------------------------------------------
+      # Build Docker image
+      # ----------------------------------------------------------------------
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ----------------------------------------------------------------------
+      # Test image size
+      # ----------------------------------------------------------------------
+      - name: Check image size
+        run: |
+          SIZE=$(docker images ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }} --format "{{.Size}}")
+          SIZE_MB=$(docker images ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }} --format "{{.Size}}" | sed 's/MB//' | sed 's/GB/*1024/' | bc 2>/dev/null || echo "0")
+
+          echo "Image size: $SIZE"
+
+          # Target: < 500MB
+          if [ -n "$SIZE_MB" ] && [ "$SIZE_MB" != "0" ]; then
+            if (( $(echo "$SIZE_MB > 500" | bc -l) )); then
+              echo "::error::Image size ($SIZE) exceeds 500MB target"
+              exit 1
+            else
+              echo "::notice::Image size ($SIZE) is within 500MB target ✓"
+            fi
+          fi
+
+      # ----------------------------------------------------------------------
+      # Inspect image
+      # ----------------------------------------------------------------------
+      - name: Inspect Docker image
+        run: |
+          echo "=== Image Details ==="
+          docker images ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }}
+
+          echo ""
+          echo "=== Architecture ==="
+          docker inspect ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }} --format '{{.Architecture}}'
+
+          echo ""
+          echo "=== Image History (size per layer) ==="
+          docker history ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }} --human --no-trunc
+
+      # ----------------------------------------------------------------------
+      # Test container startup
+      # ----------------------------------------------------------------------
+      - name: Test container startup
+        run: |
+          echo "Starting container..."
+          docker run -d \
+            --name test-container \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e PORT=3000 \
+            -e HOSTNAME=0.0.0.0 \
+            ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }}
+
+          echo "Waiting for container to be ready..."
+          sleep 15
+
+          echo "Checking container status..."
+          docker ps -a
+
+          echo "Checking container logs..."
+          docker logs test-container
+
+      # ----------------------------------------------------------------------
+      # Test health endpoint
+      # ----------------------------------------------------------------------
+      - name: Test health endpoint
+        run: |
+          echo "Testing health endpoint..."
+
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if curl -f -s http://localhost:3000/api/health > /dev/null; then
+              echo "Health check passed!"
+              HEALTH_RESPONSE=$(curl -s http://localhost:3000/api/health)
+              echo "Health response: $HEALTH_RESPONSE"
+              exit 0
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "Attempt $RETRY_COUNT failed, retrying..."
+              sleep 5
+            fi
+          done
+
+          echo "Health check failed after $MAX_RETRIES attempts"
+          echo "Container logs:"
+          docker logs test-container
+          exit 1
+
+      # ----------------------------------------------------------------------
+      # Run security scan
+      # ----------------------------------------------------------------------
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.TEST_TAG }}
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      # ----------------------------------------------------------------------
+      # Cleanup
+      # ----------------------------------------------------------------------
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop test-container || true
+          docker rm test-container || true
+
+  # ==========================================================================
+  # Test Docker Compose
+  # ==========================================================================
+  test-compose:
+    name: Test Docker Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      # ----------------------------------------------------------------------
+      # Checkout code
+      # ----------------------------------------------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------------
+      # Create test environment file
+      # ----------------------------------------------------------------------
+      - name: Create test environment file
+        run: |
+          cat > .env.local <<EOF
+          NODE_ENV=production
+          PORT=3000
+          HOSTNAME=0.0.0.0
+          EOF
+
+      # ----------------------------------------------------------------------
+      # Test docker compose build
+      # ----------------------------------------------------------------------
+      - name: Test docker compose build
+        run: |
+          docker compose build
+
+      # ----------------------------------------------------------------------
+      # Test docker compose up
+      # ----------------------------------------------------------------------
+      - name: Test docker compose up
+        run: |
+          docker compose up -d
+
+          echo "Waiting for service to be ready..."
+          sleep 15
+
+          echo "Checking service status..."
+          docker compose ps
+
+      # ----------------------------------------------------------------------
+      # Test health endpoint via compose
+      # ----------------------------------------------------------------------
+      - name: Test health endpoint
+        run: |
+          echo "Testing health endpoint..."
+
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if curl -f -s http://localhost:3000/api/health > /dev/null; then
+              echo "Health check passed!"
+              curl -s http://localhost:3000/api/health | jq .
+              exit 0
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "Attempt $RETRY_COUNT failed, retrying..."
+              sleep 5
+            fi
+          done
+
+          echo "Health check failed after $MAX_RETRIES attempts"
+          docker compose logs
+          exit 1
+
+      # ----------------------------------------------------------------------
+      # Cleanup
+      # ----------------------------------------------------------------------
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v
+
+  # ==========================================================================
+  # Build Report
+  # ==========================================================================
+  report:
+    name: Build Report
+    runs-on: ubuntu-latest
+    needs: [build, test-compose]
+    if: always()
+
+    steps:
+      - name: Generate report
+        run: |
+          echo "## Docker Build Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.build.result }}" == "success" ]]; then
+            echo "✅ Docker build: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Docker build: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [[ "${{ needs.test-compose.result }}" == "success" ]]; then
+            echo "✅ Docker Compose test: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Docker Compose test: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "- Review build logs for any warnings" >> $GITHUB_STEP_SUMMARY
+          echo "- Check image size is under 500MB target" >> $GITHUB_STEP_SUMMARY
+          echo "- Verify no CRITICAL vulnerabilities in security scan" >> $GITHUB_STEP_SUMMARY

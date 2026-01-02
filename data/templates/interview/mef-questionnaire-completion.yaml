@@ -1,0 +1,308 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: "MEF Questionnaire Completion (Phase 2)"
+description: "Answer all 41 MEF questionnaire questions with citations to transcript - designed for cascading context with advanced strategy - supports supplementary notes"
+icon: ClipboardCheck
+category: interview
+supportsSupplementalMaterial: true
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: ownership-criticality
+    name: "Section 1-2: Ownership & Criticality (Q1-8)"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Answer the following MEF questionnaire questions based ONLY on the interview transcript.
+
+      CRITICAL RULES - READ CAREFULLY:
+      1. ONLY include information that was EXPLICITLY stated in the transcript
+      2. Do NOT infer, assume, or guess capabilities, requirements, or configurations
+      3. If something wasn't discussed, say "Not discussed" - do NOT fill in with assumptions
+      4. If a speaker said "I think" or "probably", mark Confidence as Low
+      5. Preserve exact terminology - if they said "Worx" don't write "Works"
+      6. If the same topic was discussed in multiple places, consolidate all mentions
+
+      OUTPUT FORMAT - YOU MUST FOLLOW THIS EXACTLY:
+
+      For EACH question, output on SEPARATE LINES:
+      - Line 1: Q[N] ([topic]): [Your answer]
+      - Line 2: Source: "[exact quote]" [TIMESTAMP] where TIMESTAMP = seconds from start, in brackets like [123]
+      - Line 3: Confidence: High/Medium/Low
+      - Line 4: (blank line)
+
+      TIMESTAMP IS REQUIRED - Always include the timestamp in seconds like [45] or [123] or [890].
+      Get the timestamp from the transcript segment where the quote appears.
+
+      EXAMPLE OUTPUT:
+
+      Q2 (Primary owner): John Smith, Program Manager
+      Source: "John Smith is our program manager" [45]
+      Confidence: High
+
+      Q3 (Backup owner): Jane Doe, Assistant Manager
+      Source: "Jane covers when John is out" [67]
+      Confidence: High
+
+      If NOT discussed: Q[N] ([topic]): Not discussed - requires follow-up
+
+      === SECTION 1: Ownership & Contacts ===
+
+      Q1: Which ID from the Master MEF list are we completing today?
+
+      Q2: Who is the primary accountable owner for this Mission Essential Function (MEF)? Provide name and title.
+
+      Q3: Who is the alternate/backup owner for this MEF if the primary owner is unavailable? Provide name and title.
+
+      Q4: Who is the best day-to-day operational contact for this MEF? Include name, role, and preferred contact details (email and/or phone).
+
+      === SECTION 2: Criticality & Impact ===
+
+      Q5: What Criticality Tier best fits this MEF?
+      Options: (a) Mission Critical (b) Business Critical (c) Business Operational (d) Administrative Services
+
+      Q6: Maximum Tolerable Downtime (MTD): What is the maximum time this MEF can be down before the impact becomes unacceptable?
+
+      Q7: If this MEF fails, describe the impacts and their severity (High/Medium/Low) for:
+      - Public health impact
+      - Legal/regulatory impact
+      - Financial impact
+      - Reputational/political impact
+
+      Q8: Overall, what is the risk rating if this MEF is unavailable, considering both likelihood and impact?
+      Options: (a) High (b) Medium (c) Low
+
+  - id: legal-continuity
+    name: "Section 3-4: Legal & Continuity (Q9-15)"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - ownership-criticality
+    prompt: |
+      Continue answering MEF questionnaire questions. You have context from the previous section
+      about ownership and criticality - use that to inform these answers where relevant.
+
+      REMEMBER: Only include EXPLICITLY stated information. Do NOT infer or assume.
+      If discussed in multiple places, consolidate. Preserve exact terminology.
+
+      OUTPUT FORMAT - SEPARATE LINES for each question:
+      Q[N] ([topic]): [Answer]
+      Source: "[quote]" [TIMESTAMP in seconds like [123]]
+      Confidence: High/Medium/Low
+      (blank line)
+
+      TIMESTAMP IS REQUIRED on every Source line.
+
+      === SECTION 3: Legal, Regulatory, & External Dependencies ===
+
+      Q9: List any laws, regulations, grant requirements, contracts, or policies that require or govern this MEF.
+
+      Q10: Which external partners does this MEF rely on, and for what? (state agencies, hospitals, labs, vendors, community organizations)
+
+      Q11: Does this MEF depend on Citywide services (CTM/network, HR, Finance, Fleet, Facilities)?
+      Options: (a) Yes (b) No
+
+      Q12: If Yes to Q11, enter details about Citywide service dependencies.
+
+      === SECTION 4: Continuity Objectives (RTO, RPO, Service Levels) ===
+
+      Q13: Recovery Time Objective (RTO): After a disruption, within what timeframe must this MEF be restored to an acceptable level?
+
+      Q14: Recovery Point Objective (RPO): How much data loss can this MEF tolerate?
+
+      Q15: Minimum Service Level: If you cannot operate at full capacity, what is the minimum acceptable service level for this MEF during an emergency? Which activities must continue, and which can be reduced, delayed, or paused?
+
+  - id: workarounds-technology
+    name: "Section 5-6: Workarounds & Technology (Q16-26)"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - legal-continuity
+    prompt: |
+      Continue answering MEF questionnaire questions. You have context from previous sections
+      about ownership, criticality, and continuity objectives - use that to ensure consistency.
+
+      REMEMBER: Only include EXPLICITLY stated information. Do NOT infer or assume.
+      ESPECIALLY for technology questions: if they said "we use System X" do NOT assume
+      it has MFA, backups, or any other capability unless explicitly stated.
+
+      OUTPUT FORMAT - SEPARATE LINES for each question:
+      Q[N] ([topic]): [Answer]
+      Source: "[quote]" [TIMESTAMP in seconds like [123]]
+      Confidence: High/Medium/Low
+      (blank line)
+
+      TIMESTAMP IS REQUIRED on every Source line.
+
+      === SECTION 5: Workarounds, Locations, & Hours ===
+
+      Q16: Is there a manual or alternate workaround if systems are down? Start with 'Yes' or 'No', then describe how the workaround would work and how long it can be sustained.
+
+      Q17: If your primary work location is unavailable, where could this MEF be performed? List any alternate physical locations or telework options.
+
+      Q18: What are the normal operating hours for this MEF? Are any extended hours, after-hours, or on-call coverage required during emergencies?
+
+      Q19: Can this MEF be performed remotely?
+      Options: (a) Fully remote-capable (b) Partially remote-capable (c) Not remote-capable
+
+      Q20: Under normal conditions, what is the primary work location for this MEF?
+
+      === SECTION 6: Technology & Data ===
+
+      Q21: List the primary applications or systems required to perform this MEF. Include system names and any identifiers you know.
+
+      Q22: List any secondary or supporting systems used by this MEF (reporting tools, scheduling systems, document repositories, communications tools).
+
+      Q23: Where is the key data for this MEF stored? (databases, shared network drives, SharePoint sites, cloud applications, or paper files)
+
+      Q24: What network or connectivity does this MEF require to function? (City network access, VPN, internet access, secure connection to State/Federal systems)
+
+      Q25: What devices and peripherals do staff need to perform this MEF? (laptops/desktops, tablets, specialized printers, scanners, phones, card readers, labelers)
+
+      Q26: Does this MEF depend on any interfaces or data feeds between systems? If yes, describe each: source system to target system, what data is shared, and how often.
+
+  - id: security-people-process
+    name: "Section 6-8: Security, People & Process (Q27-34)"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - workarounds-technology
+    prompt: |
+      Continue answering MEF questionnaire questions. You have context from previous sections
+      about technology systems - use that when answering security questions.
+
+      REMEMBER: Only include EXPLICITLY stated information. Do NOT infer or assume.
+      For security questions (Q27-31): Only list controls that were explicitly mentioned.
+      "We use System X" does NOT imply MFA, encryption, backups, etc. unless stated.
+
+      OUTPUT FORMAT - SEPARATE LINES for each question:
+      Q[N] ([topic]): [Answer]
+      Source: "[quote]" [TIMESTAMP in seconds like [123]]
+      Confidence: High/Medium/Low
+      (blank line)
+
+      TIMESTAMP IS REQUIRED on every Source line.
+
+      === SECTION 6 (continued): Security & Data Classification ===
+
+      Q27: How are your primary systems for this MEF hosted?
+      Options: (a) On-premise (b) Vendor-hosted SaaS (c) Cloud IaaS/PaaS (d) Hybrid (e) I am unsure
+
+      Q28: What type of information does this MEF handle, and how sensitive is it?
+      Options: (a) Public (b) Non-Public (c) Restricted (d) I am unsure
+
+      Q29: If Restricted, select all categories that apply:
+      (a) PII - Personally Identifiable Information
+      (b) PHI - Protected Health Information
+      (c) PCI - Payment Card Industry
+      (d) NDA - Non-Disclosure Agreement / Other federally protected category
+
+      Q30: What security and continuity controls already protect this MEF and its systems/data? (MFA, role-based access, regular backups, DR environment, logging/monitoring, encryption, standard procedures)
+
+      Q31: Are there any known gaps or weaknesses for this MEF? (single points of failure, unsupported systems, no documentation, capacity constraints, frequent outages)
+
+      === SECTION 7: People & Roles ===
+
+      Q32: What roles or job types are required to operate this MEF? (epidemiologist, registrar, nurse, social worker, case manager, analyst, admin support)
+
+      === SECTION 8: Process Dependencies ===
+
+      Q33: What inputs does this MEF rely on from other internal units or external partners? (data, approvals, supplies, lab results, decisions)
+
+      Q34: Who depends on the outputs of this MEF? (other APH programs, City departments, State agencies, or the public, and what they depend on you for)
+
+  - id: performance-equity
+    name: "Section 9: Performance & Equity (Q35-41)"
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - security-people-process
+    prompt: |
+      Complete the final section of MEF questionnaire questions. You have full context
+      from all previous sections - use that to ensure final answers are consistent.
+
+      REMEMBER: Only include EXPLICITLY stated information. Do NOT infer or assume.
+      For metrics: only report numbers/targets if the interviewee gave specific values.
+      For equity concerns: only list populations/issues actually discussed.
+
+      OUTPUT FORMAT - SEPARATE LINES for each question:
+      Q[N] ([topic]): [Answer]
+      Source: "[quote]" [TIMESTAMP in seconds like [123]]
+      Confidence: High/Medium/Low
+      (blank line)
+
+      TIMESTAMP IS REQUIRED on every Source line.
+
+      === SECTION 9: Performance, Equity, & Improvement ===
+
+      Q35: How do you measure performance for this MEF today? (number of clients served, time to respond, turnaround time, error rate)
+
+      Q36: What are your targets or thresholds for those performance measures under normal operations? If you have different targets during emergencies, please note them.
+
+      Q37: What is your recent baseline performance for these measures? (average values from the last quarter or last year)
+
+      Q38: Does this MEF have specific equity or inclusion considerations? (impact on vulnerable populations, language access, accessibility, transportation, digital divide) Describe any concerns if the MEF is disrupted.
+
+      Q39: How high is the priority to improve or modernize this MEF?
+      Options: (a) High (b) Medium (c) Low
+
+      Q40: When was this MEF last formally reviewed (for COOP, audit, or process improvement)?
+
+      Q41: Please share any additional notes or context about this MEF that we have not captured in previous questions.
+
+  - id: completion-validation
+    name: Completion Validation
+    extractEvidence: false
+    outputFormat: bullet_points
+    dependencies:
+      - ownership-criticality
+      - legal-continuity
+      - workarounds-technology
+      - security-people-process
+      - performance-equity
+    prompt: |
+      Review all 41 questions answered above and provide a completion summary.
+
+      === COMPLETION CHECKLIST ===
+      For each section, count:
+      - Questions Answered (with supporting evidence)
+      - Questions Partially Answered (mentioned but incomplete)
+      - Questions Not Discussed (require follow-up)
+
+      Section 1 - Ownership & Contacts (Q1-4): [X/4 complete]
+      Section 2 - Criticality & Impact (Q5-8): [X/4 complete]
+      Section 3 - Legal & External (Q9-12): [X/4 complete]
+      Section 4 - Continuity Objectives (Q13-15): [X/3 complete]
+      Section 5 - Workarounds & Locations (Q16-20): [X/5 complete]
+      Section 6 - Technology & Data (Q21-31): [X/11 complete]
+      Section 7 - People & Roles (Q32): [X/1 complete]
+      Section 8 - Process Dependencies (Q33-34): [X/2 complete]
+      Section 9 - Performance & Equity (Q35-41): [X/7 complete]
+
+      TOTAL: [X/41 questions complete]
+
+      === FOLLOW-UP REQUIRED ===
+      List each question that was NOT discussed or only partially answered:
+      - Q[N]: [Brief description] | Priority: [High/Medium/Low] | Suggested Follow-up: [who to ask or how to obtain]
+
+      === CONSISTENCY FLAGS ===
+      Note any answers that seem inconsistent with other answers:
+      - [Description of inconsistency between Q[X] and Q[Y]]
+
+      === CONFIDENCE SUMMARY ===
+      - High Confidence Answers: [count]
+      - Medium Confidence Answers: [count]
+      - Low Confidence Answers: [count]
+
+      === INTERVIEW ASSESSMENT ===
+      If less than 50% of questions were answered:
+      - Assessment: "SPARSE INTERVIEW - significant follow-up required"
+      - Most Critical Gaps: [top 5 unanswered questions by priority]
+      - Recommendation: [schedule follow-up interview vs. email questionnaire vs. document review]
+
+      If certain sections were completely skipped:
+      - Skipped Sections: [list]
+      - Possible Reasons: [ran out of time, wrong SME present, deferred to IT, etc.]
+      - Next Steps: [specific recommendations]

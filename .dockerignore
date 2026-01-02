@@ -1,0 +1,214 @@
+# ============================================================================
+# Docker Build Context Exclusions
+# ============================================================================
+# This file specifies which files and directories should be excluded from
+# the Docker build context. This reduces build context size, speeds up builds,
+# and prevents unnecessary files from being copied into the image.
+# ============================================================================
+
+# ============================================================================
+# Node.js and Dependencies
+# ============================================================================
+# These will be installed fresh in the Docker image
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ============================================================================
+# Next.js Build Artifacts
+# ============================================================================
+# These will be created during the Docker build process
+.next/
+out/
+build/
+dist/
+.swc/
+
+# ============================================================================
+# Development and IDE Files
+# ============================================================================
+# Not needed in production container
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ============================================================================
+# Version Control
+# ============================================================================
+# Git history not needed in container
+.git/
+.gitignore
+.gitattributes
+.github/
+.gitlab-ci.yml
+
+# ============================================================================
+# Environment and Configuration
+# ============================================================================
+# Secrets should be passed as environment variables at runtime
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+.env.local.example
+
+# ============================================================================
+# Testing
+# ============================================================================
+# Test files not needed in production
+coverage/
+.nyc_output/
+*.test.js
+*.test.ts
+*.test.jsx
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.jsx
+*.spec.tsx
+__tests__/
+__mocks__/
+test/
+tests/
+e2e/
+
+# ============================================================================
+# Documentation
+# ============================================================================
+# Documentation not needed in container (except README if desired)
+*.md
+!README.md
+docs/
+ANALYSIS_*.md
+TEMPLATE_*.md
+EXPORT_*.md
+TRANSCRIPT_*.md
+SECURITY_*.md
+VALIDATION_*.md
+AUDIO_*.md
+
+# ============================================================================
+# Example and Sample Files
+# ============================================================================
+example-*.json
+sample-*.json
+*.example
+examples/
+samples/
+
+# ============================================================================
+# CI/CD and Deployment
+# ============================================================================
+# These are for build automation, not runtime
+.circleci/
+.travis.yml
+.gitlab-ci.yml
+azure-pipelines.yml
+cloudbuild.yaml
+netlify.toml
+vercel.json
+docker-compose*.yml
+Dockerfile*
+!Dockerfile
+.dockerignore
+
+# ============================================================================
+# Logs and Temporary Files
+# ============================================================================
+logs/
+*.log
+pids/
+*.pid
+*.seed
+*.pid.lock
+lib-cov/
+tmp/
+temp/
+
+# ============================================================================
+# TypeScript
+# ============================================================================
+# Source maps and build info not needed in production
+*.tsbuildinfo
+*.map
+
+# ============================================================================
+# Package Manager
+# ============================================================================
+# Lock files handled by npm ci in Dockerfile
+.npm/
+.yarn/
+.pnp.*
+yarn.lock
+pnpm-lock.yaml
+
+# ============================================================================
+# Build Tools
+# ============================================================================
+.cache/
+.parcel-cache/
+.turbo/
+.nuxt/
+.output/
+
+# ============================================================================
+# OS-specific Files
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================================================
+# Scripts and Development Utilities
+# ============================================================================
+# Keep build-templates.mjs for template compilation during Docker build
+scripts/
+!scripts/build-templates.mjs
+*.sh
+!entrypoint.sh
+
+# ============================================================================
+# Database and Storage
+# ============================================================================
+# Local development databases
+*.sqlite
+*.sqlite3
+*.db
+# Keep data/templates for YAML template files needed at build time
+data/
+!data/templates/
+storage/
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+.eslintcache
+.prettierignore
+.editorconfig
+.nvmrc
+.node-version
+.huskyrc
+.lintstagedrc
+.commitlintrc*

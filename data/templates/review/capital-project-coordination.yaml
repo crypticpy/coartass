@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Capital Project Coordination
+description: Track multi-department capital projects across scope, schedule, risks, and milestones
+icon: Landmark
+category: review
+outputs:
+  - summary
+  - action_items
+  - decisions
+
+sections:
+  - id: portfolio-snapshot
+    name: Portfolio Snapshot
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two short paragraphs:
+      - Paragraph 1 starts with "Portfolio Scope:" summarizing number of projects, total budget, and key corridors.
+      - Paragraph 2 starts with "Overall Health:" noting aggregate schedule status and resource posture in <=70 words.
+
+  - id: workstream-progress
+    name: Workstream Progress
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List each major workstream with dash bullets:
+      - Workstream: [name] | Phase: [stage] | Status: [On Track/At Risk/Delayed] | Note: [<=15 word context]
+      Limit to the most material workstreams discussed.
+
+  - id: budget-and-schedule-risks
+    name: "Budget & Schedule Risks"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document risks using dash bullets:
+      - Risk: [description] | Impact: [Budget/Schedule/Both] | Owner: [department] | Mitigation: [next step or "Pending"]
+      Highlight items requiring council or executive awareness.
+
+  - id: field-issues-and-constraints
+    name: "Field Issues & Constraints"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Capture field constraints using dash bullets:
+      - Issue: [problem] | Location: [project/area] | Cause: [factor] | Temporary Measure: [response or "None"]
+      Include permitting, community, or utility conflicts explicitly.
+
+  - id: upcoming-milestones
+    name: Upcoming Milestones
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List near-term milestones as dash bullets:
+      - Milestone: [name] | Target Date: [date] | Dependency: [prerequisite or "None"] | Confidence: [High/Medium/Low]
+      Flag threatened milestones inside the Confidence field.
+

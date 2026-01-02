@@ -1,0 +1,69 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: Scrum of Scrums
+description: Cross-team coordination with status reports, dependencies, escalations, and integration points
+icon: Network
+category: meeting
+outputs:
+  - summary
+  - action_items
+
+sections:
+  - id: team-status-reports
+    name: Team Status Reports
+    extractEvidence: false
+    outputFormat: bullet_points
+    prompt: |
+      Document each team's status using dash bullets:
+      - Team: [name] | Sprint Progress: [% or status] | Key Delivery: [main item this sprint] | Health: [Green/Yellow/Red]
+      Summarize each team's overall status briefly.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: cross-team-dependencies
+    name: Cross-Team Dependencies
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List dependencies using dash bullets:
+      - Dependency: [what's needed] | From: [providing team] | To: [receiving team] | Due: [date] | Status: [On Track/At Risk/Blocked]
+      Focus on dependencies between teams that could cause delays.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: escalation-items
+    name: Escalation Items
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document escalations using dash bullets:
+      - Issue: [problem] | Teams Affected: [list] | Decision Needed: [what leadership must decide] | Urgency: [High/Medium/Low]
+      Include items that cannot be resolved at the team level.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: coordination-decisions
+    name: Coordination Decisions
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - cross-team-dependencies
+      - escalation-items
+    prompt: |
+      Record decisions made using dash bullets:
+      - Decision: [agreement reached] | Teams Involved: [participants] | Impact: [effect on work] | Owner: [accountable party]
+      Include cross-team agreements and coordination choices.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: integration-points
+    name: Integration Points
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      List upcoming integration milestones using dash bullets:
+      - Integration: [what's being integrated] | Teams: [involved teams] | Target Date: [date] | Risk Level: [High/Medium/Low]
+      Focus on near-term integration activities requiring coordination.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+

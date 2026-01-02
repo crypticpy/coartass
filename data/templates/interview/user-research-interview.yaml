@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=../template.schema.json
+$schema: ../template.schema.json
+name: User Research Interview
+description: User interview capturing workflows, goals, pain points, mental models, and unmet needs
+icon: UserSearch
+category: interview
+outputs:
+  - summary
+  - quotes
+
+sections:
+  - id: participant-profile
+    name: Participant Profile
+    extractEvidence: false
+    outputFormat: paragraph
+    prompt: |
+      Provide two paragraphs:
+      - Paragraph 1 must begin with "Demographics:" describing role, experience level, and relevant background (anonymized as appropriate).
+      - Paragraph 2 must begin with "Context:" explaining their relationship to the product/domain being researched in <=60 words.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: current-workflow
+    name: Current Workflow
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document their current process using dash bullets:
+      - Activity: [what they do] | Frequency: [how often] | Tools: [what they use] | Time: [duration if mentioned] | Satisfaction: [rating or sentiment]
+      Capture how they accomplish tasks today.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: goals-motivations
+    name: "Goals & Motivations"
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document goals using dash bullets:
+      - Goal: [what they're trying to achieve] | Motivation: [underlying reason] | Priority: [High/Medium/Low] | Measure of Success: [how they'd know they achieved it]
+      Capture both explicit goals and underlying motivations.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: pain-points
+    name: Pain Points
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document frustrations using dash bullets:
+      - Pain Point: [frustration] | Context: [when it occurs] | Impact: [effect on them] | Coping Strategy: [how they deal with it] | Severity: [High/Medium/Low]
+      Capture problems, annoyances, and obstacles they face.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: mental-models
+    name: Mental Models
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document mental models using dash bullets:
+      - Concept: [how they think about something] | Language: [terms they use] | Expectation: [what they assume should happen] | Misconception: [incorrect belief if any]
+      Capture how they conceptualize the domain.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: feature-reactions
+    name: Feature Reactions
+    extractEvidence: true
+    outputFormat: bullet_points
+    prompt: |
+      Document reactions to concepts shown using dash bullets:
+      - Feature/Concept: [what was shown] | Reaction: [their response] | Appeal: [High/Medium/Low] | Concerns: [hesitations or "None"] | Quote: "[notable comment]"
+      Capture responses to prototypes, mockups, or feature descriptions.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
+  - id: unmet-needs
+    name: Unmet Needs
+    extractEvidence: true
+    outputFormat: bullet_points
+    dependencies:
+      - pain-points
+      - goals-motivations
+    prompt: |
+      Document unmet needs using dash bullets:
+      - Need: [what they wish they could do] | Current Gap: [what's missing] | Impact of Gap: [consequence] | Ideal Solution: [their vision if stated]
+      Capture opportunities for improvement they mentioned.
+      
+      If this topic was not discussed in the meeting, output: "Not applicable to this meeting."
+
