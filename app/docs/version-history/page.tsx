@@ -125,6 +125,125 @@ function VersionCard({ entry }: { entry: VersionEntry }) {
 
 const versionHistory: VersionEntry[] = [
   {
+    version: '0.14.0',
+    date: '2026-01-02',
+    title: 'Interactive Review Mode with Scorecard Overlay',
+    highlights: 'Major RTASS milestone: full-screen transcript review with synchronized audio and scorecard overlay system.',
+    changes: [
+      {
+        type: 'feature',
+        description: 'Interactive Review Mode',
+        details: [
+          'Full-screen transcript review with synchronized audio playback',
+          'Waveform visualization with timestamp-linked segment navigation',
+          'Click any transcript segment to jump to that point in audio',
+          'Visual progress indicator showing current playback position',
+        ],
+      },
+      {
+        type: 'feature',
+        description: 'Scorecard Overlay System',
+        details: [
+          'Scorecard selector dropdown showing score, status, and date',
+          'Scorecard overlay panel displaying sections and criteria verdicts',
+          'Evidence markers linking criteria to specific transcript segments',
+          'Overall score display prominently in header',
+        ],
+      },
+      {
+        type: 'improvement',
+        description: 'Audio Enhancements',
+        details: [
+          'Waveform peaks caching in IndexedDB for instant reload',
+          'Audio controls modal for playback speed adjustment',
+          'Improved audio sync hooks with better timestamp handling',
+        ],
+      },
+      {
+        type: 'improvement',
+        description: 'Branding Updates',
+        details: [
+          'Austin Fire Department logo in header',
+          'Simplified "RTASS" branding throughout app',
+          'Updated hero banner and footer text',
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.13.0',
+    date: '2026-01-01',
+    title: 'RTASS Scorecard PDF Export & Rubric Builder',
+    highlights: 'Complete scorecard PDF export with rubric visualization and interactive rubric builder UI.',
+    changes: [
+      {
+        type: 'feature',
+        description: 'Scorecard PDF Export',
+        details: [
+          'Professional PDF export of RTASS scorecards',
+          'Rubric criteria with verdicts, scores, and evidence',
+          'Section breakdown with visual scoring indicators',
+          'Overall score summary with benchmark context',
+        ],
+      },
+      {
+        type: 'feature',
+        description: 'Rubric Builder UI',
+        details: [
+          'Interactive rubric template editor',
+          'Add/edit/remove sections and criteria',
+          'Configure scoring thresholds and benchmarks',
+          'Preview rubric before saving',
+        ],
+      },
+      {
+        type: 'improvement',
+        description: 'Scoring System Enhancements',
+        details: [
+          'Improved evidence linking between criteria and transcript',
+          'Better handling of partial matches and edge cases',
+          'Enhanced benchmark display with context',
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.12.6',
+    date: '2026-01-01',
+    title: 'Initial Austin RTASS Conversion',
+    highlights: 'Conversion from general meeting transcriber to Austin Fire Department Radio Transcription Analysis Scoring System.',
+    changes: [
+      {
+        type: 'feature',
+        description: 'RTASS Foundation',
+        details: [
+          'RTASS rubric and scorecard data models',
+          'AFD-specific analysis templates',
+          'Radio traffic transcription optimizations',
+          'Incident-based transcript organization',
+        ],
+      },
+      {
+        type: 'feature',
+        description: 'AFD Templates',
+        details: [
+          'Post-Incident Review template for comprehensive analysis',
+          'Radio Quick Review template for rapid assessment',
+          'Archived non-fire-related meeting templates',
+        ],
+      },
+      {
+        type: 'improvement',
+        description: 'Analysis Strategy Updates',
+        details: [
+          'Enhanced token handling for long radio transcripts',
+          'Improved evidence extraction and normalization',
+          'Better error handling and recovery in analysis pipeline',
+        ],
+      },
+    ],
+  },
+  {
     version: '0.12.5',
     date: '2025-12-31',
     title: 'Azure AD CSP Fix',
@@ -701,7 +820,7 @@ export default function VersionHistoryPage() {
           <Box>
             <Title order={1}>Version History</Title>
             <Text c="dimmed" size="lg">
-              What&apos;s new in Meeting Transcriber
+              What&apos;s new in RTASS
             </Text>
           </Box>
         </Group>
