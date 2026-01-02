@@ -31,7 +31,7 @@ export default function Footer() {
                 textAlign: "center",
               }}
             >
-              Austin RTASS v{appVersion} &copy; {currentYear}
+              RTASS v{appVersion} &copy; {currentYear}
             </Text>
 
             <Box className="footer-links">

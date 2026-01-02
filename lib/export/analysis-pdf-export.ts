@@ -34,6 +34,7 @@ export async function generateAnalysisPdf(
     analysis: filteredAnalysis,
     transcript,
     template,
+    includeMetadata: options.includeMetadata,
     includeTableOfContents: options.includeTOC,
   });
 
@@ -67,19 +68,16 @@ function filterAnalysisForExport(
     }));
   }
 
-  // Remove action items if not included
-  if (!options.includeActionItems) {
-    delete filteredResults.actionItems;
+  if (!options.includeBenchmarks) {
+    delete filteredResults.benchmarks;
   }
 
-  // Remove decisions if not included
-  if (!options.includeDecisions) {
-    delete filteredResults.decisions;
+  if (!options.includeRadioReports) {
+    delete filteredResults.radioReports;
   }
 
-  // Remove quotes if not included
-  if (!options.includeQuotes) {
-    delete filteredResults.quotes;
+  if (!options.includeSafetyEvents) {
+    delete filteredResults.safetyEvents;
   }
 
   return {

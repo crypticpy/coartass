@@ -1,8 +1,8 @@
 /**
- * City of Austin Departments Configuration
+ * Austin RTASS Department Configuration
  *
- * Municipal departments for organizing transcripts
- * Based on actual City of Austin organizational structure
+ * Public safety departments for radio traffic analysis.
+ * RTASS focuses on Fire, Police, and EMS operations.
  */
 
 export interface Department {
@@ -15,177 +15,33 @@ export interface Department {
 }
 
 /**
- * City of Austin Departments
- * Organized alphabetically for easy reference
+ * Austin RTASS Departments
+ * Limited to public safety: Fire, Police, EMS
  */
 export const AUSTIN_DEPARTMENTS: Department[] = [
   {
-    id: 'austin-code',
-    name: 'Code Compliance',
-    nameEs: 'Cumplimiento de Códigos',
-    abbreviation: 'CODE',
-    color: 'bg-orange-500',
-    icon: '📋',
-  },
-  {
-    id: 'austin-energy',
-    name: 'Austin Energy',
-    nameEs: 'Austin Energy',
-    abbreviation: 'AE',
-    color: 'bg-yellow-500',
-    icon: '⚡',
-  },
-  {
-    id: 'austin-public-health',
-    name: 'Austin Public Health',
-    nameEs: 'Salud Pública de Austin',
-    abbreviation: 'APH',
-    color: 'bg-green-500',
-    icon: '🏥',
-  },
-  {
-    id: 'austin-water',
-    name: 'Austin Water',
-    nameEs: 'Agua de Austin',
-    abbreviation: 'AW',
-    color: 'bg-blue-500',
-    icon: '💧',
-  },
-  {
-    id: 'aviation',
-    name: 'Aviation Department',
-    nameEs: 'Departamento de Aviación',
-    abbreviation: 'AVIATION',
-    color: 'bg-sky-500',
-    icon: '✈️',
-  },
-  {
-    id: 'building-services',
-    name: 'Building Services',
-    nameEs: 'Servicios de Edificios',
-    abbreviation: 'BSD',
-    color: 'bg-gray-500',
-    icon: '🏗️',
-  },
-  {
-    id: 'communication',
-    name: 'Communication & Public Information',
-    nameEs: 'Comunicación e Información Pública',
-    abbreviation: 'CPI',
-    color: 'bg-purple-500',
-    icon: '📢',
-  },
-  {
-    id: 'development-services',
-    name: 'Development Services',
-    nameEs: 'Servicios de Desarrollo',
-    abbreviation: 'DSD',
-    color: 'bg-indigo-500',
-    icon: '🏘️',
-  },
-  {
-    id: 'emergency-management',
-    name: 'Emergency Management',
-    nameEs: 'Gestión de Emergencias',
-    abbreviation: 'HSEM',
-    color: 'bg-red-500',
-    icon: '🚨',
-  },
-  {
-    id: 'financial-services',
-    name: 'Financial Services',
-    nameEs: 'Servicios Financieros',
-    abbreviation: 'CTM',
-    color: 'bg-emerald-500',
-    icon: '💰',
-  },
-  {
     id: 'fire',
-    name: 'Fire Department',
-    nameEs: 'Departamento de Bomberos',
+    name: 'Austin Fire Department',
+    nameEs: 'Departamento de Bomberos de Austin',
     abbreviation: 'AFD',
     color: 'bg-red-600',
     icon: '🚒',
   },
   {
-    id: 'housing',
-    name: 'Housing & Planning',
-    nameEs: 'Vivienda y Planificación',
-    abbreviation: 'HPD',
-    color: 'bg-teal-500',
-    icon: '🏠',
-  },
-  {
-    id: 'human-resources',
-    name: 'Human Resources',
-    nameEs: 'Recursos Humanos',
-    abbreviation: 'HR',
-    color: 'bg-pink-500',
-    icon: '👥',
-  },
-  {
-    id: 'library',
-    name: 'Austin Public Library',
-    nameEs: 'Biblioteca Pública de Austin',
-    abbreviation: 'APL',
-    color: 'bg-amber-500',
-    icon: '📚',
-  },
-  {
-    id: 'parks-recreation',
-    name: 'Parks & Recreation',
-    nameEs: 'Parques y Recreación',
-    abbreviation: 'PARD',
-    color: 'bg-lime-500',
-    icon: '🌳',
+    id: 'ems',
+    name: 'Austin-Travis County EMS',
+    nameEs: 'Servicios Médicos de Emergencia',
+    abbreviation: 'ATCEMS',
+    color: 'bg-blue-500',
+    icon: '🚑',
   },
   {
     id: 'police',
-    name: 'Police Department',
-    nameEs: 'Departamento de Policía',
+    name: 'Austin Police Department',
+    nameEs: 'Departamento de Policía de Austin',
     abbreviation: 'APD',
-    color: 'bg-blue-600',
+    color: 'bg-blue-800',
     icon: '👮',
-  },
-  {
-    id: 'public-works',
-    name: 'Public Works',
-    nameEs: 'Obras Públicas',
-    abbreviation: 'PWD',
-    color: 'bg-stone-500',
-    icon: '🛠️',
-  },
-  {
-    id: 'resource-recovery',
-    name: 'Austin Resource Recovery',
-    nameEs: 'Recuperación de Recursos de Austin',
-    abbreviation: 'ARR',
-    color: 'bg-green-600',
-    icon: '♻️',
-  },
-  {
-    id: 'transportation',
-    name: 'Transportation & Public Works',
-    nameEs: 'Transporte y Obras Públicas',
-    abbreviation: 'TPW',
-    color: 'bg-slate-500',
-    icon: '🚗',
-  },
-  {
-    id: 'watershed',
-    name: 'Watershed Protection',
-    nameEs: 'Protección de Cuencas',
-    abbreviation: 'WPD',
-    color: 'bg-cyan-500',
-    icon: '🌊',
-  },
-  {
-    id: 'other',
-    name: 'Other Department',
-    nameEs: 'Otro Departamento',
-    abbreviation: 'OTHER',
-    color: 'bg-neutral-500',
-    icon: '📁',
   },
 ];
 

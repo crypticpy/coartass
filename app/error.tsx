@@ -59,7 +59,7 @@ export default function Error({ error, reset }: ErrorProps) {
 
         <Stack gap="md" align="center">
           <Title order={2} ta="center" c="aphBlue.7">
-            Meeting Transcriber
+            Austin RTASS
           </Title>
           <Text size="lg" ta="center" c="dimmed" maw={500}>
             Don&apos;t worry, your data is safe. Try refreshing the page or return to the home page.

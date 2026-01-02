@@ -5,6 +5,8 @@
  * transcripts are processed and what information is extracted.
  */
 
+import type { AnalysisStrategy } from '@/lib/analysis-strategy';
+
 /**
  * Output formatting options for analysis results.
  */
@@ -12,6 +14,16 @@ export type OutputFormat =
   | 'bullet_points'  // Format as bullet list
   | 'paragraph'      // Format as continuous prose
   | 'table';         // Format as structured table
+
+/**
+ * Content type classification for templates.
+ * Affects default strategy selection and analysis behavior.
+ */
+export type ContentType =
+  | 'meeting'        // Traditional meeting transcripts (high token density)
+  | 'radio-traffic'  // Radio communications (lower token density, needs full context)
+  | 'interview'      // Interview transcripts
+  | 'general';       // General-purpose templates
 
 /**
  * Template categorization for organization and filtering.
@@ -27,9 +39,13 @@ export type TemplateCategory =
  */
 export type OutputType =
   | 'summary'       // Condensed overview of content
-  | 'action_items'  // Extracted tasks and responsibilities
-  | 'quotes'        // Notable quotations from the transcript
-  | 'decisions';    // Key decisions made during the meeting
+  | 'benchmarks'    // Fireground benchmarks/milestones (training/compliance)
+  | 'radio_reports' // Structured radio reports + CAN logs
+  | 'safety_events' // Safety/accountability events (PAR, MAYDAY, evac, etc.)
+  // Legacy meeting-focused outputs (kept for backward compatibility)
+  | 'action_items'
+  | 'quotes'
+  | 'decisions';
 
 /**
  * Defines a single section within a template's analysis structure.
@@ -101,6 +117,28 @@ export interface Template {
    */
   supportsSupplementalMaterial?: boolean;
 
+  /**
+   * Maximum analysis strategy allowed for this template.
+   * Radio traffic templates should use 'basic' or 'hybrid' to avoid
+   * truncation issues with advanced cascading.
+   *
+   * - 'basic': Only basic strategy allowed
+   * - 'hybrid': Basic or hybrid allowed
+   * - 'advanced' or undefined: All strategies allowed
+   */
+  maxStrategy?: AnalysisStrategy;
+
+  /**
+   * Type of content this template is designed for.
+   * Affects default strategy selection and analysis behavior.
+   *
+   * - 'radio-traffic': Lower token density, needs full context (caps at hybrid)
+   * - 'meeting': High token density, benefits from cascading
+   * - 'interview': Conversational format
+   * - 'general': Default behavior
+   */
+  contentType?: ContentType;
+
   // --- Sync/versioning fields (for built-in template synchronization) ---
 
   /**
@@ -157,7 +195,15 @@ export function isTemplateCategory(category: string): category is TemplateCatego
  * Type guard to check if a string is a valid OutputType.
  */
 export function isOutputType(type: string): type is OutputType {
-  return ['summary', 'action_items', 'quotes', 'decisions'].includes(type);
+  return [
+    'summary',
+    'benchmarks',
+    'radio_reports',
+    'safety_events',
+    'action_items',
+    'quotes',
+    'decisions',
+  ].includes(type);
 }
 
 /**

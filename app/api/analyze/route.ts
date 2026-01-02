@@ -63,6 +63,12 @@ const analyzeRequestSchema = z.object({
   }),
   template: z.object({
     name: z.string(),
+    description: z.string().optional(),
+    icon: z.string().optional(),
+    category: z.enum(['meeting', 'interview', 'review', 'custom']).optional(),
+    contentType: z.enum(['meeting', 'radio-traffic', 'interview', 'general']).optional(),
+    maxStrategy: z.enum(['basic', 'hybrid', 'advanced']).optional(),
+    supportsSupplementalMaterial: z.boolean().optional(),
     sections: z.array(
       z.object({
         id: z.string(),
@@ -72,7 +78,18 @@ const analyzeRequestSchema = z.object({
         outputFormat: z.enum(['bullet_points', 'paragraph', 'table']),
       })
     ),
-    outputs: z.array(z.enum(['summary', 'action_items', 'quotes', 'decisions'])),
+    outputs: z.array(
+      z.enum([
+        'summary',
+        'benchmarks',
+        'radio_reports',
+        'safety_events',
+        // Legacy meeting-focused outputs (still accepted)
+        'action_items',
+        'quotes',
+        'decisions',
+      ])
+    ),
   }),
   strategy: z.enum(['basic', 'hybrid', 'advanced', 'auto']).optional(),
   runEvaluation: z.boolean().optional(),
@@ -153,6 +170,18 @@ export async function POST(request: NextRequest) {
 
     const { transcriptId, templateId, transcript, template, strategy, runEvaluation, supplementalMaterial } = body;
 
+    // Fireground mode: this platform no longer produces meeting-era structured outputs.
+    // Always request the fireground structured logs, preserving summary only if selected.
+    const effectiveTemplate = {
+      ...template,
+      outputs: [
+        ...(template.outputs.includes("summary") ? (["summary"] as const) : []),
+        "benchmarks" as const,
+        "radio_reports" as const,
+        "safety_events" as const,
+      ],
+    };
+
     // Validate transcript has at least one segment
     if (!transcript.segments || transcript.segments.length === 0) {
       return errorResponse('Transcript has no segments', 400, {
@@ -185,6 +214,7 @@ export async function POST(request: NextRequest) {
       utilization: `${deploymentInfo.utilizationPercentage}%`,
       isExtendedContext: deploymentInfo.isExtended,
       sectionCount: template.sections.length,
+      effectiveOutputs: effectiveTemplate.outputs,
       requestedStrategy: strategy || 'auto',
       runEvaluation: runEvaluation !== false,
       hasSupplementalMaterial: !!supplementalMaterial,
@@ -214,7 +244,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Format transcript with timestamp markers for accurate timestamp extraction
-    // This enables the LLM to provide precise timestamps for action items, decisions, and quotes
+    // This enables the LLM to provide precise timestamps for structured outputs (benchmarks, reports, safety events)
     const timestampedTranscript = formatTranscriptWithTimestamps(
       transcript.segments as TranscriptSegment[]
     );
@@ -229,7 +259,7 @@ export async function POST(request: NextRequest) {
     let result;
     try {
       result = await executeAnalysis(
-        template as Template,
+        effectiveTemplate as Template,
         timestampedTranscript,
         openaiClient,
         deployment,

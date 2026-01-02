@@ -36,6 +36,7 @@ const navItems: NavItem[] = [
   { href: "/recordings", label: "Recordings" },
   { href: "/transcripts", label: "Incidents" },
   { href: "/templates", label: "Templates" },
+  { href: "/rubrics", label: "Rubrics" },
   { href: "/docs", label: "Docs" },
 ];
 
@@ -70,10 +71,10 @@ export default function Header() {
               <Group gap="sm">
                 <Box style={{ display: "flex", alignItems: "center" }}>
 <Image
-                    src="/images/coa-logo.png"
-                    alt="City of Austin Logo"
-                    width={180}
-                    height={45}
+                    src="/images/austin-fire-logo.png"
+                    alt="Austin Fire Department"
+                    width={80}
+                    height={80}
                     className="coa-header-logo"
                   priority
                   style={{
@@ -82,12 +83,12 @@ export default function Header() {
                   />
                 </Box>
                 <Text
-                  size="md"
+                  size="lg"
                   fw={700}
                   visibleFrom="sm"
                   className="coa-header-tagline"
                 >
-                  Austin RTASS
+                  RTASS
                 </Text>
               </Group>
             </Link>

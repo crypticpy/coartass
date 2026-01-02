@@ -35,10 +35,8 @@ const iconOptions = [
   { value: "Target", label: "Target" },
 ];
 
-// Category options
+// Category options (Review first for RTASS)
 const categoryOptions: { value: TemplateCategory; label: string }[] = [
-  { value: "meeting", label: "Meeting" },
-  { value: "interview", label: "Interview" },
   { value: "review", label: "Review" },
   { value: "custom", label: "Custom" },
 ];
@@ -73,7 +71,15 @@ export default function NewTemplatePage() {
       outputFormat: "bullet_points",
     },
   ]);
-  const [outputs, setOutputs] = React.useState<string[]>([]);
+  const REQUIRED_OUTPUTS = React.useMemo(
+    () => ["benchmarks", "radio_reports", "safety_events"] as const,
+    []
+  );
+
+  const [outputs, setOutputs] = React.useState<string[]>([
+    "summary",
+    ...REQUIRED_OUTPUTS,
+  ]);
 
   // Add a new section
   const handleAddSection = () => {
@@ -112,6 +118,9 @@ export default function NewTemplatePage() {
 
   // Toggle output option
   const handleToggleOutput = (output: string) => {
+    if (REQUIRED_OUTPUTS.includes(output as (typeof REQUIRED_OUTPUTS)[number])) {
+      return;
+    }
     setOutputs((prev) =>
       prev.includes(output)
         ? prev.filter((o) => o !== output)
@@ -181,6 +190,13 @@ export default function NewTemplatePage() {
     setIsSubmitting(true);
 
     try {
+      const sanitizedOutputs = Array.from(
+        new Set([
+          ...(outputs.includes("summary") ? (["summary"] as const) : []),
+          ...REQUIRED_OUTPUTS,
+        ])
+      );
+
       const template: Template = {
         id: crypto.randomUUID(),
         name: name.trim(),
@@ -188,7 +204,7 @@ export default function NewTemplatePage() {
         icon,
         category,
         sections,
-        outputs: outputs as Template['outputs'],
+        outputs: sanitizedOutputs as Template["outputs"],
         isCustom: true,
         createdAt: new Date(),
       };
@@ -413,22 +429,22 @@ export default function NewTemplatePage() {
                   onChange={() => handleToggleOutput("summary")}
                 />
                 <Checkbox
-                  label="Action Items"
-                  description="Extract tasks and action items"
-                  checked={outputs.includes("action_items")}
-                  onChange={() => handleToggleOutput("action_items")}
+                  label="Benchmarks & Milestones"
+                  description="Extract fireground benchmarks (command, searches, knockdown, under control) (always included)"
+                  checked
+                  disabled
                 />
                 <Checkbox
-                  label="Key Decisions"
-                  description="Identify important decisions made"
-                  checked={outputs.includes("decisions")}
-                  onChange={() => handleToggleOutput("decisions")}
+                  label="Radio Reports & CAN"
+                  description="Capture structured radio reports (initial, 360, entry, command transfer, CAN) (always included)"
+                  checked
+                  disabled
                 />
                 <Checkbox
-                  label="Notable Quotes"
-                  description="Extract memorable or important quotes"
-                  checked={outputs.includes("quotes")}
-                  onChange={() => handleToggleOutput("quotes")}
+                  label="Safety & Accountability"
+                  description="Log PAR, MAYDAY/urgent traffic, evac orders, RIC/safety officer events (always included)"
+                  checked
+                  disabled
                 />
               </Stack>
             </Stack>

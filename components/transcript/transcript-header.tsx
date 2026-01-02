@@ -16,8 +16,6 @@ import {
   Calendar,
   Clock,
   FileType,
-  Languages,
-  Mic,
   Share2
 } from 'lucide-react';
 import {
@@ -26,13 +24,11 @@ import {
   Menu,
   Group,
   ActionIcon,
-  Paper,
   Text,
   Tooltip,
   Stack,
   Flex,
   Box,
-  SimpleGrid,
   Title
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
@@ -41,7 +37,6 @@ import {
   formatDateTime,
   formatDuration,
   calculateWordCount,
-  formatFileSize
 } from '@/lib/transcript-utils';
 import { exportAndDownloadTranscript, exportMultipleAnalysesPackage, downloadPackage, generatePackageFilename } from '@/lib/package/export';
 import type { Transcript } from '@/types/transcript';
@@ -89,7 +84,6 @@ export const TranscriptHeader = memo(function TranscriptHeader({
   const wordCount = calculateWordCount(transcript.text);
   const formattedDate = formatDateTime(transcript.createdAt);
   const duration = formatDuration(transcript.metadata.duration);
-  const fileSize = formatFileSize(transcript.metadata.fileSize);
 
   const handleDeleteClick = () => {
     modals.openConfirmModal({
@@ -243,101 +237,17 @@ export const TranscriptHeader = memo(function TranscriptHeader({
         </Flex>
       </Box>
 
-      {/* Metadata Grid - Clean Card Design */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
-        {/* Duration Card */}
-        <Paper
-          p="md"
-          radius="md"
-          style={{ backgroundColor: "var(--mantine-color-default)", border: "1px solid var(--mantine-color-default-border)" }}
-        >
-          <Group gap="xs" mb={4}>
-            <Clock
-              size={14}
-              style={{ color: "var(--mantine-color-dimmed)" }}
-            />
-            <Text size="xs" fw={700} c="dimmed" tt="uppercase" lts={0.5}>
-              Duration
-            </Text>
-          </Group>
-          <Text size="lg" fw={600}>{duration}</Text>
-        </Paper>
-
-        {/* Word Count Card */}
-        <Paper
-          p="md"
-          radius="md"
-          style={{ backgroundColor: "var(--mantine-color-default)", border: "1px solid var(--mantine-color-default-border)" }}
-        >
-          <Group gap="xs" mb={4}>
-            <FileText
-              size={14}
-              style={{ color: "var(--mantine-color-dimmed)" }}
-            />
-            <Text size="xs" fw={700} c="dimmed" tt="uppercase" lts={0.5}>
-              Word Count
-            </Text>
-          </Group>
-          <Text size="lg" fw={600}>{wordCount.toLocaleString()}</Text>
-        </Paper>
-
-        {/* Language Card */}
-        <Paper
-          p="md"
-          radius="md"
-          style={{ backgroundColor: "var(--mantine-color-default)", border: "1px solid var(--mantine-color-default-border)" }}
-        >
-          <Group gap="xs" mb={4}>
-            <Languages
-              size={14}
-              style={{ color: "var(--mantine-color-dimmed)" }}
-            />
-            <Text size="xs" fw={700} c="dimmed" tt="uppercase" lts={0.5}>
-              Language
-            </Text>
-          </Group>
-          <Text size="lg" fw={600}>
-            {transcript.metadata.language
-              ? transcript.metadata.language.toUpperCase()
-              : "Unknown"}
-          </Text>
-        </Paper>
-
-        {/* Model Card */}
-        <Paper
-          p="md"
-          radius="md"
-          style={{ backgroundColor: "var(--mantine-color-default)", border: "1px solid var(--mantine-color-default-border)" }}
-        >
-          <Group gap="xs" mb={4}>
-            <Mic size={14} style={{ color: "var(--mantine-color-dimmed)" }} />
-            <Text size="xs" fw={700} c="dimmed" tt="uppercase" lts={0.5}>
-              Model
-            </Text>
-          </Group>
-          <Text size="md" fw={600} style={{ wordBreak: "break-word" }}>
-            {transcript.metadata.model}
-          </Text>
-        </Paper>
-
-        {/* File Size Card */}
-        <Paper
-          p="md"
-          radius="md"
-          style={{ backgroundColor: "var(--mantine-color-default)", border: "1px solid var(--mantine-color-default-border)" }}
-        >
-          <Group gap="xs" mb={4}>
-            <FileText
-              size={14}
-              style={{ color: "var(--mantine-color-dimmed)" }}
-            />
-            <Text size="xs" fw={700} c="dimmed" tt="uppercase" lts={0.5}>
-              File Size
-            </Text>
-          </Group>
-          <Text size="lg" fw={600}>{fileSize}</Text>
-        </Paper>
-      </SimpleGrid>
+      {/* Compact Metadata - Duration and Word Count only (other info shown in playback area) */}
+      <Group gap="lg" c="dimmed">
+        <Group gap={6}>
+          <Clock size={14} />
+          <Text size="sm">{duration}</Text>
+        </Group>
+        <Group gap={6}>
+          <FileText size={14} />
+          <Text size="sm">{wordCount.toLocaleString()} words</Text>
+        </Group>
+      </Group>
     </Stack>
   );
 }, (prevProps, nextProps) => {

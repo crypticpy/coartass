@@ -322,8 +322,8 @@ export function CategoryManagerModal({
         {/* Info Alert */}
         <Alert icon={<AlertCircle size={16} />} color="blue" variant="light">
           <Text size="sm">
-            Templates assigned to &quot;Default&quot; will use the built-in category
-            system based on their type (meeting, interview, or review).
+            Templates assigned to &quot;Default&quot; will appear in the Review
+            category. Create custom categories to organize templates your way.
           </Text>
         </Alert>
 

@@ -4,10 +4,13 @@ name: AFD Radio Quick Review
 description: Fast, trainer-friendly review of fireground radio traffic focused on command, CAN, and benchmark announcements. Designed for quick classroom playback and discussion.
 icon: Radio
 category: review
+contentType: radio-traffic
+maxStrategy: basic
 outputs:
   - summary
-  - action_items
-  - quotes
+  - benchmarks
+  - radio_reports
+  - safety_events
 
 sections:
   - id: quick-summary
@@ -15,37 +18,74 @@ sections:
     extractEvidence: true
     outputFormat: paragraph
     prompt: |
-      Write a concise 4–6 sentence summary of what happened based ONLY on the radio traffic.
-      Include: initial conditions, command/strategy, major milestones (if stated), and overall communication quality.
-      Do not speculate.
+      Write a concise 4-6 sentence summary of what happened based on the radio traffic.
+
+      Include:
+      - Incident type and location
+      - First-arriving unit and initial conditions (fire/smoke, structure type)
+      - Strategy declared (offensive/defensive)
+      - Major milestones reached (command, 360, knockdown, searches)
+      - Overall communication quality assessment (clear/unclear, disciplined/chaotic)
+
+      Example format:
+      "Box alarm at [address] on TAC [channel] for [incident type]. [First unit] arrived to find [conditions] and declared [strategy]. Operations included [key actions]. Communications were [quality assessment] with [notable strength or issue]."
 
   - id: compliance-checklist
     name: Compliance Checklist (Transcript-Only)
     extractEvidence: true
     outputFormat: bullet_points
     prompt: |
-      Produce a checklist using dash bullets with this format:
-      - [Met/Missed/Not Observed] <item> — Evidence: "<short quote>" [timestamp]
+      Produce a quick compliance checklist using this format:
+      - [✓ Met / ✗ Missed / — Not Observed] <item> — Evidence: "<short quote>" [timestamp]
 
-      Checklist items:
+      Checklist items to evaluate:
+
+      **Arrival & Size-Up:**
       - Arrival/on scene announced
+      - Structure description given
+      - Fire/smoke conditions reported
+
+      **Command & Strategy:**
       - Command assumed
-      - Strategy/mode declared
+      - Strategy/mode declared (offensive/defensive)
       - 360 reported (attempted/complete/not complete)
-      - CAN report(s) present
+
+      **Operations:**
+      - CAN report(s) present (Conditions/Actions/Needs)
       - Primary search complete announced
       - Knockdown announced
       - Under control announced
 
+      **Safety:**
+      - RIC established (if applicable)
+      - Safety officer assigned (if applicable)
+
       Rules:
-      - Use Not Observed if not explicitly stated.
-      - Evidence is required for Met/Missed whenever possible.
+      - Use "✓ Met" only for explicit radio announcements
+      - Use "✗ Missed" if the benchmark should have been announced but wasn't
+      - Use "— Not Observed" if not stated (may not be applicable)
+      - Always include a short quote and timestamp for Met items
 
   - id: coaching-points
     name: Coaching Points
     extractEvidence: true
     outputFormat: bullet_points
     prompt: |
-      Provide 5 coaching points as dash bullets.
-      Each bullet must be phrased as a coaching statement (what to do next time), and should reference an observed example or gap.
+      Provide 5 specific coaching points for classroom discussion.
 
+      Format each as an actionable statement:
+      - **[Topic]**: <What to do next time>. Example from audio: "<quote>" [timestamp]
+
+      Focus on:
+
+      1. **Size-up clarity** - Was the initial picture clear for incoming units?
+      2. **Command presence** - Was command clearly established and coordinated?
+      3. **CAN discipline** - Did interior crews provide useful CAN updates?
+      4. **Benchmark announcements** - Were key milestones transmitted?
+      5. **Radio discipline** - Clear unit IDs, concise messages, no stepped-on traffic?
+
+      Rules:
+      - Phrase as coaching ("Next time, consider...") not criticism
+      - Reference specific examples from the audio
+      - Balance positive reinforcement with improvement areas
+      - Keep each point to 1-2 sentences

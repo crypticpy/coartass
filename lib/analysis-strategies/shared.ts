@@ -7,6 +7,7 @@
 
 import type { AnalysisResults, OutputFormat, TranscriptSegment } from '@/types';
 import type { AnalysisStrategy } from '@/lib/analysis-strategy';
+import type { Template } from '@/types/template';
 import { estimateTokens } from '@/lib/token-utils';
 import {
   AnalysisError,
@@ -727,6 +728,23 @@ export function validateTimestamps(
     checkTimestamp(item.timestamp, 'Action item', i, item.task);
   });
 
+  // Check benchmark observations (timestamp optional)
+  results.benchmarks?.forEach((b, i) => {
+    if (b.timestamp !== undefined) {
+      checkTimestamp(b.timestamp, 'Benchmark', i, b.benchmark);
+    }
+  });
+
+  // Check radio reports
+  results.radioReports?.forEach((r, i) => {
+    checkTimestamp(r.timestamp, 'Radio report', i, r.type);
+  });
+
+  // Check safety events
+  results.safetyEvents?.forEach((e, i) => {
+    checkTimestamp(e.timestamp, 'Safety event', i, e.details);
+  });
+
   // Check decisions
   results.decisions?.forEach((dec, i) => {
     checkTimestamp(dec.timestamp, 'Decision', i, dec.decision);
@@ -765,6 +783,9 @@ export function postProcessResults(
   const processedResults: AnalysisResults = {
     ...results,
     agendaItems: ensureUniqueIds(results.agendaItems, 'agenda'),
+    benchmarks: ensureUniqueIds(results.benchmarks, 'benchmark'),
+    radioReports: ensureUniqueIds(results.radioReports, 'report'),
+    safetyEvents: ensureUniqueIds(results.safetyEvents, 'safety'),
     actionItems: ensureUniqueIds(results.actionItems, 'action'),
     decisions: ensureUniqueIds(results.decisions, 'decision'),
   };
@@ -789,6 +810,9 @@ export function postProcessResults(
   // 4. Log statistics
   const stats = {
     agendaItemCount: processedResults.agendaItems?.length || 0,
+    benchmarkCount: processedResults.benchmarks?.length || 0,
+    radioReportCount: processedResults.radioReports?.length || 0,
+    safetyEventCount: processedResults.safetyEvents?.length || 0,
     actionItemCount: processedResults.actionItems?.length || 0,
     decisionCount: processedResults.decisions?.length || 0,
     validationWarnings: validation.warnings.length,
@@ -799,6 +823,75 @@ export function postProcessResults(
   logger.info(strategyName, 'Post-processing complete', stats);
 
   return processedResults;
+}
+
+/**
+ * Prune outputs that are not requested by the template (or not appropriate for content type).
+ *
+ * For radio-traffic templates we also strip meeting-oriented artifacts (action items,
+ * decisions, quotes) even if the model returned them.
+ */
+export function pruneResultsForTemplate(
+  results: AnalysisResults,
+  _template: Template
+): AnalysisResults {
+  const pruned: AnalysisResults = { ...results };
+
+  // Retired meeting-era outputs (fireground platform now uses structured logs instead)
+  delete pruned.actionItems;
+  delete pruned.decisions;
+  delete pruned.quotes;
+  delete pruned.agendaItems;
+
+  return pruned;
+}
+
+/**
+ * Normalize common JSON key variants produced by LLMs into the app's canonical shapes.
+ *
+ * In practice some models will output snake_case keys even when the prompt examples
+ * use camelCase. Our parsers/validators expect camelCase, so we map known variants
+ * before validating.
+ */
+export function normalizeAnalysisJsonKeys<T>(data: T): T {
+  if (!data || typeof data !== "object") return data;
+
+  const obj = data as Record<string, unknown>;
+  const normalized: Record<string, unknown> = { ...obj };
+
+  const mapArrayKey = (from: string, to: string) => {
+    if (normalized[to] !== undefined) return;
+    const value = obj[from];
+    if (Array.isArray(value)) {
+      normalized[to] = value;
+    }
+  };
+
+  const mapObjectKey = (from: string, to: string) => {
+    if (normalized[to] !== undefined) return;
+    const value = obj[from];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      normalized[to] = value;
+    }
+  };
+
+  // Fireground outputs
+  mapArrayKey("radio_reports", "radioReports");
+  mapArrayKey("safety_events", "safetyEvents");
+
+  // Legacy meeting outputs (still normalized for robustness; later pruned)
+  mapArrayKey("agenda_items", "agendaItems");
+  mapArrayKey("action_items", "actionItems");
+
+  // Evaluation wrapper keys
+  mapObjectKey("final_results", "finalResults");
+
+  // If finalResults exists, normalize inside it as well.
+  if (normalized.finalResults && typeof normalized.finalResults === "object") {
+    normalized.finalResults = normalizeAnalysisJsonKeys(normalized.finalResults);
+  }
+
+  return normalized as T;
 }
 
 /**
@@ -869,6 +962,66 @@ export function repairTimestamps(
     return item;
   });
 
+  // Repair benchmark observations (timestamp optional)
+  const repairedBenchmarks = finalResults.benchmarks?.map((item) => {
+    if (item.timestamp !== undefined && needsRepair(item.timestamp)) {
+      const draftItem = draftResults.benchmarks?.find((d) => d.id === item.id);
+      if (draftItem && draftItem.timestamp !== undefined && !needsRepair(draftItem.timestamp)) {
+        repairCount++;
+        logger.warn(
+          'Timestamp Repair',
+          `Benchmark "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+        );
+        return { ...item, timestamp: draftItem.timestamp };
+      }
+      logger.warn(
+        'Timestamp Repair',
+        `Benchmark "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+      );
+    }
+    return item;
+  });
+
+  // Repair radio reports
+  const repairedRadioReports = finalResults.radioReports?.map((item) => {
+    if (needsRepair(item.timestamp)) {
+      const draftItem = draftResults.radioReports?.find((d) => d.id === item.id);
+      if (draftItem && !needsRepair(draftItem.timestamp)) {
+        repairCount++;
+        logger.warn(
+          'Timestamp Repair',
+          `Radio report "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+        );
+        return { ...item, timestamp: draftItem.timestamp };
+      }
+      logger.warn(
+        'Timestamp Repair',
+        `Radio report "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+      );
+    }
+    return item;
+  });
+
+  // Repair safety events
+  const repairedSafetyEvents = finalResults.safetyEvents?.map((item) => {
+    if (needsRepair(item.timestamp)) {
+      const draftItem = draftResults.safetyEvents?.find((d) => d.id === item.id);
+      if (draftItem && !needsRepair(draftItem.timestamp)) {
+        repairCount++;
+        logger.warn(
+          'Timestamp Repair',
+          `Safety event "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+        );
+        return { ...item, timestamp: draftItem.timestamp };
+      }
+      logger.warn(
+        'Timestamp Repair',
+        `Safety event "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+      );
+    }
+    return item;
+  });
+
   // Repair decisions
   const repairedDecisions = finalResults.decisions?.map((item) => {
     if (needsRepair(item.timestamp)) {
@@ -919,6 +1072,9 @@ export function repairTimestamps(
   return {
     ...finalResults,
     actionItems: repairedActionItems,
+    benchmarks: repairedBenchmarks,
+    radioReports: repairedRadioReports,
+    safetyEvents: repairedSafetyEvents,
     decisions: repairedDecisions,
     quotes: repairedQuotes,
   };

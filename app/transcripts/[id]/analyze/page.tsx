@@ -562,8 +562,6 @@ export default function AnalyzePage() {
               onChange={setSelectedCategory}
               data={[
                 { label: `Reviews (${categoryCounts.review})`, value: 'review' },
-                { label: `Meetings (Legacy) (${categoryCounts.meeting})`, value: 'meeting' },
-                { label: `Interviews (${categoryCounts.interview})`, value: 'interview' },
                 // User-defined categories
                 ...userSettings.customCategories.map(cat => ({
                   label: `${cat} (${categoryCounts[cat] || 0})`,

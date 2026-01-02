@@ -1,7 +1,7 @@
 {
-  "name": "Meeting Transcriber",
-  "short_name": "Transcriber",
-  "description": "Transform your meeting recordings into actionable insights",
+  "name": "Austin RTASS",
+  "short_name": "RTASS",
+  "description": "Radio Traffic Analysis Scoring System for Austin Fire Department",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",

@@ -546,7 +546,7 @@ export default function UploadPage() {
               Select Audio File
             </Title>
             <Text size="sm" c="dimmed" mt={4}>
-              Upload an audio recording of your meeting. Supported formats:
+              Upload an audio recording for transcription. Supported formats:
               MP3, M4A, WAV, WebM, OGG, FLAC, AAC. Files larger than 25MB
               are automatically converted and split before upload.
             </Text>

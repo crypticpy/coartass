@@ -15,7 +15,7 @@
 import type { Template, AnalysisResults, EvaluationResults, TranscriptSegment } from '@/types';
 import type { AnalysisStrategy } from '@/lib/analysis-strategy';
 import type OpenAI from 'openai';
-import { recommendStrategy, getStrategyMetadata } from '@/lib/analysis-strategy';
+import { recommendStrategy, getStrategyMetadata, capStrategy, getEffectiveMaxStrategy } from '@/lib/analysis-strategy';
 import { estimateTokens } from '@/lib/token-utils';
 
 // Import all strategy executors
@@ -556,21 +556,45 @@ export async function executeAnalysis(
   let strategy: AnalysisStrategy;
   let wasAutoSelected = false;
 
+  // Compute effective max strategy from template config and content type
+  const effectiveMaxStrategy = getEffectiveMaxStrategy(template.maxStrategy, template.contentType);
+
   if (strategyOption === 'auto') {
-    const recommendation = recommendStrategy(transcript);
+    // Pass template's maxStrategy and contentType to recommendStrategy for auto-capping
+    const recommendation = recommendStrategy(transcript, {
+      maxStrategy: template.maxStrategy,
+      contentType: template.contentType,
+    });
     strategy = recommendation.strategy;
     wasAutoSelected = true;
 
     // Apply circuit breaker recommendation
     strategy = circuitBreaker.getRecommendedStrategy(strategy);
 
+    // Apply effective max strategy cap after circuit breaker
+    if (effectiveMaxStrategy) {
+      strategy = capStrategy(strategy, effectiveMaxStrategy);
+    }
+
     logger.info('Analysis', `Auto-selected strategy: ${strategy}`, {
       originalRecommendation: recommendation.strategy,
       reasoning: recommendation.reasoning,
       circuitBreakerTripped: circuitBreaker.isTripped(),
+      templateMaxStrategy: template.maxStrategy,
+      contentType: template.contentType,
+      effectiveMaxStrategy,
     });
   } else {
     strategy = strategyOption;
+
+    // Apply effective max strategy cap for explicit selection too
+    if (effectiveMaxStrategy) {
+      const cappedStrategy = capStrategy(strategy, effectiveMaxStrategy);
+      if (cappedStrategy !== strategy) {
+        logger.warn('Analysis', `Strategy capped to ${effectiveMaxStrategy} (template: ${template.maxStrategy}, contentType: ${template.contentType}), using ${cappedStrategy} instead of ${strategy}`);
+        strategy = cappedStrategy;
+      }
+    }
 
     // Still check circuit breaker for explicit strategy
     if (!circuitBreaker.shouldAttempt(strategy)) {

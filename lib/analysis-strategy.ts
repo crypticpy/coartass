@@ -2,12 +2,18 @@
  * Analysis Strategy Selector
  *
  * This module provides intelligent strategy selection for transcript analysis based on
- * transcript length, complexity, and user preferences.
+ * transcript length, complexity, content type, and user preferences.
  *
  * Three-Tier Strategy System (Updated for GPT-5.2):
  * - Basic: Fast monolithic single-pass analysis (2-4 min) for short meetings
  * - Hybrid: Batched analysis with context (4-6 min) for medium-length meetings
  * - Advanced: Serial cascading analysis (6-8 min) for complex, long meetings
+ *
+ * Content Type Considerations:
+ * - radio-traffic: Lower token density, needs full context - caps at hybrid
+ * - meeting: Standard token density, all strategies available
+ * - interview: Similar to meetings, all strategies available
+ * - general: No special handling
  *
  * Strategy Selection:
  * - Automatic: Token-based breakpoints with smart recommendations
@@ -15,11 +21,29 @@
  */
 
 import { estimateTokens } from './token-utils';
+import type { ContentType } from '@/types/template';
 
 /**
  * Analysis strategy types
  */
 export type AnalysisStrategy = 'basic' | 'hybrid' | 'advanced';
+
+/**
+ * Strategy order from least to most intensive.
+ * Used for capping and comparison operations.
+ */
+export const STRATEGY_ORDER: readonly AnalysisStrategy[] = ['basic', 'hybrid', 'advanced'] as const;
+
+/**
+ * Default max strategy by content type.
+ * Radio traffic caps at hybrid to preserve full context.
+ */
+export const CONTENT_TYPE_MAX_STRATEGY: Record<ContentType, AnalysisStrategy | undefined> = {
+  'radio-traffic': 'hybrid',  // Radio needs full context, chunking loses critical timing
+  'meeting': undefined,       // No cap - all strategies available
+  'interview': undefined,     // No cap - all strategies available
+  'general': undefined,       // No cap - all strategies available
+} as const;
 
 /**
  * Token breakpoints for strategy recommendation
@@ -75,12 +99,74 @@ export interface StrategyRecommendation {
 }
 
 /**
+ * Cap a strategy to a maximum allowed strategy.
+ * Strategy ordering: basic < hybrid < advanced
+ *
+ * @param strategy - Strategy to potentially cap
+ * @param maxStrategy - Maximum allowed strategy
+ * @returns The capped strategy
+ */
+export function capStrategy(strategy: AnalysisStrategy, maxStrategy?: AnalysisStrategy): AnalysisStrategy {
+  if (!maxStrategy) return strategy;
+
+  const strategyIndex = STRATEGY_ORDER.indexOf(strategy);
+  const maxIndex = STRATEGY_ORDER.indexOf(maxStrategy);
+
+  if (strategyIndex > maxIndex) {
+    return maxStrategy;
+  }
+  return strategy;
+}
+
+/**
+ * Get the effective max strategy considering both template maxStrategy and content type.
+ *
+ * @param templateMaxStrategy - Explicit max strategy from template
+ * @param contentType - Content type classification
+ * @returns The most restrictive max strategy
+ */
+export function getEffectiveMaxStrategy(
+  templateMaxStrategy?: AnalysisStrategy,
+  contentType?: ContentType
+): AnalysisStrategy | undefined {
+  const contentTypeMax = contentType ? CONTENT_TYPE_MAX_STRATEGY[contentType] : undefined;
+
+  if (!templateMaxStrategy && !contentTypeMax) {
+    return undefined;
+  }
+
+  if (!templateMaxStrategy) {
+    return contentTypeMax;
+  }
+
+  if (!contentTypeMax) {
+    return templateMaxStrategy;
+  }
+
+  // Return the more restrictive of the two
+  const templateIndex = STRATEGY_ORDER.indexOf(templateMaxStrategy);
+  const contentIndex = STRATEGY_ORDER.indexOf(contentTypeMax);
+  return templateIndex <= contentIndex ? templateMaxStrategy : contentTypeMax;
+}
+
+/**
+ * Options for strategy recommendation
+ */
+export interface RecommendStrategyOptions {
+  /** Optional maximum strategy cap (from template) */
+  maxStrategy?: AnalysisStrategy;
+  /** Content type classification (affects default caps) */
+  contentType?: ContentType;
+}
+
+/**
  * Recommend an analysis strategy based on transcript
  *
- * Analyzes transcript length and provides intelligent strategy recommendation
- * with reasoning, time estimates, and alternatives.
+ * Analyzes transcript length, content type, and provides intelligent strategy
+ * recommendation with reasoning, time estimates, and alternatives.
  *
  * @param transcriptText - Full transcript text
+ * @param options - Optional configuration (maxStrategy, contentType)
  * @returns Strategy recommendation with alternatives
  *
  * @example
@@ -91,8 +177,23 @@ export interface StrategyRecommendation {
  * console.log(recommendation.reasoning);     // "Medium-length meeting..."
  * console.log(recommendation.estimatedTime); // { min: 120, max: 180 }
  * ```
+ *
+ * @example
+ * ```typescript
+ * // With content type (radio traffic caps at hybrid)
+ * const recommendation = recommendStrategy(transcript.text, {
+ *   contentType: 'radio-traffic'
+ * });
+ * ```
  */
-export function recommendStrategy(transcriptText: string): StrategyRecommendation {
+export function recommendStrategy(
+  transcriptText: string,
+  options?: AnalysisStrategy | RecommendStrategyOptions
+): StrategyRecommendation {
+  // Support legacy call signature: recommendStrategy(text, maxStrategy)
+  const opts: RecommendStrategyOptions = typeof options === 'string'
+    ? { maxStrategy: options }
+    : options ?? {};
   const tokens = estimateTokens(transcriptText);
   const estimatedDuration = Math.round(tokens / 150); // ~150 tokens per minute of speech
 
@@ -167,10 +268,28 @@ export function recommendStrategy(transcriptText: string): StrategyRecommendatio
     ];
   }
 
+  // Compute effective max strategy considering both template and content type
+  const effectiveMax = getEffectiveMaxStrategy(opts.maxStrategy, opts.contentType);
+  const cappedStrategy = capStrategy(strategy, effectiveMax);
+
+  // Update reasoning if strategy was capped
+  if (cappedStrategy !== strategy) {
+    const capSource = opts.contentType === 'radio-traffic' && !opts.maxStrategy
+      ? 'content type (radio traffic needs full context)'
+      : 'template configuration';
+    reasoning = `${reasoning} (Capped to ${cappedStrategy} by ${capSource})`;
+    // Update alternatives to only show allowed strategies
+    alternatives = alternatives.filter(alt => {
+      const altOrder = STRATEGY_ORDER.indexOf(alt.strategy);
+      const maxOrder = STRATEGY_ORDER.indexOf(effectiveMax!);
+      return altOrder <= maxOrder;
+    });
+  }
+
   return {
-    strategy,
+    strategy: cappedStrategy,
     reasoning,
-    estimatedTime: STRATEGY_TIME_ESTIMATES[strategy],
+    estimatedTime: STRATEGY_TIME_ESTIMATES[cappedStrategy],
     transcriptTokens: tokens,
     estimatedDuration,
     confidence,

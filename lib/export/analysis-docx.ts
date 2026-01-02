@@ -39,6 +39,8 @@ const COLORS = {
   light: "F5F5F5", // Light gray background
   border: "CCCCCC", // Border gray
   success: "2E7D32", // Green for decisions
+  warning: "F59E0B",
+  danger: "DC2626",
 };
 
 /**
@@ -51,7 +53,7 @@ function createHeading(
   return new Paragraph({
     text,
     heading: level,
-    spacing: { before: 400, after: 200 },
+    spacing: { before: 300, after: 150 },
   });
 }
 
@@ -66,6 +68,7 @@ function createParagraph(
     color?: string;
     spacing?: { before?: number; after?: number };
     indent?: number;
+    size?: number;
   } = {}
 ): Paragraph {
   return new Paragraph({
@@ -75,6 +78,7 @@ function createParagraph(
         bold: options.bold,
         italics: options.italic,
         color: options.color,
+        size: options.size,
       }),
     ],
     spacing: options.spacing || { after: 120 },
@@ -117,12 +121,16 @@ function createMetadataSection(
   addRow("Analyzed", formatDate(analysis.createdAt));
   addRow("Sections", String(analysis.results.sections.length));
 
-  if (analysis.results.actionItems && analysis.results.actionItems.length > 0) {
-    addRow("Action Items", String(analysis.results.actionItems.length));
+  if (analysis.results.benchmarks && analysis.results.benchmarks.length > 0) {
+    addRow("Benchmarks", String(analysis.results.benchmarks.length));
   }
 
-  if (analysis.results.decisions && analysis.results.decisions.length > 0) {
-    addRow("Decisions", String(analysis.results.decisions.length));
+  if (analysis.results.radioReports && analysis.results.radioReports.length > 0) {
+    addRow("Radio Reports", String(analysis.results.radioReports.length));
+  }
+
+  if (analysis.results.safetyEvents && analysis.results.safetyEvents.length > 0) {
+    addRow("Safety Events", String(analysis.results.safetyEvents.length));
   }
 
   return new Table({
@@ -244,101 +252,60 @@ function createAnalysisSection(
   return paragraphs;
 }
 
-/**
- * Create action items table
- */
-function createActionItemsTable(
-  actionItems: NonNullable<Analysis["results"]["actionItems"]>
+function createBenchmarksTable(
+  benchmarks: NonNullable<Analysis["results"]["benchmarks"]>
 ): (Paragraph | Table)[] {
   const elements: (Paragraph | Table)[] = [
-    createHeading("Action Items", HeadingLevel.HEADING_1),
+    createHeading("Benchmarks & Milestones", HeadingLevel.HEADING_1),
   ];
 
-  // Header row
   const headerRow = new TableRow({
-    children: [
-      new TableCell({
-        children: [createParagraph("Task", { bold: true })],
-        width: { size: 45, type: WidthType.PERCENTAGE },
-        shading: { type: ShadingType.SOLID, color: COLORS.secondary },
-      }),
-      new TableCell({
-        children: [
-          new Paragraph({
-            children: [new TextRun({ text: "Owner", bold: true, color: "FFFFFF" })],
-          }),
-        ],
-        width: { size: 20, type: WidthType.PERCENTAGE },
-        shading: { type: ShadingType.SOLID, color: COLORS.secondary },
-      }),
-      new TableCell({
-        children: [
-          new Paragraph({
-            children: [new TextRun({ text: "Deadline", bold: true, color: "FFFFFF" })],
-          }),
-        ],
-        width: { size: 20, type: WidthType.PERCENTAGE },
-        shading: { type: ShadingType.SOLID, color: COLORS.secondary },
-      }),
-      new TableCell({
-        children: [
-          new Paragraph({
-            children: [new TextRun({ text: "Time", bold: true, color: "FFFFFF" })],
-          }),
-        ],
-        width: { size: 15, type: WidthType.PERCENTAGE },
-        shading: { type: ShadingType.SOLID, color: COLORS.secondary },
-      }),
-    ],
     tableHeader: true,
+    children: ["Benchmark", "Status", "Time", "Unit/Role", "Evidence", "Notes"].map((label) =>
+      new TableCell({
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text: label, bold: true, color: "FFFFFF" })],
+            spacing: { after: 80 },
+          }),
+        ],
+        shading: { type: ShadingType.SOLID, color: COLORS.secondary },
+      })
+    ),
   });
 
-  // Data rows
-  const dataRows = actionItems.map(
-    (item, index) =>
-      new TableRow({
-        children: [
-          new TableCell({
-            children: [createParagraph(item.task)],
-            shading:
-              index % 2 === 1
-                ? { type: ShadingType.SOLID, color: COLORS.light }
-                : undefined,
-          }),
-          new TableCell({
-            children: [createParagraph(item.owner || "-")],
-            shading:
-              index % 2 === 1
-                ? { type: ShadingType.SOLID, color: COLORS.light }
-                : undefined,
-          }),
-          new TableCell({
-            children: [createParagraph(item.deadline || "-")],
-            shading:
-              index % 2 === 1
-                ? { type: ShadingType.SOLID, color: COLORS.light }
-                : undefined,
-          }),
-          new TableCell({
-            children: [
-              createParagraph(
-                item.timestamp !== undefined
-                  ? formatTimestamp(item.timestamp)
-                  : "-"
-              ),
-            ],
-            shading:
-              index % 2 === 1
-                ? { type: ShadingType.SOLID, color: COLORS.light }
-                : undefined,
-          }),
-        ],
-      })
-  );
+  const rows = benchmarks.map((b, idx) => {
+    const shading =
+      idx % 2 === 1 ? { type: ShadingType.SOLID, color: COLORS.light } : undefined;
+    const statusColor =
+      b.status === "met"
+        ? COLORS.success
+        : b.status === "missed"
+          ? COLORS.danger
+          : b.status === "not_observed"
+            ? COLORS.warning
+            : COLORS.accent;
+    return new TableRow({
+      children: [
+        new TableCell({ children: [createParagraph(b.benchmark)], shading }),
+        new TableCell({
+          children: [createParagraph(b.status.replace("_", " "), { color: statusColor, bold: true })],
+          shading,
+        }),
+        new TableCell({
+          children: [createParagraph(b.timestamp !== undefined ? formatTimestamp(b.timestamp) : "-")],
+          shading,
+        }),
+        new TableCell({ children: [createParagraph(b.unitOrRole || "-")], shading }),
+        new TableCell({ children: [createParagraph(b.evidenceQuote || "-")], shading }),
+        new TableCell({ children: [createParagraph(b.notes || "-")], shading }),
+      ],
+    });
+  });
 
   elements.push(
     new Table({
-      rows: [headerRow, ...dataRows],
+      rows: [headerRow, ...rows],
       width: { size: 100, type: WidthType.PERCENTAGE },
     })
   );
@@ -346,108 +313,116 @@ function createActionItemsTable(
   return elements;
 }
 
-/**
- * Create decisions timeline
- */
-function createDecisionsSection(
-  decisions: NonNullable<Analysis["results"]["decisions"]>
-): Paragraph[] {
-  const paragraphs: Paragraph[] = [
-    createHeading("Decisions Timeline", HeadingLevel.HEADING_1),
+function createRadioReportsSection(
+  radioReports: NonNullable<Analysis["results"]["radioReports"]>
+): (Paragraph | Table)[] {
+  const elements: (Paragraph | Table)[] = [
+    createHeading("Radio Reports & CAN", HeadingLevel.HEADING_1),
   ];
 
-  for (const decision of decisions) {
-    paragraphs.push(
+  radioReports.forEach((r, idx) => {
+    elements.push(
       new Paragraph({
         children: [
           new TextRun({
-            text: `[${formatTimestamp(decision.timestamp)}] `,
+            text: `[${formatTimestamp(r.timestamp)}] ${r.type.replace(/_/g, " ").toUpperCase()}`,
             bold: true,
-            color: COLORS.success,
+            color: COLORS.primary,
+            size: 22,
           }),
           new TextRun({
-            text: decision.decision,
+            text: r.from ? `  |  ${r.from}` : "",
+            color: COLORS.accent,
+            size: 20,
+          }),
+        ],
+        spacing: { before: idx === 0 ? 100 : 200, after: 80 },
+      })
+    );
+
+    if (r.fields && Object.keys(r.fields).length > 0) {
+      Object.entries(r.fields).forEach(([key, value]) => {
+        elements.push(
+          createParagraph(`${key}: ${String(value)}`, { indent: 400, color: COLORS.secondary })
+        );
+      });
+    }
+
+    if (r.evidenceQuote) {
+      elements.push(
+        new Paragraph({
+          children: [new TextRun({ text: `"${r.evidenceQuote}"`, italics: true, color: COLORS.accent })],
+          indent: { left: 400 },
+          spacing: { after: 80 },
+        })
+      );
+    }
+
+    if (r.missingRequired && r.missingRequired.length > 0) {
+      elements.push(
+        createParagraph(`Missing: ${r.missingRequired.join(", ")}`, {
+          indent: 400,
+          color: COLORS.warning,
+          bold: true,
+        })
+      );
+    }
+  });
+
+  return elements;
+}
+
+function createSafetyEventsSection(
+  safetyEvents: NonNullable<Analysis["results"]["safetyEvents"]>
+): (Paragraph | Table)[] {
+  const elements: (Paragraph | Table)[] = [
+    createHeading("Safety & Accountability Events", HeadingLevel.HEADING_1),
+  ];
+
+  safetyEvents.forEach((e) => {
+    const color =
+      e.severity === "critical"
+        ? COLORS.danger
+        : e.severity === "warning"
+          ? COLORS.warning
+          : COLORS.accent;
+    elements.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: `[${formatTimestamp(e.timestamp)}] ${e.type.replace(/_/g, " ").toUpperCase()}`,
             bold: true,
+            color,
+            size: 22,
+          }),
+          new TextRun({
+            text: e.unitOrRole ? `  |  ${e.unitOrRole}` : "",
+            color: COLORS.secondary,
+            size: 20,
           }),
         ],
         spacing: { before: 200, after: 80 },
         border: {
-          left: { style: BorderStyle.SINGLE, size: 16, color: COLORS.primary },
+          left: { style: BorderStyle.SINGLE, size: 16, color },
         },
         indent: { left: 200 },
       })
     );
-
-    if (decision.context) {
-      paragraphs.push(
+    elements.push(
+      createParagraph(e.details, { indent: 400, color: COLORS.secondary })
+    );
+    if (e.evidenceQuote) {
+      elements.push(
         new Paragraph({
-          children: [
-            new TextRun({
-              text: decision.context,
-              italics: true,
-              color: COLORS.accent,
-            }),
-          ],
-          spacing: { after: 160 },
+          children: [new TextRun({ text: `"${e.evidenceQuote}"`, italics: true, color: COLORS.accent })],
           indent: { left: 400 },
+          spacing: { after: 80 },
         })
       );
     }
-  }
+  });
 
-  return paragraphs;
-}
-
-/**
- * Create quotes section
- */
-function createQuotesSection(
-  quotes: NonNullable<Analysis["results"]["quotes"]>
-): Paragraph[] {
-  const paragraphs: Paragraph[] = [
-    createHeading("Notable Quotes", HeadingLevel.HEADING_1),
-  ];
-
-  for (const quote of quotes) {
-    paragraphs.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: `"${quote.text}"`,
-            italics: true,
-          }),
-        ],
-        spacing: { before: 160, after: 80 },
-        shading: { type: ShadingType.SOLID, color: COLORS.light },
-        border: {
-          left: { style: BorderStyle.SINGLE, size: 12, color: COLORS.accent },
-        },
-        indent: { left: 200, right: 200 },
-      })
-    );
-
-    paragraphs.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: quote.speaker ? `\u2014 ${quote.speaker}  ` : "",
-            color: COLORS.primary,
-            bold: true,
-          }),
-          new TextRun({
-            text: `[${formatTimestamp(quote.timestamp)}]`,
-            color: COLORS.accent,
-            size: 18,
-          }),
-        ],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 200 },
-        indent: { right: 200 },
-      })
-    );
-  }
-
-  return paragraphs;
+  return elements;
 }
 
 /**
@@ -544,38 +519,25 @@ export async function generateAnalysisDocx(
     }
   }
 
-  // Action Items
-  if (
-    options.includeActionItems &&
-    analysis.results.actionItems &&
-    analysis.results.actionItems.length > 0
-  ) {
-    tables.push(...createActionItemsTable(analysis.results.actionItems));
-    tables.push(new Paragraph({ spacing: { after: 400 } }));
+  if (options.includeBenchmarks && analysis.results.benchmarks?.length) {
+    tables.push(...createBenchmarksTable(analysis.results.benchmarks));
+    tables.push(new Paragraph({ spacing: { after: 300 } }));
   }
 
-  // Decisions
-  if (
-    options.includeDecisions &&
-    analysis.results.decisions &&
-    analysis.results.decisions.length > 0
-  ) {
-    tables.push(...createDecisionsSection(analysis.results.decisions));
+  if (options.includeRadioReports && analysis.results.radioReports?.length) {
+    tables.push(...createRadioReportsSection(analysis.results.radioReports));
+    tables.push(new Paragraph({ spacing: { after: 300 } }));
   }
 
-  // Quotes
-  if (
-    options.includeQuotes &&
-    analysis.results.quotes &&
-    analysis.results.quotes.length > 0
-  ) {
-    tables.push(...createQuotesSection(analysis.results.quotes));
+  if (options.includeSafetyEvents && analysis.results.safetyEvents?.length) {
+    tables.push(...createSafetyEventsSection(analysis.results.safetyEvents));
+    tables.push(new Paragraph({ spacing: { after: 300 } }));
   }
 
   // Create the document
   const doc = new Document({
     title: `Analysis - ${transcript.filename}`,
-    creator: "Meeting Transcriber",
+    creator: "Austin RTASS",
     description: "Transcript Analysis Report",
     sections: [
       {
@@ -611,7 +573,7 @@ export async function generateAnalysisDocx(
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: "Generated with Meeting Transcriber  |  Page ",
+                    text: "Generated with Austin RTASS  |  Page ",
                     color: COLORS.accent,
                     size: 18,
                   }),

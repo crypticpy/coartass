@@ -51,9 +51,6 @@ export function generateEvaluatorPrompt(
   promptsUsed?: string[]
 ): string {
   const sections = draftResults.sections.map((s) => s.name).join(', ');
-  const hasAgenda = !!draftResults.agendaItems && draftResults.agendaItems.length > 0;
-  const hasDecisions = !!draftResults.decisions && draftResults.decisions.length > 0;
-  const hasActions = !!draftResults.actionItems && draftResults.actionItems.length > 0;
 
   return `${RTASS_CONTEXT}
 
@@ -81,18 +78,21 @@ ${promptsUsed.map((p, idx) => `### Prompt ${idx + 1}\n\`\`\`\n${p.substring(0, 5
 
 ${formatDraftResults(draftResults)}
 
-## Original Transcript (for reference)
+## Original Transcript (FULL - for verification)
 
 \`\`\`
-${transcript.substring(0, 5000)}${transcript.length > 5000 ? '...\n\n[Transcript truncated for brevity - full transcript was available to initial analyst]' : ''}
+${transcript}
 \`\`\`
 
 ## Your Review Tasks
 
-### 1. **Completeness Check**
-   - Are all important points from the transcript captured?
-   - Are there any significant topics, decisions, or action items missing?
+### 1. **Completeness Check** (CRITICAL)
+   - Does the analysis cover the ENTIRE transcript from start to finish?
+   - Are events from ALL time periods captured (early, middle, AND late phases)?
+   - If the incident is 50+ minutes, are there events documented past 30 minutes?
+   - Are there any significant topics or events missing from the timeline?
    - Does the analysis adequately address all sections in the template?
+   - WARNING: Analysis that stops at ~20 minutes on a longer incident is INCOMPLETE
 
 ### 2. **Accuracy Verification**
    - Are facts from the transcript represented correctly?
@@ -108,27 +108,28 @@ ${transcript.substring(0, 5000)}${transcript.length > 5000 ? '...\n\n[Transcript
    - Are there opportunities to simplify or clarify?
    - Do NOT reformat or remove Source lines with timestamps - these are functional UI elements
 
-### 4. **Relationship Validation** ${hasAgenda && (hasDecisions || hasActions) ? '(CRITICAL)' : ''}
-   ${
-     hasAgenda && (hasDecisions || hasActions)
-       ? `
-   - Are all decisions properly linked to agenda items?
-   - Are all action items linked to relevant decisions and agenda items?
-   - Are there "orphaned" items that should be connected?
-   - Note any decisions/actions made outside the main agenda
-   `
-       : '- Check that items are logically organized and related where appropriate'
-   }
+### 4. **Structured Output Validation**
+   - Ensure structured logs are coherent and non-duplicative
+   - Benchmarks: status/timestamps align with radio traffic (no inference)
+   - Radio reports: required fields captured when stated; missingRequired used appropriately
+   - Safety events: severity/type match the traffic; no fabricated events
 
 ### 5. **Practical Value**
-   - Would someone who missed the meeting understand what happened?
-   - Are action items specific enough to be actionable?
-   - Are next steps clear?
-   - Is the analysis useful for follow-up and accountability?
+   - Would a training officer understand what happened on the incident?
+   - Are key radio benchmarks and CAN updates easy to scan?
+   - Are safety/accountability issues clearly surfaced?
+   - Is the output usable for post-incident training and compliance review?
 
-### 6. **Polish & Professionalism**
+### 6. **Markdown Formatting Quality**
+   - Are tables properly formatted with header row separator (|---|---|)?
+   - Are bullet points using consistent "-" format (NOT numbered)?
+   - Are headers using proper markdown (## and ###)?
+   - Is bold (**text**) used consistently for emphasis?
+   - Are empty table cells using "-" not blank?
+
+### 7. **Polish & Professionalism**
    - Is the tone professional but accessible?
-   - Are there any grammatical or formatting issues?
+   - Are there any grammatical issues?
    - Does the overall presentation inspire confidence?
 
 ## Output Format
@@ -165,39 +166,41 @@ You MUST respond with valid JSON in this EXACT structure:
         "evidence": []
       }
     ],
-    "agendaItems": [
+    "benchmarks": [
       {
-        "id": "agenda-1",
-        "topic": "Improved topic description",
-        "timestamp": 120,
-        "context": "Additional context if helpful"
+        "id": "benchmark-1",
+        "benchmark": "Command established",
+        "status": "met",
+        "timestamp": 207,
+        "unitOrRole": "Engine 25",
+        "evidenceQuote": "Engine 25 assuming command",
+        "notes": "Initial command"
       }
     ],
-    "actionItems": [
+    "radioReports": [
       {
-        "id": "action-1",
-        "task": "More specific task description",
-        "owner": "Person name",
-        "deadline": "Clearer deadline",
-        "timestamp": 300,
-        "agendaItemIds": ["agenda-1"],
-        "decisionIds": ["decision-1"]
+        "id": "report-1",
+        "type": "initial_radio_report",
+        "timestamp": 207,
+        "from": "Engine 25",
+        "fields": {
+          "strategy": "offensive",
+          "building": "single-story",
+          "conditions": "fire Alpha/Bravo"
+        },
+        "missingRequired": [],
+        "evidenceQuote": "Engine 25 assuming command..."
       }
     ],
-    "decisions": [
+    "safetyEvents": [
       {
-        "id": "decision-1",
-        "decision": "Clearer decision statement",
-        "timestamp": 240,
-        "context": "Better context/rationale",
-        "agendaItemIds": ["agenda-1"]
-      }
-    ],
-    "quotes": [
-      {
-        "text": "Exact quote",
-        "speaker": "Speaker name",
-        "timestamp": 180
+        "id": "safety-1",
+        "type": "ric_established",
+        "severity": "info",
+        "timestamp": 1046,
+        "unitOrRole": "Engine 54",
+        "details": "RIC established and location announced.",
+        "evidenceQuote": "Engine 54 established RIC..."
       }
     ]
   }
@@ -206,18 +209,24 @@ You MUST respond with valid JSON in this EXACT structure:
 
 ## Guidelines for Improvements
 
-1. **Be Surgical**: Only change what needs improvement. Don't rewrite unnecessarily.
-2. **Add Value**: If you make a change, it should make the analysis more accurate, clear, or useful.
-3. **Maintain Voice**: Keep the professional-but-accessible tone.
-4. **Preserve Structure**: Maintain all IDs and relationships from the draft.
-5. **Format Consistency**: ALL bullet lists MUST use "-" character (NOT numbered lists 1,2,3 or other bullets), capitalize first letter.
-6. **Preserve & Normalize Timestamps**: CRITICAL - All timestamps must be in [seconds] format:
+1. **FULL COVERAGE**: If the timeline/analysis stops early, ADD missing events from the full transcript.
+2. **Be Surgical**: Only change what needs improvement. Don't rewrite unnecessarily.
+3. **No Legacy Meeting Outputs**: Do NOT add action items, decisions, or notable quotes as standalone outputs. This platform uses Benchmarks, Radio Reports, and Safety Events instead.
+3. **Add Value**: If you make a change, it should make the analysis more accurate, clear, or useful.
+4. **Maintain Voice**: Keep the professional-but-accessible tone.
+5. **Preserve Structure**: Maintain all IDs and relationships from the draft.
+6. **Format Tables Properly**: Tables MUST have:
+   - Header row: | Col1 | Col2 | Col3 |
+   - Separator row: |------|------|------|
+   - Data rows: | data | data | data |
+7. **Format Consistency**: ALL bullet lists MUST use "-" character (NOT numbered lists 1,2,3), capitalize first letter.
+8. **Preserve & Normalize Timestamps**: CRITICAL - All timestamps must be in [seconds] format:
    - Numeric timestamp fields (timestamp: 120) MUST NOT be changed to 0 or removed
    - Inline bracket timestamps like [63] or [123] MUST be preserved - these are clickable links
    - Source citations like 'Source: "quote" [123]' MUST keep the bracket timestamp intact
    - If you see non-standard formats like [1:23], [01:23], [1h23m], (1:23), or "at 1:23", CONVERT them to [seconds] format (e.g., [1:23] → [83], [5:30] → [330])
    - The ONLY valid timestamp format in section content is [number] where number is total seconds
-7. **Be Specific in improvements/additions**: List exactly what you changed and why.
+9. **Be Specific in improvements/additions**: List exactly what you changed and why.
 
 ## Quality Score Guidelines
 
@@ -249,67 +258,48 @@ function formatDraftResults(draft: AnalysisResults): string {
     });
   }
 
-  // Agenda Items
-  if (draft.agendaItems && draft.agendaItems.length > 0) {
-    formatted += `**Agenda Items:**\n`;
-    draft.agendaItems.forEach((item) => {
-      formatted += `- [${item.id}] ${item.topic}`;
-      if (item.timestamp) formatted += ` (${formatTimestamp(item.timestamp)})`;
+  if (draft.benchmarks && draft.benchmarks.length > 0) {
+    formatted += `**Benchmarks:**\n`;
+    draft.benchmarks.forEach((b) => {
+      formatted += `- [${b.id}] ${b.benchmark} (${b.status})`;
+      if (b.timestamp !== undefined) {
+        formatted += ` [timestamp: ${b.timestamp}s = ${formatTimestamp(b.timestamp)}]`;
+      }
+      if (b.unitOrRole) formatted += ` (Unit/Role: ${b.unitOrRole})`;
       formatted += '\n';
+      if (b.evidenceQuote) formatted += `  Evidence: "${b.evidenceQuote}"\n`;
+      if (b.notes) formatted += `  Notes: ${b.notes}\n`;
     });
     formatted += '\n';
   }
 
-  // Decisions
-  if (draft.decisions && draft.decisions.length > 0) {
-    formatted += `**Decisions:**\n`;
-    draft.decisions.forEach((decision) => {
-      formatted += `- [${decision.id}] ${decision.decision}`;
-      if (decision.timestamp !== undefined) {
-        formatted += ` [timestamp: ${decision.timestamp}s = ${formatTimestamp(decision.timestamp)}]`;
+  if (draft.radioReports && draft.radioReports.length > 0) {
+    formatted += `**Radio Reports:**\n`;
+    draft.radioReports.forEach((r) => {
+      formatted += `- [${r.id}] ${r.type}`;
+      if (r.timestamp !== undefined) {
+        formatted += ` [timestamp: ${r.timestamp}s = ${formatTimestamp(r.timestamp)}]`;
       }
-      if (decision.agendaItemIds && decision.agendaItemIds.length > 0) {
-        formatted += ` (linked to: ${decision.agendaItemIds.join(', ')})`;
-      }
+      if (r.from) formatted += ` (From: ${r.from})`;
       formatted += '\n';
-      if (decision.context) {
-        formatted += `  Context: ${decision.context}\n`;
+      if (r.missingRequired && r.missingRequired.length > 0) {
+        formatted += `  Missing: ${r.missingRequired.join(', ')}\n`;
       }
+      if (r.evidenceQuote) formatted += `  Evidence: "${r.evidenceQuote}"\n`;
     });
     formatted += '\n';
   }
 
-  // Action Items
-  if (draft.actionItems && draft.actionItems.length > 0) {
-    formatted += `**Action Items:**\n`;
-    draft.actionItems.forEach((action) => {
-      formatted += `- [${action.id}] ${action.task}`;
-      if (action.timestamp !== undefined) {
-        formatted += ` [timestamp: ${action.timestamp}s = ${formatTimestamp(action.timestamp)}]`;
+  if (draft.safetyEvents && draft.safetyEvents.length > 0) {
+    formatted += `**Safety Events:**\n`;
+    draft.safetyEvents.forEach((e) => {
+      formatted += `- [${e.id}] ${e.type} (${e.severity})`;
+      if (e.timestamp !== undefined) {
+        formatted += ` [timestamp: ${e.timestamp}s = ${formatTimestamp(e.timestamp)}]`;
       }
-      if (action.owner) formatted += ` (Owner: ${action.owner})`;
-      if (action.deadline) formatted += ` (Due: ${action.deadline})`;
-      if (action.agendaItemIds && action.agendaItemIds.length > 0) {
-        formatted += ` (agenda: ${action.agendaItemIds.join(', ')})`;
-      }
-      if (action.decisionIds && action.decisionIds.length > 0) {
-        formatted += ` (decisions: ${action.decisionIds.join(', ')})`;
-      }
-      formatted += '\n';
-    });
-    formatted += '\n';
-  }
-
-  // Quotes
-  if (draft.quotes && draft.quotes.length > 0) {
-    formatted += `**Notable Quotes:**\n`;
-    draft.quotes.forEach((quote) => {
-      formatted += `- "${quote.text}"`;
-      if (quote.speaker) formatted += ` - ${quote.speaker}`;
-      if (quote.timestamp !== undefined) {
-        formatted += ` [timestamp: ${quote.timestamp}s = ${formatTimestamp(quote.timestamp)}]`;
-      }
-      formatted += '\n';
+      if (e.unitOrRole) formatted += ` (Unit/Role: ${e.unitOrRole})`;
+      formatted += `\n  Details: ${e.details}\n`;
+      if (e.evidenceQuote) formatted += `  Evidence: "${e.evidenceQuote}"\n`;
     });
   }
 

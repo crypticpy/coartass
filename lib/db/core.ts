@@ -38,12 +38,12 @@ export interface AudioFileEntry {
 }
 
 /**
- * Main Dexie database class for Meeting Transcriber.
+ * Main Dexie database class for Austin RTASS.
  *
- * Manages six tables: transcripts, templates, analyses, audioFiles, conversations, and recordings
- * with proper indexing for efficient queries.
+ * Manages tables for transcripts, templates, analyses, audioFiles, conversations,
+ * recordings, RTASS scorecards, and rubric templates.
  */
-export class MeetingTranscriberDB extends Dexie {
+export class AustinRTASSDB extends Dexie {
   /** Transcripts table with full-text and date indexing */
   transcripts!: Table<Transcript, string>;
 
@@ -69,7 +69,7 @@ export class MeetingTranscriberDB extends Dexie {
   rtassRubricTemplates!: Table<RtassRubricTemplate, string>;
 
   constructor() {
-    super("MeetingTranscriberDB");
+    super("AustinRTASSDB");
 
     // Define database schema with version 1
     this.version(1).stores({
@@ -187,15 +187,15 @@ export class MeetingTranscriberDB extends Dexie {
 }
 
 // Singleton instance of the database
-let dbInstance: MeetingTranscriberDB | null = null;
+let dbInstance: AustinRTASSDB | null = null;
 
 /**
  * Gets or creates the singleton database instance.
  *
- * @returns The MeetingTranscriberDB instance
+ * @returns The AustinRTASSDB instance
  * @throws {DatabaseError} If the database cannot be initialized
  */
-export function getDatabase(): MeetingTranscriberDB {
+export function getDatabase(): AustinRTASSDB {
   if (!dbInstance) {
     // Check for IndexedDB support
     if (typeof window === "undefined" || !window.indexedDB) {
@@ -205,7 +205,7 @@ export function getDatabase(): MeetingTranscriberDB {
       );
     }
 
-    dbInstance = new MeetingTranscriberDB();
+    dbInstance = new AustinRTASSDB();
   }
 
   return dbInstance;
@@ -235,7 +235,7 @@ export function closeDatabase(): void {
 export async function deleteDatabase(): Promise<void> {
   try {
     closeDatabase();
-    await Dexie.delete("MeetingTranscriberDB");
+    await Dexie.delete("AustinRTASSDB");
   } catch (error) {
     throw new DatabaseError(
       "Failed to delete database",

@@ -129,7 +129,7 @@ az containerapp revision list \
 
 ### Database Schema (lib/db.ts)
 
-The `MeetingTranscriberDB` class manages six IndexedDB tables:
+The `AustinRTASSDB` class manages these IndexedDB tables:
 - `transcripts` - Transcribed audio with segments and metadata
 - `templates` - Analysis templates (built-in and custom)
 - `analyses` - AI-generated analyses linked to transcripts

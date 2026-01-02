@@ -231,14 +231,14 @@ export default function TemplatesPage() {
 
   // Category data for SegmentedControl - includes user-defined categories
   const categoryData = React.useMemo(() => {
-    // Count templates per built-in category (considering user overrides)
-    const counts: Record<string, number> = { meeting: 0, interview: 0, review: 0 };
+    // Count templates in the review category (the only built-in category shown in RTASS)
+    let reviewCount = 0;
 
     // Single pass through built-in templates
     builtInTemplates.forEach(t => {
       const effectiveCategory = getEffectiveCategory(t.id, t.name);
-      if (counts[effectiveCategory] !== undefined) {
-        counts[effectiveCategory]++;
+      if (effectiveCategory === 'review') {
+        reviewCount++;
       }
     });
 
@@ -253,11 +253,9 @@ export default function TemplatesPage() {
       }
     });
 
-    // Build category options
+    // Build category options (Reviews first for RTASS)
     const data = [
-      { label: `Meeting (${counts.meeting})`, value: 'meeting' },
-      { label: `Interview (${counts.interview})`, value: 'interview' },
-      { label: `Review (${counts.review})`, value: 'review' },
+      { label: `Review (${reviewCount})`, value: 'review' },
       // User-defined categories
       ...userSettings.customCategories.map(cat => ({
         label: `${cat} (${userCategoryCounts[cat]})`,
@@ -284,7 +282,7 @@ export default function TemplatesPage() {
   const handleResetUserSettings = React.useCallback(() => {
     resetUserCategorySettings();
     setUserSettings({ customCategories: [], templateAssignments: {} });
-    setSelectedCategory('meeting'); // Reset to default category
+    setSelectedCategory('review'); // Reset to default category
     notifications.show({
       title: 'Categories Reset',
       message: 'Template categories have been reset to defaults.',

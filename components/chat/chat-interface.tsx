@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import {
   Paper,
   Stack,
@@ -48,6 +48,32 @@ export interface ChatInterfaceProps {
 }
 
 /**
+ * Format seconds as MM:SS timestamp
+ */
+function formatTimestamp(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Format transcript segments with timestamps for chat context
+ * e.g., "[0:00] Attention Fire Department..."
+ *
+ * This is critical for firefighters to reference specific times
+ * during their Q&A sessions about radio traffic.
+ */
+function formatTranscriptWithTimestamps(transcript: Transcript): string {
+  if (!transcript.segments || transcript.segments.length === 0) {
+    return transcript.text;
+  }
+
+  return transcript.segments
+    .map(segment => `[${formatTimestamp(segment.start)}] ${segment.text}`)
+    .join('\n');
+}
+
+/**
  * Main chat interface component
  *
  * Features:
@@ -68,14 +94,21 @@ export function ChatInterface({ transcriptId, transcript }: ChatInterfaceProps) 
     { open: openClearModal, close: closeClearModal },
   ] = useDisclosure(false);
 
-  // Use chat hook
+  // Format transcript with timestamps for chat context
+  // This is critical for firefighters to reference specific times in radio traffic
+  const transcriptTextWithTimestamps = useMemo(
+    () => formatTranscriptWithTimestamps(transcript),
+    [transcript]
+  );
+
+  // Use chat hook with timestamped transcript
   const {
     messages,
     loading,
     error,
     sendMessage,
     clearConversation,
-  } = useChat(transcriptId, transcript.text);
+  } = useChat(transcriptId, transcriptTextWithTimestamps);
 
   // Refs
   const scrollAreaRef = useRef<HTMLDivElement>(null);

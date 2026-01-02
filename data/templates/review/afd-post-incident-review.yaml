@@ -4,11 +4,13 @@ name: AFD Post-Incident Review (Narrative)
 description: Structured post-incident narrative aligned to AFD training review practices (incident overview, benchmarks, compliance, improvements, recommendations). Produces evidence-linked sections with timestamps.
 icon: ClipboardCheck
 category: review
+contentType: radio-traffic
+maxStrategy: hybrid
 outputs:
   - summary
-  - action_items
-  - decisions
-  - quotes
+  - benchmarks
+  - radio_reports
+  - safety_events
 
 sections:
   - id: incident-overview
@@ -16,114 +18,231 @@ sections:
     extractEvidence: true
     outputFormat: paragraph
     prompt: |
-      Write a concise incident overview in 6–10 sentences based ONLY on what is stated in the radio traffic.
-      Include (if present):
-      - Incident type (structure fire, MVC, rescue, etc.)
-      - Primary TAC / channel references
-      - First-arriving unit actions and initial conditions (Alpha/Bravo, smoke/fire location)
-      - Strategy/mode of operation (offensive/defensive/investigation)
+      Write a comprehensive incident overview based on ALL radio traffic in this transcript from START to FINISH.
+
+      CRITICAL: You MUST cover the ENTIRE incident timeline, including:
+      - Early phase (0-10 min): Dispatch, arrival, initial operations
+      - Middle phase (10-30 min): Active firefighting, searches, water supply
+      - Late phase (30+ min): Overhaul, utilities, incident stabilization, demobilization
+
+      Include these elements when present:
+      - Dispatch information: incident type, location address, TAC channel
+      - First-arriving unit and initial size-up (structure description, fire/smoke conditions)
+      - Strategy/mode declared (offensive/defensive/investigation)
+      - Key operational milestones (360 complete, divisions assigned, RIC, knockdown, searches)
+      - Notable challenges or changes during operations
+      - Final disposition (under control, extinguished, units released)
+      - Total incident duration if announced
+
+      Radio Traffic Format Notes:
+      - Unit identifiers follow patterns like "Engine 25", "Rescue 28", "Battalion 2"
+      - Timestamps are in [MM:SS] format at the start of each segment
+      - Size-up uses Alpha/Bravo/Charlie/Delta side designations
 
       Rules:
-      - Do not speculate. If unknown, state "Not stated in radio traffic."
-      - Use plain language suitable for training documentation.
+      - Extract ALL information from the ENTIRE transcript - do not stop at 20 minutes
+      - Cite specific timestamps in [seconds] format for key events
+      - If information conflicts (e.g., "single-story" vs "two-story"), note the discrepancy
+      - Write in past tense for completed actions
+      - Aim for 10-15 sentences to capture the full incident
 
   - id: key-actions-and-timeline
     name: Key Actions & Timeline
     extractEvidence: true
     outputFormat: bullet_points
+    dependencies:
+      - incident-overview
     prompt: |
-      Extract a time-ordered list of key operational events as dash bullets.
-      Each bullet MUST follow this format:
-      - [timestamp] Event: <short label> | Unit(s): <if known> | Notes: <1 sentence>
+      Create a comprehensive chronological timeline of ALL significant events from the ENTIRE radio traffic.
 
-      Focus on events that are commonly benchmarked or trained:
-      - arrival/on scene, command established, 360, mode/strategy declared
-      - water on fire, knockdown, under control, extinguished
-      - primary/secondary search complete, RIC established, safety officer assigned
-      - utilities shutoff, rehab, mayday (if any)
+      CRITICAL: Cover the FULL incident from dispatch to demobilization. Do NOT stop at 20 minutes.
 
-      If timestamps are missing for an event, omit it rather than guessing.
+      Format each entry EXACTLY as:
+      - **[MM:SS] Event label** | Unit(s): unit IDs | Notes: 1 sentence
+
+      Example:
+      - **[3:27] Command established** | Unit(s): Engine 25 | Notes: Single-story, fire Alpha/Bravo
+
+      REQUIRED events to include (when present in transcript):
+      - Dispatch/Alarm
+      - First unit arrival/on scene
+      - Command established (with unit ID)
+      - Initial size-up transmitted
+      - Strategy/mode declared (offensive/defensive)
+      - 360 completion reported
+      - Division/group assignments
+      - RIC established
+      - Water supply status (assigned, established, low water alerts)
+      - Interior entry and conditions reports
+      - Primary search initiated and completed
+      - Secondary search assigned/completed
+      - Fire knockdown
+      - Fire under control
+      - Fire extinguished
+      - Utilities shutoff (power, gas)
+      - Safety officer assigned
+      - Significant tactical changes or challenges
+      - PAR checks
+      - Any mayday or emergency traffic
+      - Units released/available
+      - Total incident time announced
+
+      Rules:
+      - Include events from the ENTIRE transcript, not just the first 20 minutes
+      - Use exact [MM:SS] timestamps from the transcript
+      - Capture unit IDs exactly as stated (Engine 25, not E25)
+      - Aim for 15-25 timeline entries for a typical incident
 
   - id: benchmark-observations
     name: Benchmark Observations (Transcript-Only)
     extractEvidence: true
     outputFormat: table
+    dependencies:
+      - key-actions-and-timeline
     prompt: |
-      Create a table with columns:
-      - Benchmark (label)
-      - Observed? (Yes/No)
-      - Evidence (short quote + [timestamp])
-      - Notes (1 sentence)
+      Create a benchmark observation table evaluating key incident milestones.
 
-      Include these benchmark labels (even if not observed):
-      - Command established
-      - First water on fire
-      - Primary search complete
-      - Secondary search complete
-      - Fire knocked down
-      - Fire under control
-      - Fire extinguished
-      - Water supply established
-      - Utilities shutoff
+      OUTPUT FORMAT - Use proper markdown table syntax:
 
-      Rules:
-      - Mark "Observed? = No" if not explicitly stated in the transcript.
-      - Do not infer from context; rely on explicit radio statements.
+      | Benchmark | Observed? | Timestamp | Evidence Quote | Notes |
+      |-----------|-----------|-----------|----------------|-------|
+      | Command established | Yes | 3:27 | "Engine 25 assuming command" | First command |
+      | Primary search complete | No | - | - | Not announced |
+
+      REQUIRED benchmarks to evaluate (one row per benchmark):
+      1. Command established - First unit assumes command
+      2. First water on fire - "Water on the fire" or equivalent announced
+      3. Primary search complete - "Primary search complete" with findings
+      4. Secondary search complete - "Secondary complete" announcement
+      5. Fire knocked down - "Knocked down" or "bulk of fire knocked"
+      6. Fire under control - "Under control" announced
+      7. Fire extinguished - "Extinguished" announced
+      8. Water supply established - Hydrant/supply confirmed operational
+      9. Utilities shutoff - Power/gas shutoff confirmed
+      10. RIC established - RIC team assigned and confirmed
+      11. Safety officer assigned - Safety role announced
+
+      Scoring rules:
+      - "Yes" = Explicitly stated in radio traffic with clear announcement
+      - "No" = Not stated in the transcript (benchmark was not transmitted)
+      - Include verbatim quote and MM:SS timestamp for all "Yes" entries
+      - For "No" entries, use "-" for Timestamp and Evidence Quote columns
+
+      IMPORTANT: Do NOT mark something as "Yes" based on inference - only explicit radio announcements count.
 
   - id: a1016-compliance-observations
     name: A101.6 Compliance Observations (Transcript-Only)
     extractEvidence: true
     outputFormat: table
+    dependencies:
+      - incident-overview
+      - key-actions-and-timeline
     prompt: |
-      Create a table with columns:
-      - Policy Element (label)
-      - Observed? (Yes/No/Partial)
-      - Evidence (short quote + [timestamp])
-      - Notes (1 sentence)
+      Evaluate compliance with AFD A101.6 radio communication standards.
 
-      Evaluate these elements ONLY using the radio traffic:
-      - Initial size-up includes structure/conditions
-      - Strategy/mode declared
-      - 360 attempted/complete/not complete reported
-      - Command transfer (if any) is structured
-      - CAN reports used (conditions/actions/needs)
-      - Divisions/groups announced (if any)
-      - RIC established (if any)
-      - Safety officer assigned (if any)
+      OUTPUT FORMAT - Use proper markdown table syntax:
 
-      Rules:
-      - If an element is not present, mark Observed? = No.
-      - If partially present (e.g., conditions but no structure details), mark Partial.
+      | Policy Element | Observed? | Evidence Quote | Timestamp | Notes |
+      |----------------|-----------|----------------|-----------|-------|
+      | Initial size-up | Yes | "two-story structure, heavy fire Bravo side" | 4:25 | Complete |
+      | Strategy declaration | Partial | "offensive mode" | 5:10 | No mode changes announced |
+
+      REQUIRED policy elements to evaluate (one row per element):
+
+      1. **Initial size-up completeness** - Structure type/height, fire/smoke conditions, exposures
+      2. **Strategy/mode declaration** - Offensive/defensive/investigation stated, mode changes announced
+      3. **360 degree survey** - 360 completion announced, conditions on all sides
+      4. **Command establishment and transfer** - Command assumed clearly, transfer briefing if applicable
+      5. **CAN reports** - Interior crews provide Conditions/Actions/Needs updates
+      6. **Division/Group structure** - Divisions assigned and announced with assignments
+      7. **RIC establishment** - RIC assigned with unit ID and acknowledgment
+      8. **Safety officer** - Safety role assigned and acknowledged
+
+      Scoring:
+      - "Yes" = Element clearly present and properly executed
+      - "Partial" = Element present but incomplete (note what's missing in Notes column)
+      - "No" = Not present in transcript
+      - "N/A" = Not applicable to this incident type
+
+      Use "-" for empty cells. Include MM:SS timestamps.
 
   - id: strengths-and-improvements
     name: Strengths & Areas for Improvement
     extractEvidence: true
     outputFormat: bullet_points
+    dependencies:
+      - benchmark-observations
+      - a1016-compliance-observations
     prompt: |
-      Provide two subsections using dash bullets:
+      Based on the benchmark and compliance observations, provide specific feedback.
 
-      Strengths:
-      - <bullet>
-      - <bullet>
+      FORMAT - Use these exact markdown headers and bullet format:
 
-      Areas for Improvement:
-      - <bullet>
-      - <bullet>
+      ## Strengths
+
+      - **Clear initial size-up** | Source: "two-story structure, heavy fire..." [4:25]
+      - **Timely command establishment** | Source: "Engine 25 assuming command" [3:27]
+
+      ## Areas for Improvement
+
+      - **Missing secondary search announcement** | Source: Not stated in radio traffic
+      - **Incomplete command transfer briefing** | Source: "assuming command" [4:20] - no status given
+
+      REQUIRED: List 4-6 items in each section.
+
+      Look for these STRENGTHS:
+      - Clear initial size-up with actionable information
+      - Timely strategy declaration
+      - Effective CAN reporting from interior
+      - Proper benchmark announcements
+      - Clear command presence and coordination
+      - Good division/group management
+
+      Look for these IMPROVEMENT AREAS:
+      - Missing or delayed benchmark announcements
+      - Incomplete CAN reports (missing needs, conditions, or actions)
+      - Unclear or conflicting information
+      - Radio discipline issues (unclear unit IDs, stepping on traffic)
+      - Missing safety-critical communications
 
       Rules:
-      - Keep each bullet to one sentence.
-      - Tie claims to what was said on the radio (no speculation).
+      - Be specific - cite exact quotes and [MM:SS] timestamps
+      - Focus on actionable communication improvements
+      - Balance positive reinforcement with constructive feedback
+      - Use bold for the issue/strength label
 
   - id: training-recommendations
     name: Training Recommendations
     extractEvidence: true
     outputFormat: bullet_points
+    dependencies:
+      - strengths-and-improvements
     prompt: |
-      Provide 5–10 actionable training recommendations as dash bullets.
-      Each bullet must follow:
-      - Recommendation: <action> | Why: <brief> | Suggested drill: <brief>
+      Provide 5-8 specific training recommendations based on the observations.
+
+      FORMAT - Use this exact structure for each recommendation:
+
+      ### 1. Practice command-transfer brief with CAN update
+      - **Why**: Assumption lacked status/benchmarks
+      - **Evidence**: "assuming command" [4:20]
+      - **Suggested Drill**: Role-play transfer with conditions/actions/needs in 15 seconds
+
+      ### 2. Drill water-supply forecasting
+      - **Why**: Interior held due to near-empty tank
+      - **Evidence**: "almost out of water" [11:02]
+      - **Suggested Drill**: Hydrant-to-attack transition with timed radio updates
+
+      Focus areas for fireground radio training:
+
+      1. **Size-up and Arrival Reports** - Structure description, conditions, strategy timing
+      2. **Benchmark Communications** - Command, 360, searches, knockdown, under control
+      3. **CAN Report Discipline** - Complete format, trigger points, interior reporting
+      4. **Division/Group Operations** - Assignment clarity, talk-paths, accountability
+      5. **Support Functions** - Water supply, utilities, RIC, safety comms
+      6. **Radio Discipline** - Unit ID, brevity, avoiding stepped-on traffic
 
       Rules:
-      - Base recommendations only on observed communications and gaps.
-      - Do not recommend policy changes unless the transcript clearly indicates a recurring protocol miss.
-
+      - Tie each recommendation to specific observed issues from this incident
+      - Provide practical, specific drill suggestions
+      - Prioritize safety-critical communications first
+      - Use numbered headers (### 1., ### 2., etc.) for each recommendation

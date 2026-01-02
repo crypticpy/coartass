@@ -28,6 +28,8 @@ import type OpenAI from 'openai';
 import {
   formatOutputType,
   postProcessResults,
+  pruneResultsForTemplate,
+  normalizeAnalysisJsonKeys,
   validateTokenLimits,
   ANALYSIS_CONSTANTS,
   logger,
@@ -92,6 +94,57 @@ interface SectionAnalysisResponse {
     topic: string;
     timestamp?: number;
     context?: string;
+  }>;
+
+  /** Benchmark/milestone observations if this section extracts them */
+  benchmarks?: Array<{
+    id: string;
+    benchmark: string;
+    status: 'met' | 'missed' | 'not_observed' | 'not_applicable';
+    timestamp?: number;
+    unitOrRole?: string;
+    evidenceQuote?: string;
+    notes?: string;
+  }>;
+
+  /** Structured radio reports/CAN logs if this section extracts them */
+  radioReports?: Array<{
+    id: string;
+    type:
+      | 'initial_radio_report'
+      | 'follow_up_360'
+      | 'entry_report'
+      | 'command_transfer_company_officer'
+      | 'command_transfer_chief'
+      | 'can_report'
+      | 'other';
+    timestamp: number;
+    from?: string;
+    fields?: Record<string, unknown>;
+    missingRequired?: string[];
+    evidenceQuote?: string;
+  }>;
+
+  /** Safety/accountability events if this section extracts them */
+  safetyEvents?: Array<{
+    id: string;
+    type:
+      | 'par'
+      | 'mayday'
+      | 'urgent_traffic'
+      | 'evacuation_order'
+      | 'strategy_change'
+      | 'ric_established'
+      | 'safety_officer_assigned'
+      | 'rehab'
+      | 'utilities_hazard'
+      | 'collapse_hazard'
+      | 'other';
+    severity: 'info' | 'warning' | 'critical';
+    timestamp: number;
+    unitOrRole?: string;
+    details: string;
+    evidenceQuote?: string;
   }>;
 
   /** Action items if this section extracts them */
@@ -709,6 +762,36 @@ This context should inform your analysis of the current section.
   // Determine what structured outputs this section should produce
   const sectionNameLower = section.name.toLowerCase();
   const shouldExtractAgenda = sectionNameLower.includes('agenda');
+  const promptLower = section.prompt.toLowerCase();
+
+  const shouldExtractBenchmarks =
+    sectionNameLower.includes('benchmark') ||
+    sectionNameLower.includes('milestone') ||
+    sectionNameLower.includes('report card') ||
+    promptLower.includes('benchmark');
+  const shouldExtractRadioReports =
+    sectionNameLower.includes('radio') ||
+    sectionNameLower.includes('can') ||
+    sectionNameLower.includes('size-up') ||
+    sectionNameLower.includes('entry') ||
+    sectionNameLower.includes('command transfer') ||
+    promptLower.includes('radio') ||
+    promptLower.includes('can report') ||
+    promptLower.includes('command transfer') ||
+    promptLower.includes('size-up') ||
+    promptLower.includes('initial radio report');
+  const shouldExtractSafetyEvents =
+    sectionNameLower.includes('safety') ||
+    sectionNameLower.includes('accountability') ||
+    sectionNameLower.includes('mayday') ||
+    sectionNameLower.includes('par') ||
+    sectionNameLower.includes('evac') ||
+    promptLower.includes('mayday') ||
+    promptLower.includes('par') ||
+    promptLower.includes('evac') ||
+    promptLower.includes('safety officer') ||
+    promptLower.includes('ric') ||
+    promptLower.includes('urgent');
   const shouldExtractDecisions =
     sectionNameLower.includes('decision') || sectionNameLower.includes('conclusion');
   const shouldExtractActions =
@@ -833,6 +916,45 @@ Focus on extracting the required content directly from the transcript.
 `;
   }
 
+  if (shouldExtractBenchmarks) {
+    outputFormatInstructions += `
+**Benchmarks**: Extract benchmark/milestone observations as structured objects with:
+- \`id\`: Unique identifier (e.g., "benchmark-1")
+- \`benchmark\`: Benchmark label (e.g., "Command established")
+- \`status\`: One of "met" | "missed" | "not_observed" | "not_applicable"
+- \`timestamp\`: Timestamp in seconds (omit if not observed)
+- \`unitOrRole\`: Unit/role associated (if stated)
+- \`evidenceQuote\`: Short verbatim quote (optional)
+- \`notes\`: Brief context (optional)
+`;
+  }
+
+  if (shouldExtractRadioReports) {
+    outputFormatInstructions += `
+**Radio Reports**: Extract structured radio reports/CAN logs as objects with:
+- \`id\`: Unique identifier (e.g., "report-1")
+- \`type\`: One of "initial_radio_report" | "follow_up_360" | "entry_report" | "command_transfer_company_officer" | "command_transfer_chief" | "can_report" | "other"
+- \`timestamp\`: Timestamp in seconds (REQUIRED)
+- \`from\`: Speaking unit/role (if identifiable)
+- \`fields\`: Key/value extracted fields relevant to the report type (keep values concise)
+- \`missingRequired\`: Array of missing/unclear required fields (if any)
+- \`evidenceQuote\`: Short verbatim quote (optional)
+`;
+  }
+
+  if (shouldExtractSafetyEvents) {
+    outputFormatInstructions += `
+**Safety Events**: Extract safety/accountability events as objects with:
+- \`id\`: Unique identifier (e.g., "safety-1")
+- \`type\`: One of "par" | "mayday" | "urgent_traffic" | "evacuation_order" | "strategy_change" | "ric_established" | "safety_officer_assigned" | "rehab" | "utilities_hazard" | "collapse_hazard" | "other"
+- \`severity\`: "info" | "warning" | "critical"
+- \`timestamp\`: Timestamp in seconds (REQUIRED)
+- \`unitOrRole\`: Unit/role associated (if identifiable)
+- \`details\`: 1 sentence description (REQUIRED)
+- \`evidenceQuote\`: Short verbatim quote (optional)
+`;
+  }
+
   if (shouldExtractQuotes) {
     outputFormatInstructions += `
 **Quotes**: Extract 3-5 notable quotes with:
@@ -861,13 +983,13 @@ ${TIMESTAMP_INSTRUCTION}
 
 ## Timestamp Extraction Example
 
-Given: "[2:45] Sarah: Action item - John to prepare budget by Friday"
-Extract: { "task": "John to prepare budget by Friday", "owner": "John", "deadline": "Friday", "timestamp": 165 }
+Given: "[2:45] Engine 25: Engine 25 assuming command, offensive mode"
+Extract: { "type": "initial_radio_report", "timestamp": 165, "from": "Engine 25", "fields": { "command": "assumed", "strategy": "offensive" } }
 Calculation: [2:45] = (2 × 60) + 45 = 165 seconds
 
-Given: "[5:30] Manager: We decided to go with Option B"
-Extract: { "decision": "Go with Option B", "timestamp": 330 }
-Calculation: [5:30] = (5 × 60) + 30 = 330 seconds
+Given: "[11:02] Interior: CAN - conditions heavy heat, actions advancing, needs ventilation"
+Extract: { "type": "can_report", "timestamp": 662, "fields": { "conditions": "heavy heat", "actions": "advancing", "needs": "ventilation" } }
+Calculation: [11:02] = (11 × 60) + 2 = 662 seconds
 
 ${contextSection}
 
@@ -899,6 +1021,9 @@ You MUST respond with valid JSON in this EXACT structure:
 {
   "content": "Extracted content formatted per requirements above",
   ${shouldExtractAgenda ? '"agendaItems": [ /* array of agenda objects */ ],' : ''}
+  ${shouldExtractBenchmarks ? '"benchmarks": [ /* array of benchmark objects */ ],' : ''}
+  ${shouldExtractRadioReports ? '"radioReports": [ /* array of radio report objects */ ],' : ''}
+  ${shouldExtractSafetyEvents ? '"safetyEvents": [ /* array of safety event objects */ ],' : ''}
   ${shouldExtractDecisions ? '"decisions": [ /* array of decision objects */ ],' : ''}
   ${shouldExtractActions ? '"actionItems": [ /* array of action objects */ ],' : ''}
   ${shouldExtractQuotes ? '"quotes": [ /* array of quote objects */ ],' : ''}
@@ -941,6 +1066,9 @@ function isValidSectionAnalysisResponse(data: unknown): data is SectionAnalysisR
 
   // Optional arrays must be valid if present
   if (obj.agendaItems !== undefined && !Array.isArray(obj.agendaItems)) return false;
+  if (obj.benchmarks !== undefined && !Array.isArray(obj.benchmarks)) return false;
+  if (obj.radioReports !== undefined && !Array.isArray(obj.radioReports)) return false;
+  if (obj.safetyEvents !== undefined && !Array.isArray(obj.safetyEvents)) return false;
   if (obj.actionItems !== undefined && !Array.isArray(obj.actionItems)) return false;
   if (obj.decisions !== undefined && !Array.isArray(obj.decisions)) return false;
   if (obj.quotes !== undefined && !Array.isArray(obj.quotes)) return false;
@@ -963,6 +1091,9 @@ function mergeSectionResults(
   const accumulated: Partial<AnalysisResults> = {
     sections: [],
     agendaItems: [],
+    benchmarks: [],
+    radioReports: [],
+    safetyEvents: [],
     actionItems: [],
     decisions: [],
     quotes: [],
@@ -976,6 +1107,9 @@ function mergeSectionResults(
     summary: accumulated.summary,
     sections: accumulated.sections || [],
     agendaItems: accumulated.agendaItems,
+    benchmarks: accumulated.benchmarks,
+    radioReports: accumulated.radioReports,
+    safetyEvents: accumulated.safetyEvents,
     actionItems: accumulated.actionItems,
     decisions: accumulated.decisions,
     quotes: accumulated.quotes,
@@ -1013,6 +1147,30 @@ function mergeSectionIntoResults(
       accumulated.agendaItems = [];
     }
     accumulated.agendaItems.push(...response.agendaItems);
+  }
+
+  // Merge benchmark observations
+  if (response.benchmarks && response.benchmarks.length > 0) {
+    if (!accumulated.benchmarks) {
+      accumulated.benchmarks = [];
+    }
+    accumulated.benchmarks.push(...response.benchmarks);
+  }
+
+  // Merge radio reports
+  if (response.radioReports && response.radioReports.length > 0) {
+    if (!accumulated.radioReports) {
+      accumulated.radioReports = [];
+    }
+    accumulated.radioReports.push(...response.radioReports);
+  }
+
+  // Merge safety events
+  if (response.safetyEvents && response.safetyEvents.length > 0) {
+    if (!accumulated.safetyEvents) {
+      accumulated.safetyEvents = [];
+    }
+    accumulated.safetyEvents.push(...response.safetyEvents);
   }
 
   // Merge action items
@@ -1134,6 +1292,9 @@ export async function executeAdvancedAnalysis(
       hasContext: (section.dependencies?.length || 0) > 0,
       previousSectionCount: accumulated.sections?.length || 0,
       previousAgendaCount: accumulated.agendaItems?.length || 0,
+      previousBenchmarkCount: accumulated.benchmarks?.length || 0,
+      previousRadioReportCount: accumulated.radioReports?.length || 0,
+      previousSafetyEventCount: accumulated.safetyEvents?.length || 0,
       previousDecisionCount: accumulated.decisions?.length || 0,
     });
 
@@ -1223,6 +1384,7 @@ export async function executeAdvancedAnalysis(
     let parsedResponse: unknown;
     try {
       parsedResponse = JSON.parse(content);
+      parsedResponse = normalizeAnalysisJsonKeys(parsedResponse);
     } catch (error) {
       logger.error('Advanced Analysis', `Failed to parse JSON for "${section.name}"`, {
         error,
@@ -1316,7 +1478,10 @@ export async function executeAdvancedAnalysis(
   const rawResults = mergeSectionResults(sectionResponses);
 
   // Post-process: ensure unique IDs and validate relationships
-  const draftResults = postProcessResults(rawResults, 'Advanced Analysis');
+  const draftResults = pruneResultsForTemplate(
+    postProcessResults(rawResults, 'Advanced Analysis'),
+    template
+  );
 
   // Step 5: Generate comprehensive summary statistics
   const sectionsWithDeps = sortedSections.filter(s => s.dependencies && s.dependencies.length > 0);
@@ -1423,7 +1588,7 @@ export async function executeAdvancedAnalysis(
     );
 
     return {
-      results: finalResults,
+      results: pruneResultsForTemplate(finalResults, template),
       draftResults,
       evaluation,
       promptsUsed,

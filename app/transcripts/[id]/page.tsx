@@ -27,7 +27,6 @@ import {
   Loader2,
   ArrowLeft,
   AlertCircle,
-  PlayCircle,
   FileTextIcon,
   Sparkles,
   MessageCircle,
@@ -41,6 +40,8 @@ import {
   getAnalysisByTranscript,
   getAllTemplates,
   saveAnalysis,
+  getRtassScorecardsByTranscript,
+  getRtassRubricTemplate,
 } from "@/lib/db";
 import {
   exportTranscriptAsText,
@@ -62,15 +63,16 @@ import type { Transcript, TranscriptSegment } from "@/types/transcript";
 import type { Analysis } from "@/types/analysis";
 import type { AudioPlayerControls } from "@/types/audio";
 import type { Template } from "@/types/template";
+import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
 
-// Dynamic import for AudioPlayer (contains heavy WaveSurfer dependency)
-const AudioPlayer = dynamic(
-  () => import("@/components/audio/audio-player").then((mod) => mod.AudioPlayer),
+// Dynamic import for RadioPlaybackInterface (contains heavy WaveSurfer dependency)
+const RadioPlaybackInterface = dynamic(
+  () => import("@/components/audio/radio-playback-interface").then((mod) => mod.RadioPlaybackInterface),
   {
     ssr: false,
     loading: () => (
       <Box
-        h={160}
+        h={300}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -85,6 +87,15 @@ const AudioPlayer = dynamic(
         </Group>
       </Box>
     )
+  }
+);
+
+// Dynamic import for InteractiveReviewMode (full-screen overlay)
+const InteractiveReviewMode = dynamic(
+  () => import("@/components/audio/interactive-review-mode").then((mod) => mod.InteractiveReviewMode),
+  {
+    ssr: false,
+    loading: () => null
   }
 );
 
@@ -127,6 +138,7 @@ export default function TranscriptDetailPage() {
   const [activeTab, setActiveTab] = useState<string | null>("transcript");
   const [generatingEvidenceFor, setGeneratingEvidenceFor] = useState<string | null>(null);
   const [evaluationViewMode, setEvaluationViewMode] = useState<Record<string, "draft" | "final">>({});
+  const [showReviewMode, setShowReviewMode] = useState(false);
   const hasSetInitialTab = useRef(false);
 
   const audioControlsRef = useRef<AudioPlayerControls | null>(null);
@@ -171,6 +183,34 @@ export default function TranscriptDetailPage() {
   const templateById = useMemo(() => {
     return new Map((templates ?? []).map((t) => [t.id, t]));
   }, [templates]);
+
+  // Load RTASS scorecards for this transcript (for Review Mode benchmarks)
+  const scorecards = useLiveQuery<RtassScorecard[]>(async () => {
+    if (!transcriptId) return [];
+    try {
+      return await getRtassScorecardsByTranscript(transcriptId);
+    } catch (error) {
+      console.error("Error loading scorecards:", error);
+      return [];
+    }
+  }, [transcriptId]);
+
+  // Get the most recent scorecard for the review mode
+  const latestScorecard = useMemo(() => {
+    if (!scorecards || scorecards.length === 0) return undefined;
+    return scorecards[0];
+  }, [scorecards]);
+
+  // Load the rubric template for the latest scorecard (for Review Mode benchmarks)
+  const latestRubric = useLiveQuery<RtassRubricTemplate | undefined>(async () => {
+    if (!latestScorecard?.rubricTemplateId) return undefined;
+    try {
+      return await getRtassRubricTemplate(latestScorecard.rubricTemplateId);
+    } catch (error) {
+      console.error("Error loading rubric template:", error);
+      return undefined;
+    }
+  }, [latestScorecard?.rubricTemplateId]);
 
   const citationsEnabled = process.env.NEXT_PUBLIC_CITATIONS_ENABLED !== "false";
 
@@ -672,30 +712,24 @@ export default function TranscriptDetailPage() {
               hasExistingAnalyses={analyses.length > 0}
             />
 
-            {/* Audio Player (if audio is available) */}
+            {/* Radio Playback Interface (if audio is available) */}
             {audioUrl && transcript.segments.length > 0 && (
               <Paper
                 p="md"
                 radius="md"
                 style={{ backgroundColor: "var(--mantine-color-default)", border: "1px solid var(--mantine-color-default-border)" }}
               >
-                <Stack gap="xs">
-                  <Group gap="xs" mb="xs">
-                    <PlayCircle
-                      size={14}
-                      style={{ color: "var(--mantine-color-dimmed)" }}
-                    />
-                    <Text size="xs" fw={700} c="dimmed" tt="uppercase" lts={0.5}>
-                      Audio Playback
-                    </Text>
-                  </Group>
-                  <AudioPlayer
-                    audioUrl={audioUrl}
-                    segments={transcript.segments}
-                    onSegmentChange={handleSegmentChange}
-                    onControlsReady={handleControlsReady}
-                  />
-                </Stack>
+                <RadioPlaybackInterface
+                  audioUrl={audioUrl}
+                  cacheKey={transcript.id}
+                  segments={transcript.segments}
+                  duration={transcript.metadata.duration}
+                  wordCount={transcript.text.split(/\s+/).filter(Boolean).length}
+                  fileSize={transcript.metadata.fileSize}
+                  onSegmentChange={handleSegmentChange}
+                  onControlsReady={handleControlsReady}
+                  onReviewModeClick={() => setShowReviewMode(true)}
+                />
               </Paper>
             )}
 
@@ -872,6 +906,20 @@ export default function TranscriptDetailPage() {
             </div>
           </Stack>
         </Container>
+
+        {/* Interactive Review Mode Overlay */}
+        {showReviewMode && audioUrl && (
+          <InteractiveReviewMode
+            audioUrl={audioUrl}
+            segments={transcript.segments}
+            scorecard={latestScorecard}
+            rubric={latestRubric}
+            scorecards={scorecards ?? []}
+            duration={transcript.metadata.duration}
+            cacheKey={transcript.id}
+            onClose={() => setShowReviewMode(false)}
+          />
+        )}
       </div>
   );
 }

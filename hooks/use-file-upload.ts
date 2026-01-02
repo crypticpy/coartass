@@ -231,14 +231,22 @@ async function extractVideoDuration(file: File): Promise<number> {
       }
     };
 
-    video.onerror = () => {
+    video.onerror = (e) => {
       clearTimeout(timeout);
       cleanupVideoElement();
-      console.warn('Video metadata extraction error');
+      console.warn('Video metadata extraction error - codec may be unsupported, FFmpeg will handle conversion:', e);
       resolve(0);
     };
 
-    video.src = url;
+    // Wrap src assignment in try-catch for edge cases
+    try {
+      video.src = url;
+    } catch (e) {
+      clearTimeout(timeout);
+      cleanupVideoElement();
+      console.warn('Failed to set video source:', e);
+      resolve(0);
+    }
   });
 }
 
@@ -567,16 +575,20 @@ export function useFileUpload(): UseFileUploadReturn {
       // (WebM metadata extraction can fail, but duration was captured during selectFile)
       const strategy = await getFileProcessingStrategy(state.file, state.audioMetadata?.duration);
 
+      console.log('[Upload] Processing strategy:', strategy);
+
       if (strategy.needsConversion || strategy.needsSplitting) {
         // Process audio (convert and/or split)
+        console.log('[Upload] Starting audio processing...');
         filesToProcess = await processAudioForTranscription(
           state.file,
           (stage, progress) => {
-            // CRITICAL FIX: Ensure progress is a valid number and clamped
-            const safeProgress = Math.min(Math.max(progress || 0, 0), 1);
+            // Progress from processAudioForTranscription is 0-100 scale, not 0-1
+            const normalizedProgress = Math.min(Math.max(progress || 0, 0), 100) / 100;
+            console.log(`[Upload] Processing: ${stage} - ${Math.round(normalizedProgress * 100)}%`);
             const processingProgress: TranscriptionProgress = {
               status: 'processing',
-              progress: Math.round(safeProgress * 30), // Use 0-30% for processing
+              progress: Math.round(normalizedProgress * 30), // Use 0-30% for processing
               message: stage,
             };
             updateProgressSafely(processingProgress, options?.onProgress);
@@ -593,6 +605,8 @@ export function useFileUpload(): UseFileUploadReturn {
           }));
         }
       }
+
+      console.log(`[Upload] Files to process: ${filesToProcess.length}`, filesToProcess.map(f => ({ name: f.name, size: f.size })));
 
       const totalParts = filesToProcess.length;
       const partProgress = new Map<number, number>();

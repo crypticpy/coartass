@@ -154,9 +154,9 @@ export function ExportOptionsModal({
 
   // Calculate counts for display
   const sectionCount = analysis.results.sections.length;
-  const actionItemCount = analysis.results.actionItems?.length || 0;
-  const decisionCount = analysis.results.decisions?.length || 0;
-  const quoteCount = analysis.results.quotes?.length || 0;
+  const benchmarkCount = analysis.results.benchmarks?.length || 0;
+  const radioReportCount = analysis.results.radioReports?.length || 0;
+  const safetyEventCount = analysis.results.safetyEvents?.length || 0;
 
   // Estimate file size
   const estimatedSize = React.useMemo(
@@ -304,53 +304,53 @@ export function ExportOptionsModal({
                 />
               )}
 
-              {actionItemCount > 0 && (
+              {benchmarkCount > 0 && (
                 <Checkbox
                   label={
                     <Group gap="xs">
-                      <Text size="sm">Action Items</Text>
-                      <Badge size="xs" variant="light" color="blue">
-                        {actionItemCount}
+                      <Text size="sm">Benchmarks</Text>
+                      <Badge size="xs" variant="light" color="teal">
+                        {benchmarkCount}
                       </Badge>
                     </Group>
                   }
-                  checked={options.includeActionItems}
+                  checked={options.includeBenchmarks}
                   onChange={(e) =>
-                    updateOption("includeActionItems", e.currentTarget.checked)
+                    updateOption("includeBenchmarks", e.currentTarget.checked)
                   }
                 />
               )}
 
-              {decisionCount > 0 && (
+              {radioReportCount > 0 && (
                 <Checkbox
                   label={
                     <Group gap="xs">
-                      <Text size="sm">Decisions</Text>
-                      <Badge size="xs" variant="light" color="green">
-                        {decisionCount}
+                      <Text size="sm">Radio Reports</Text>
+                      <Badge size="xs" variant="light" color="indigo">
+                        {radioReportCount}
                       </Badge>
                     </Group>
                   }
-                  checked={options.includeDecisions}
+                  checked={options.includeRadioReports}
                   onChange={(e) =>
-                    updateOption("includeDecisions", e.currentTarget.checked)
+                    updateOption("includeRadioReports", e.currentTarget.checked)
                   }
                 />
               )}
 
-              {quoteCount > 0 && (
+              {safetyEventCount > 0 && (
                 <Checkbox
                   label={
                     <Group gap="xs">
-                      <Text size="sm">Notable Quotes</Text>
-                      <Badge size="xs" variant="light" color="grape">
-                        {quoteCount}
+                      <Text size="sm">Safety Events</Text>
+                      <Badge size="xs" variant="light" color="red">
+                        {safetyEventCount}
                       </Badge>
                     </Group>
                   }
-                  checked={options.includeQuotes}
+                  checked={options.includeSafetyEvents}
                   onChange={(e) =>
-                    updateOption("includeQuotes", e.currentTarget.checked)
+                    updateOption("includeSafetyEvents", e.currentTarget.checked)
                   }
                 />
               )}

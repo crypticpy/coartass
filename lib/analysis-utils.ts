@@ -1342,7 +1342,7 @@ export function buildAnalysisSummaryText(
   template?: Template
 ): string {
   const lines: string[] = [];
-  const headerTitle = template?.name ? `${template.name} Analysis` : 'Meeting Analysis';
+  const headerTitle = template?.name ? `${template.name} Analysis` : 'Radio Traffic Analysis';
 
   lines.push(headerTitle);
 
@@ -1375,60 +1375,98 @@ export function buildAnalysisSummaryText(
     lines.push('');
   }
 
-  if (results.actionItems && results.actionItems.length > 0) {
-    lines.push('Action Items');
-    lines.push('-'.repeat('Action Items'.length));
+  if (results.benchmarks && results.benchmarks.length > 0) {
+    lines.push('Benchmarks & Milestones');
+    lines.push('-'.repeat('Benchmarks & Milestones'.length));
     lines.push('');
 
-    results.actionItems.forEach((item) => {
-      const details: string[] = [];
+    results.benchmarks.forEach((b) => {
+      const parts: string[] = [b.benchmark, `Status: ${b.status.replace(/_/g, ' ')}`];
 
-      if (item.owner) {
-        details.push(`Owner: ${item.owner}`);
+      if (typeof b.timestamp === 'number') {
+        parts.push(`Time: ${formatTimestamp(b.timestamp)}`);
       }
 
-      if (item.deadline) {
-        details.push(`Due: ${item.deadline}`);
+      if (b.unitOrRole) {
+        parts.push(`Unit/Role: ${b.unitOrRole}`);
       }
 
-      if (typeof item.timestamp === 'number') {
-        details.push(`Mentioned at ${formatTimestamp(item.timestamp)}`);
+      lines.push(`- ${parts.join(' | ')}`);
+      if (b.evidenceQuote) {
+        lines.push(`  Evidence: "${b.evidenceQuote}"`);
       }
-
-      const detailText = details.length > 0 ? ` (${details.join(' | ')})` : '';
-      lines.push(`- [ ] ${item.task}${detailText}`);
+      if (b.notes) {
+        lines.push(`  Notes: ${b.notes}`);
+      }
     });
 
     lines.push('');
   }
 
-  if (results.decisions && results.decisions.length > 0) {
-    lines.push('Key Decisions');
-    lines.push('-'.repeat('Key Decisions'.length));
+  if (results.radioReports && results.radioReports.length > 0) {
+    lines.push('Radio Reports');
+    lines.push('-'.repeat('Radio Reports'.length));
     lines.push('');
 
-    results.decisions.forEach((decision, index) => {
-      const summaryParts: string[] = [];
+    results.radioReports.forEach((r) => {
+      const headerParts: string[] = [
+        formatTimestamp(r.timestamp),
+        r.type.replace(/_/g, ' ').toUpperCase(),
+      ];
+      if (r.from) headerParts.push(`From: ${r.from}`);
+      lines.push(`- ${headerParts.join(' | ')}`);
 
-      if (decision.context) {
-        summaryParts.push(`Context: ${decision.context}`);
+      if (r.fields && Object.keys(r.fields).length > 0) {
+        Object.entries(r.fields).forEach(([key, value]) => {
+          lines.push(`  - ${key}: ${String(value)}`);
+        });
       }
 
-      if (typeof decision.timestamp === 'number') {
-        summaryParts.push(`Time: ${formatTimestamp(decision.timestamp)}`);
+      if (r.missingRequired && r.missingRequired.length > 0) {
+        lines.push(`  Missing: ${r.missingRequired.join(', ')}`);
       }
 
-      const suffix = summaryParts.length > 0 ? ` (${summaryParts.join(' | ')})` : '';
-      lines.push(`${index + 1}. ${decision.decision}${suffix}`);
+      if (r.evidenceQuote) {
+        lines.push(`  Evidence: "${r.evidenceQuote}"`);
+      }
     });
 
     lines.push('');
   }
 
-  // Filter out "Action Items" sections since they're already included via results.actionItems[]
+  if (results.safetyEvents && results.safetyEvents.length > 0) {
+    lines.push('Safety & Accountability');
+    lines.push('-'.repeat('Safety & Accountability'.length));
+    lines.push('');
+
+    results.safetyEvents.forEach((e) => {
+      const parts: string[] = [
+        formatTimestamp(e.timestamp),
+        e.type.replace(/_/g, ' ').toUpperCase(),
+        `Severity: ${e.severity.toUpperCase()}`,
+      ];
+      if (e.unitOrRole) parts.push(`Unit/Role: ${e.unitOrRole}`);
+      lines.push(`- ${parts.join(' | ')}`);
+      lines.push(`  Details: ${e.details}`);
+      if (e.evidenceQuote) {
+        lines.push(`  Evidence: "${e.evidenceQuote}"`);
+      }
+    });
+
+    lines.push('');
+  }
+
+  // Filter out legacy meeting-era sections that are not used in RTASS outputs.
   const filteredSections = results.sections.filter(section => {
     const lowerName = section.name.toLowerCase();
-    return lowerName !== 'action items' && lowerName !== 'action items for improvement';
+    return ![
+      'action items',
+      'action items for improvement',
+      'key decisions',
+      'decisions',
+      'notable quotes',
+      'quotes',
+    ].includes(lowerName);
   });
 
   filteredSections.forEach((section, index) => {

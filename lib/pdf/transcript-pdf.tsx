@@ -308,7 +308,7 @@ const PDFFooter: React.FC<{ transcript: Transcript }> = ({ transcript }) => (
     <View style={styles.footerLeft}>
       <Text>{transcript.filename}</Text>
       <Text style={styles.branding}>
-        Generated with Meeting Transcriber
+        Generated with Austin RTASS
       </Text>
     </View>
     <View style={styles.footerRight}>
@@ -348,10 +348,10 @@ export const TranscriptPDFDocument: React.FC<TranscriptPDFDocumentProps> = ({
   return (
     <Document
       title={`Transcript - ${transcript.filename}`}
-      author="Meeting Transcriber"
+      author="Austin RTASS"
       subject="Audio Transcript"
-      keywords="transcript, meeting, audio"
-      creator="Meeting Transcriber"
+      keywords="transcript, radio, fire, ems, police"
+      creator="Austin RTASS"
     >
       <Page size="A4" style={styles.page}>
         <PDFHeader transcript={transcript} />

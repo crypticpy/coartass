@@ -11,7 +11,7 @@ import type { ExportOptions } from "./analysis-exporter";
 /**
  * JSON export schema version for compatibility tracking
  */
-const SCHEMA_VERSION = "1.0.0";
+const SCHEMA_VERSION = "1.1.0";
 
 /**
  * Export envelope structure
@@ -50,26 +50,35 @@ interface AnalysisExportEnvelope {
         relevanceScore: number;
       }>;
     }>;
-    actionItems?: Array<{
+    benchmarks?: Array<{
       id: string;
-      task: string;
-      owner?: string;
-      deadline?: string;
+      benchmark: string;
+      status: string;
       timestamp?: number;
       timestampFormatted?: string;
+      unitOrRole?: string;
+      evidenceQuote?: string;
+      notes?: string;
     }>;
-    decisions?: Array<{
+    radioReports?: Array<{
       id: string;
-      decision: string;
+      type: string;
       timestamp: number;
       timestampFormatted: string;
-      context?: string;
+      from?: string;
+      fields?: Record<string, unknown>;
+      missingRequired?: string[];
+      evidenceQuote?: string;
     }>;
-    quotes?: Array<{
-      text: string;
-      speaker?: string;
+    safetyEvents?: Array<{
+      id: string;
+      type: string;
+      severity: string;
       timestamp: number;
       timestampFormatted: string;
+      unitOrRole?: string;
+      details: string;
+      evidenceQuote?: string;
     }>;
   };
 
@@ -77,9 +86,9 @@ interface AnalysisExportEnvelope {
   statistics: {
     sectionCount: number;
     totalEvidenceCount: number;
-    actionItemCount: number;
-    decisionCount: number;
-    quoteCount: number;
+    benchmarkCount: number;
+    radioReportCount: number;
+    safetyEventCount: number;
     wordCount: number;
   };
 }
@@ -156,7 +165,7 @@ export function generateAnalysisJson(
 
     exportMetadata: {
       exportedAt: new Date().toISOString(),
-      generator: "Meeting Transcriber",
+      generator: "Austin RTASS",
       generatorVersion: "1.0.0",
     },
 
@@ -172,9 +181,9 @@ export function generateAnalysisJson(
     statistics: {
       sectionCount: analysis.results.sections.length,
       totalEvidenceCount: calculateEvidenceCount(analysis),
-      actionItemCount: analysis.results.actionItems?.length || 0,
-      decisionCount: analysis.results.decisions?.length || 0,
-      quoteCount: analysis.results.quotes?.length || 0,
+      benchmarkCount: analysis.results.benchmarks?.length || 0,
+      radioReportCount: analysis.results.radioReports?.length || 0,
+      safetyEventCount: analysis.results.safetyEvents?.length || 0,
       wordCount: calculateWordCount(analysis),
     },
   };
@@ -208,52 +217,56 @@ export function generateAnalysisJson(
     });
   }
 
-  // Include action items if requested
+  // Structured logs
   if (
-    options.includeActionItems &&
-    analysis.results.actionItems &&
-    analysis.results.actionItems.length > 0
+    options.includeBenchmarks &&
+    analysis.results.benchmarks &&
+    analysis.results.benchmarks.length > 0
   ) {
-    envelope.analysis.actionItems = analysis.results.actionItems.map((item) => ({
+    envelope.analysis.benchmarks = analysis.results.benchmarks.map((item) => ({
       id: item.id,
-      task: item.task,
-      ...(item.owner ? { owner: item.owner } : {}),
-      ...(item.deadline ? { deadline: item.deadline } : {}),
+      benchmark: item.benchmark,
+      status: item.status,
       ...(item.timestamp !== undefined
-        ? {
-            timestamp: item.timestamp,
-            timestampFormatted: formatTimestamp(item.timestamp),
-          }
+        ? { timestamp: item.timestamp, timestampFormatted: formatTimestamp(item.timestamp) }
         : {}),
+      ...(item.unitOrRole ? { unitOrRole: item.unitOrRole } : {}),
+      ...(item.evidenceQuote ? { evidenceQuote: item.evidenceQuote } : {}),
+      ...(item.notes ? { notes: item.notes } : {}),
     }));
   }
 
-  // Include decisions if requested
   if (
-    options.includeDecisions &&
-    analysis.results.decisions &&
-    analysis.results.decisions.length > 0
+    options.includeRadioReports &&
+    analysis.results.radioReports &&
+    analysis.results.radioReports.length > 0
   ) {
-    envelope.analysis.decisions = analysis.results.decisions.map((decision) => ({
-      id: decision.id,
-      decision: decision.decision,
-      timestamp: decision.timestamp,
-      timestampFormatted: formatTimestamp(decision.timestamp),
-      ...(decision.context ? { context: decision.context } : {}),
+    envelope.analysis.radioReports = analysis.results.radioReports.map((item) => ({
+      id: item.id,
+      type: item.type,
+      timestamp: item.timestamp,
+      timestampFormatted: formatTimestamp(item.timestamp),
+      ...(item.from ? { from: item.from } : {}),
+      ...(item.fields ? { fields: item.fields } : {}),
+      ...(item.missingRequired ? { missingRequired: item.missingRequired } : {}),
+      ...(item.evidenceQuote ? { evidenceQuote: item.evidenceQuote } : {}),
     }));
   }
 
-  // Include quotes if requested
   if (
-    options.includeQuotes &&
-    analysis.results.quotes &&
-    analysis.results.quotes.length > 0
+    options.includeSafetyEvents &&
+    analysis.results.safetyEvents &&
+    analysis.results.safetyEvents.length > 0
   ) {
-    envelope.analysis.quotes = analysis.results.quotes.map((quote) => ({
-      text: quote.text,
-      ...(quote.speaker ? { speaker: quote.speaker } : {}),
-      timestamp: quote.timestamp,
-      timestampFormatted: formatTimestamp(quote.timestamp),
+    envelope.analysis.safetyEvents = analysis.results.safetyEvents.map((item) => ({
+      id: item.id,
+      type: item.type,
+      severity: item.severity,
+      timestamp: item.timestamp,
+      timestampFormatted: formatTimestamp(item.timestamp),
+      ...(item.unitOrRole ? { unitOrRole: item.unitOrRole } : {}),
+      details: item.details,
+      ...(item.evidenceQuote ? { evidenceQuote: item.evidenceQuote } : {}),
     }));
   }
 
@@ -268,7 +281,7 @@ export function getAnalysisJsonSchema(): object {
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
     title: "Analysis Export",
-    description: "Meeting Transcriber analysis export format",
+    description: "Austin RTASS analysis export format",
     type: "object",
     required: ["schemaVersion", "exportMetadata", "document", "analysis", "statistics"],
     properties: {
@@ -332,45 +345,54 @@ export function getAnalysisJsonSchema(): object {
               },
             },
           },
-          actionItems: {
+          benchmarks: {
             type: "array",
             items: {
               type: "object",
-              required: ["id", "task"],
+              required: ["id", "benchmark", "status"],
               properties: {
                 id: { type: "string" },
-                task: { type: "string" },
-                owner: { type: "string" },
-                deadline: { type: "string" },
+                benchmark: { type: "string" },
+                status: { type: "string" },
                 timestamp: { type: "number" },
                 timestampFormatted: { type: "string" },
+                unitOrRole: { type: "string" },
+                evidenceQuote: { type: "string" },
+                notes: { type: "string" },
               },
             },
           },
-          decisions: {
+          radioReports: {
             type: "array",
             items: {
               type: "object",
-              required: ["id", "decision", "timestamp", "timestampFormatted"],
+              required: ["id", "type", "timestamp", "timestampFormatted"],
               properties: {
                 id: { type: "string" },
-                decision: { type: "string" },
+                type: { type: "string" },
                 timestamp: { type: "number" },
                 timestampFormatted: { type: "string" },
-                context: { type: "string" },
+                from: { type: "string" },
+                fields: { type: "object", additionalProperties: true },
+                missingRequired: { type: "array", items: { type: "string" } },
+                evidenceQuote: { type: "string" },
               },
             },
           },
-          quotes: {
+          safetyEvents: {
             type: "array",
             items: {
               type: "object",
-              required: ["text", "timestamp", "timestampFormatted"],
+              required: ["id", "type", "severity", "timestamp", "timestampFormatted", "details"],
               properties: {
-                text: { type: "string" },
-                speaker: { type: "string" },
+                id: { type: "string" },
+                type: { type: "string" },
+                severity: { type: "string" },
                 timestamp: { type: "number" },
                 timestampFormatted: { type: "string" },
+                unitOrRole: { type: "string" },
+                details: { type: "string" },
+                evidenceQuote: { type: "string" },
               },
             },
           },
@@ -381,17 +403,17 @@ export function getAnalysisJsonSchema(): object {
         required: [
           "sectionCount",
           "totalEvidenceCount",
-          "actionItemCount",
-          "decisionCount",
-          "quoteCount",
+          "benchmarkCount",
+          "radioReportCount",
+          "safetyEventCount",
           "wordCount",
         ],
         properties: {
           sectionCount: { type: "integer", minimum: 0 },
           totalEvidenceCount: { type: "integer", minimum: 0 },
-          actionItemCount: { type: "integer", minimum: 0 },
-          decisionCount: { type: "integer", minimum: 0 },
-          quoteCount: { type: "integer", minimum: 0 },
+          benchmarkCount: { type: "integer", minimum: 0 },
+          radioReportCount: { type: "integer", minimum: 0 },
+          safetyEventCount: { type: "integer", minimum: 0 },
           wordCount: { type: "integer", minimum: 0 },
         },
       },

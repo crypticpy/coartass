@@ -204,6 +204,9 @@ export async function convertMP4ToMP3(
  * 1. Detect silence periods
  * 2. Split at optimal silence points
  *
+ * For non-MP3 inputs, re-encodes to ensure compatibility.
+ * Falls back to time-based splitting if no silence is detected.
+ *
  * @param file - Audio file to split
  * @param onProgress - Optional progress callback (0-100)
  * @returns Array of audio file chunks
@@ -212,7 +215,13 @@ export async function splitAudioAtSilence(
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<File[]> {
-  const inputFileName = 'input_split.mp3';
+  // Determine input extension for FFmpeg format detection
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
+  const inputFileName = `input_split.${fileExt}`;
+
+  // Check if input is already MP3 - only then can we use stream copy
+  const isMP3 = file.type === 'audio/mpeg' || fileExt === 'mp3';
+
   let ffmpeg: FFmpeg | null = null;
   let logListener: (({ message }: { message: string }) => void) | null = null;
   const outputFilesToCleanup: string[] = [];
@@ -225,6 +234,7 @@ export async function splitAudioAtSilence(
     // Write input file
     onProgress?.(5);
     await ffmpeg.writeFile(inputFileName, await fetchFile(file));
+    console.log(`[Split] Input file written: ${inputFileName}, isMP3: ${isMP3}, size: ${file.size}`);
 
     // --- Pass 1: Detect Silence ---
     onProgress?.(10);
@@ -256,15 +266,17 @@ export async function splitAudioAtSilence(
 
     ffmpeg.on('log', logListener);
 
-    // Run silencedetect
+    // Run silencedetect with more lenient settings for radio traffic
+    // Radio often has continuous audio with minimal silence
     await ffmpeg.exec([
       '-i', inputFileName,
-      '-af', 'silencedetect=noise=-30dB:d=0.5',
+      '-af', 'silencedetect=noise=-35dB:d=0.3',  // More sensitive: -35dB (vs -30dB), 0.3s (vs 0.5s)
       '-f', 'null',
       '-'
     ]);
 
     ffmpeg.off('log', logListener);
+    console.log(`[Split] Silence detection complete: found ${silences.length} silence periods`);
     onProgress?.(40);
 
     // --- Calculate Split Points ---
@@ -321,34 +333,57 @@ export async function splitAudioAtSilence(
       }
     }
 
+    console.log(`[Split] Calculated ${splitPoints.length} split points from silence detection`);
+
     // --- Pass 2: Split ---
     onProgress?.(50);
 
     const outputPattern = 'output%03d.mp3';
 
+    // Build FFmpeg split command
+    // For non-MP3 inputs, we MUST re-encode to MP3 (cannot use -c copy)
+    // For MP3 inputs, we can use stream copy for speed
     const splitArgs = [
       '-i', inputFileName,
       '-f', 'segment',
-      '-c', 'copy',
     ];
+
+    if (isMP3) {
+      // Stream copy for MP3 inputs (fast)
+      splitArgs.push('-c', 'copy');
+    } else {
+      // Re-encode for non-MP3 inputs (AAC, WAV, etc.)
+      // Use same settings as convertMP4ToMP3 for consistency
+      splitArgs.push(
+        '-vn',           // Remove video
+        '-ar', '16000',  // 16kHz sample rate
+        '-ac', '1',      // Mono
+        '-b:a', '64k'    // 64kbps bitrate
+      );
+    }
 
     if (splitPoints.length > 0) {
       splitArgs.push('-segment_times', splitPoints.join(','));
     } else {
+      // No silence detected - fall back to fixed-duration time-based splitting
+      console.log(`[Split] No silence-based split points, using time-based splitting at ${TARGET_DURATION}s intervals`);
       splitArgs.push('-segment_time', String(TARGET_DURATION));
     }
 
     splitArgs.push(outputPattern);
 
+    console.log(`[Split] Running FFmpeg with args:`, splitArgs.join(' '));
     await ffmpeg.exec(splitArgs);
 
     onProgress?.(90);
 
     // Read all output files
-    const files = await ffmpeg.listDir('/');
-    const outputFiles = files
+    const allFiles = await ffmpeg.listDir('/');
+    const outputFiles = allFiles
       .filter(f => f.name.startsWith('output') && f.name.endsWith('.mp3'))
       .sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log(`[Split] FFmpeg produced ${outputFiles.length} output files`);
 
     // Track output files for cleanup
     outputFiles.forEach(f => outputFilesToCleanup.push(f.name));
@@ -364,6 +399,7 @@ export async function splitAudioAtSilence(
         const blob = new Blob([new Uint8Array(uint8Data)], { type: 'audio/mpeg' });
         const fileName = `${file.name.replace(/\.[^.]+$/, '')}_part${i + 1}.mp3`;
         chunks.push(new File([blob], fileName, { type: 'audio/mpeg' }));
+        console.log(`[Split] Created chunk ${i + 1}: ${fileName} (${(uint8Data.length / 1024 / 1024).toFixed(2)}MB)`);
       }
 
       // Clean up chunk file
@@ -380,6 +416,13 @@ export async function splitAudioAtSilence(
 
     onProgress?.(100);
 
+    // Safety check: if splitting produced no chunks, something went wrong
+    if (chunks.length === 0) {
+      console.error('[Split] FFmpeg produced 0 output files - splitting failed');
+      throw new Error('Audio splitting produced no output files. The file format may be incompatible.');
+    }
+
+    console.log(`[Split] Complete: produced ${chunks.length} chunks`);
     return chunks;
   } catch (error) {
     console.error('Audio splitting failed:', error);
@@ -610,6 +653,154 @@ export async function processAudioForTranscription(
   }
 
   return [processedFile];
+}
+
+/**
+ * Audio enhancement configuration for radio traffic
+ */
+export interface AudioEnhancementConfig {
+  /** Peak normalize to target level in dB (default: -1) */
+  normalizePeak?: number;
+  /** High-pass filter cutoff frequency in Hz (default: 80) */
+  highPassFreq?: number;
+  /** Apply light compression for evening out levels (default: true) */
+  applyCompression?: boolean;
+  /** Apply noise gate to reduce background noise (default: true) */
+  applyNoiseGate?: boolean;
+}
+
+const DEFAULT_ENHANCEMENT_CONFIG: Required<AudioEnhancementConfig> = {
+  normalizePeak: -1,
+  highPassFreq: 80,
+  applyCompression: true,
+  applyNoiseGate: true,
+};
+
+/**
+ * Enhance audio quality for radio traffic playback
+ *
+ * Applies the following processing chain:
+ * 1. High-pass filter - removes low-frequency rumble (<80Hz)
+ * 2. Noise gate - reduces background noise during silence
+ * 3. Compression - evens out loud/quiet transmissions
+ * 4. Normalization - brings peak level to -1dB
+ *
+ * @param file - Audio file to enhance
+ * @param config - Enhancement configuration
+ * @param onProgress - Optional progress callback (0-100)
+ * @returns Enhanced audio file
+ */
+export async function enhanceRadioAudio(
+  file: File,
+  config?: AudioEnhancementConfig,
+  onProgress?: (progress: number) => void
+): Promise<File> {
+  const opts = { ...DEFAULT_ENHANCEMENT_CONFIG, ...config };
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'mp3';
+  const inputFileName = `input_enhance.${fileExt}`;
+  const outputFileName = 'enhanced.mp3';
+  let ffmpeg: FFmpeg | null = null;
+  let progressListener: (({ progress }: { progress: number }) => void) | null = null;
+
+  try {
+    onProgress?.(0);
+    ffmpeg = await getFFmpeg();
+
+    // Set up progress tracking
+    progressListener = ({ progress }: { progress: number }) => {
+      onProgress?.(Math.min(95, Math.max(0, Math.round(progress * 100))));
+    };
+    ffmpeg.on('progress', progressListener);
+
+    // Write input file
+    onProgress?.(5);
+    await ffmpeg.writeFile(inputFileName, await fetchFile(file));
+    onProgress?.(15);
+
+    // Build filter chain
+    const filters: string[] = [];
+
+    // 1. High-pass filter to remove low-frequency rumble
+    if (opts.highPassFreq > 0) {
+      filters.push(`highpass=f=${opts.highPassFreq}`);
+    }
+
+    // 2. Noise gate - reduces background noise during silence
+    // Parameters tuned for radio traffic:
+    // - threshold: -35dB (trigger level)
+    // - ratio: 2 (moderate reduction)
+    // - attack: 25ms (fast response for speech)
+    // - release: 100ms (smooth decay)
+    if (opts.applyNoiseGate) {
+      filters.push('agate=threshold=-35dB:ratio=2:attack=25:release=100');
+    }
+
+    // 3. Dynamic range compression
+    // Evens out loud and quiet transmissions
+    // Parameters tuned for radio:
+    // - threshold: -20dB (compress signals above this)
+    // - ratio: 3:1 (moderate compression)
+    // - attack: 5ms (fast attack for transients)
+    // - release: 100ms (smooth release)
+    // - makeup: 2dB (compensate for gain reduction)
+    if (opts.applyCompression) {
+      filters.push('acompressor=threshold=-20dB:ratio=3:attack=5:release=100:makeup=2dB');
+    }
+
+    // 4. Peak normalization - bring level up to target peak
+    // Use loudnorm for better perceptual loudness (EBU R128 based)
+    // Target integrated loudness: -14 LUFS (standard for speech)
+    // Target peak: configurable (default -1dB)
+    filters.push(`loudnorm=I=-14:TP=${opts.normalizePeak}:LRA=11`);
+
+    // Build FFmpeg command
+    const filterChain = filters.join(',');
+    const args = [
+      '-i', inputFileName,
+      '-af', filterChain,
+      '-ar', '16000',  // 16kHz for speech
+      '-ac', '1',      // Mono
+      '-b:a', '64k',   // 64kbps
+      '-y',            // Overwrite output
+      outputFileName
+    ];
+
+    console.log(`[AudioEnhance] Applying filters: ${filterChain}`);
+    await ffmpeg.exec(args);
+
+    onProgress?.(95);
+
+    // Read output file
+    const data = (await ffmpeg.readFile(outputFileName)) as Uint8Array;
+
+    onProgress?.(100);
+
+    // Create enhanced file
+    const enhancedBlob = new Blob([new Uint8Array(data)], { type: 'audio/mpeg' });
+    const enhancedFileName = file.name.replace(/\.[^.]+$/, '_enhanced.mp3');
+    const enhancedFile = new File([enhancedBlob], enhancedFileName, { type: 'audio/mpeg' });
+
+    console.log(`[AudioEnhance] Enhanced ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB) → ${enhancedFileName} (${(enhancedFile.size / 1024 / 1024).toFixed(2)}MB)`);
+
+    return enhancedFile;
+  } catch (error) {
+    console.error('Audio enhancement failed:', error);
+    // Return original file if enhancement fails (graceful degradation)
+    console.log('[AudioEnhance] Returning original file due to enhancement failure');
+    return file;
+  } finally {
+    if (ffmpeg) {
+      try {
+        await ffmpeg.deleteFile(inputFileName).catch(() => {});
+        await ffmpeg.deleteFile(outputFileName).catch(() => {});
+        if (progressListener) {
+          ffmpeg.off('progress', progressListener);
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
 }
 
 /**

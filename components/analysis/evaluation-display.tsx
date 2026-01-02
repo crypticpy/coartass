@@ -40,7 +40,6 @@ import {
   AlertTriangle,
   MessageSquare,
   CheckCircle2,
-  FileText,
   Eye,
 } from "lucide-react";
 import type { EvaluationResults, AnalysisResults } from "@/types";
@@ -73,16 +72,16 @@ export interface EvaluationDisplayProps {
  */
 function calculateStats(results: AnalysisResults): {
   sections: number;
-  agendaItems: number;
-  decisions: number;
-  actionItems: number;
+  benchmarks: number;
+  radioReports: number;
+  safetyEvents: number;
   evidence: number;
 } {
   return {
     sections: results.sections.length,
-    agendaItems: results.agendaItems?.length || 0,
-    decisions: results.decisions?.length || 0,
-    actionItems: results.actionItems?.length || 0,
+    benchmarks: results.benchmarks?.length || 0,
+    radioReports: results.radioReports?.length || 0,
+    safetyEvents: results.safetyEvents?.length || 0,
     evidence: results.sections.reduce((sum, s) => sum + (s.evidence?.length || 0), 0),
   };
 }
@@ -105,9 +104,9 @@ export function EvaluationDisplay({
 
   // Calculate differences
   const statsDiff = {
-    agendaItems: finalStats.agendaItems - draftStats.agendaItems,
-    decisions: finalStats.decisions - draftStats.decisions,
-    actionItems: finalStats.actionItems - draftStats.actionItems,
+    benchmarks: finalStats.benchmarks - draftStats.benchmarks,
+    radioReports: finalStats.radioReports - draftStats.radioReports,
+    safetyEvents: finalStats.safetyEvents - draftStats.safetyEvents,
     evidence: finalStats.evidence - draftStats.evidence,
   };
 
@@ -184,10 +183,13 @@ export function EvaluationDisplay({
                     {draftStats.sections} sections
                   </Badge>
                   <Badge size="xs" variant="dot" color="gray">
-                    {draftStats.actionItems} actions
+                    {draftStats.benchmarks} benchmarks
                   </Badge>
                   <Badge size="xs" variant="dot" color="gray">
-                    {draftStats.decisions} decisions
+                    {draftStats.radioReports} reports
+                  </Badge>
+                  <Badge size="xs" variant="dot" color="gray">
+                    {draftStats.safetyEvents} safety
                   </Badge>
                 </Group>
               </Box>
@@ -215,21 +217,31 @@ export function EvaluationDisplay({
                   </Group>
                   <Group gap={4} wrap="nowrap">
                     <Badge size="xs" variant="dot" color="aphGreen">
-                      {finalStats.actionItems} actions
+                      {finalStats.benchmarks} benchmarks
                     </Badge>
-                    {statsDiff.actionItems > 0 && (
+                    {statsDiff.benchmarks > 0 && (
                       <Text size="xs" c="aphGreen" fw={600}>
-                        (+{statsDiff.actionItems})
+                        (+{statsDiff.benchmarks})
                       </Text>
                     )}
                   </Group>
                   <Group gap={4} wrap="nowrap">
                     <Badge size="xs" variant="dot" color="aphGreen">
-                      {finalStats.decisions} decisions
+                      {finalStats.radioReports} reports
                     </Badge>
-                    {statsDiff.decisions > 0 && (
+                    {statsDiff.radioReports > 0 && (
                       <Text size="xs" c="aphGreen" fw={600}>
-                        (+{statsDiff.decisions})
+                        (+{statsDiff.radioReports})
+                      </Text>
+                    )}
+                  </Group>
+                  <Group gap={4} wrap="nowrap">
+                    <Badge size="xs" variant="dot" color="aphGreen">
+                      {finalStats.safetyEvents} safety
+                    </Badge>
+                    {statsDiff.safetyEvents > 0 && (
+                      <Text size="xs" c="aphGreen" fw={600}>
+                        (+{statsDiff.safetyEvents})
                       </Text>
                     )}
                   </Group>
@@ -358,98 +370,6 @@ export function EvaluationDisplay({
             </Accordion.Item>
           )}
 
-          {/* Orphaned Items */}
-          {evaluation.orphanedItems && (
-            <Accordion.Item value="orphaned">
-              <Accordion.Control
-                icon={
-                  <ThemeIcon size="sm" radius="xl" variant="light" color="gray">
-                    <FileText size={16} />
-                  </ThemeIcon>
-                }
-              >
-                <Group gap="xs">
-                  <Text fw={600}>Orphaned Items</Text>
-                  {(() => {
-                    const count =
-                      (evaluation.orphanedItems?.decisionsWithoutAgenda?.length || 0) +
-                      (evaluation.orphanedItems?.actionItemsWithoutDecisions?.length || 0) +
-                      (evaluation.orphanedItems?.agendaItemsWithoutDecisions?.length || 0);
-                    return count > 0 ? (
-                      <Badge size="sm" variant="light" color="gray" radius="xl">
-                        {count}
-                      </Badge>
-                    ) : null;
-                  })()}
-                </Group>
-              </Accordion.Control>
-              <Accordion.Panel>
-                <Stack gap="md">
-                  {evaluation.orphanedItems.decisionsWithoutAgenda &&
-                    evaluation.orphanedItems.decisionsWithoutAgenda.length > 0 && (
-                      <Box>
-                        <Text size="sm" fw={600} mb="xs">
-                          Decisions without agenda items:
-                        </Text>
-                        <List spacing="xs" size="sm">
-                          {evaluation.orphanedItems.decisionsWithoutAgenda.map((item, idx) => (
-                            <List.Item key={idx}>
-                              <Text size="sm" c="dimmed">
-                                {item}
-                              </Text>
-                            </List.Item>
-                          ))}
-                        </List>
-                      </Box>
-                    )}
-
-                  {evaluation.orphanedItems.actionItemsWithoutDecisions &&
-                    evaluation.orphanedItems.actionItemsWithoutDecisions.length > 0 && (
-                      <Box>
-                        <Text size="sm" fw={600} mb="xs">
-                          Action items without decisions:
-                        </Text>
-                        <List spacing="xs" size="sm">
-                          {evaluation.orphanedItems.actionItemsWithoutDecisions.map((item, idx) => (
-                            <List.Item key={idx}>
-                              <Text size="sm" c="dimmed">
-                                {item}
-                              </Text>
-                            </List.Item>
-                          ))}
-                        </List>
-                      </Box>
-                    )}
-
-                  {evaluation.orphanedItems.agendaItemsWithoutDecisions &&
-                    evaluation.orphanedItems.agendaItemsWithoutDecisions.length > 0 && (
-                      <Box>
-                        <Text size="sm" fw={600} mb="xs">
-                          Agenda items without decisions (discussion-only):
-                        </Text>
-                        <List spacing="xs" size="sm">
-                          {evaluation.orphanedItems.agendaItemsWithoutDecisions.map((item, idx) => (
-                            <List.Item key={idx}>
-                              <Text size="sm" c="dimmed">
-                                {item}
-                              </Text>
-                            </List.Item>
-                          ))}
-                        </List>
-                      </Box>
-                    )}
-
-                  {!evaluation.orphanedItems.decisionsWithoutAgenda &&
-                    !evaluation.orphanedItems.actionItemsWithoutDecisions &&
-                    !evaluation.orphanedItems.agendaItemsWithoutDecisions && (
-                      <Text size="sm" c="dimmed" ta="center" py="md">
-                        No orphaned items detected. All entities are properly linked.
-                      </Text>
-                    )}
-                </Stack>
-              </Accordion.Panel>
-            </Accordion.Item>
-          )}
         </Accordion>
 
         {/* Summary Footer */}

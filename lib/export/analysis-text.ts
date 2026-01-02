@@ -94,38 +94,6 @@ function wrapText(
 }
 
 /**
- * Create a boxed section of text
- */
-function createBox(lines: string[], width: number = LINE_WIDTH - 2): string {
-  const innerWidth = width - 2;
-  const result: string[] = [];
-
-  // Top border
-  result.push(
-    CHARS.BOX_TOP_LEFT +
-      CHARS.BOX_HORIZONTAL.repeat(innerWidth) +
-      CHARS.BOX_TOP_RIGHT
-  );
-
-  // Content lines
-  for (const line of lines) {
-    const paddedLine = line.padEnd(innerWidth);
-    result.push(
-      CHARS.BOX_VERTICAL + paddedLine.substring(0, innerWidth) + CHARS.BOX_VERTICAL
-    );
-  }
-
-  // Bottom border
-  result.push(
-    CHARS.BOX_BOTTOM_LEFT +
-      CHARS.BOX_HORIZONTAL.repeat(innerWidth) +
-      CHARS.BOX_BOTTOM_RIGHT
-  );
-
-  return result.join("\n");
-}
-
-/**
  * Format section header
  */
 function sectionHeader(title: string): string {
@@ -195,69 +163,62 @@ export function generateAnalysisText(
     }
   }
 
-  // Action Items
   if (
-    options.includeActionItems &&
-    analysis.results.actionItems &&
-    analysis.results.actionItems.length > 0
+    options.includeBenchmarks &&
+    analysis.results.benchmarks &&
+    analysis.results.benchmarks.length > 0
   ) {
-    sections.push(sectionHeader("Action Items"));
+    sections.push(sectionHeader("Benchmarks & Milestones"));
     sections.push("");
-
-    const actionLines: string[] = [];
-    for (const item of analysis.results.actionItems) {
-      actionLines.push(` ${CHARS.CHECKBOX} ${truncateText(item.task, 60)}`);
-      const details: string[] = [];
-      if (item.owner) details.push(`Owner: ${item.owner}`);
-      if (item.deadline) details.push(`Due: ${item.deadline}`);
-      if (item.timestamp !== undefined) {
-        details.push(`Mentioned at ${formatTimestamp(item.timestamp)}`);
-      }
-      if (details.length > 0) {
-        actionLines.push(`   ${details.join(" | ")}`);
-      }
-      actionLines.push("");
+    for (const b of analysis.results.benchmarks) {
+      sections.push(
+        `${CHARS.BULLET} ${b.benchmark} | Status: ${b.status} | Time: ${
+          b.timestamp !== undefined ? formatTimestamp(b.timestamp) : "-"
+        }${b.unitOrRole ? ` | Unit: ${b.unitOrRole}` : ""}`
+      );
+      if (b.evidenceQuote) sections.push(`    Evidence: "${b.evidenceQuote}"`);
+      if (b.notes) sections.push(`    Notes: ${b.notes}`);
+      sections.push("");
     }
-
-    sections.push(createBox(actionLines));
-    sections.push("");
   }
 
-  // Decisions
   if (
-    options.includeDecisions &&
-    analysis.results.decisions &&
-    analysis.results.decisions.length > 0
+    options.includeRadioReports &&
+    analysis.results.radioReports &&
+    analysis.results.radioReports.length > 0
   ) {
-    sections.push(sectionHeader("Decisions"));
+    sections.push(sectionHeader("Radio Reports & CAN"));
     sections.push("");
-
-    for (const decision of analysis.results.decisions) {
+    for (const r of analysis.results.radioReports) {
       sections.push(
-        `${CHARS.ARROW} [${formatTimestamp(decision.timestamp)}] ${decision.decision}`
+        `${CHARS.ARROW} [${formatTimestamp(r.timestamp)}] ${r.type.replace(/_/g, " ").toUpperCase()}${r.from ? ` | ${r.from}` : ""}`
       );
-      if (decision.context) {
-        sections.push(`  Context: ${wrapText(decision.context, LINE_WIDTH - 10, "  ")}`);
+      if (r.fields && Object.keys(r.fields).length > 0) {
+        Object.entries(r.fields).forEach(([k, v]) => {
+          sections.push(`    ${k}: ${String(v)}`);
+        });
+      }
+      if (r.evidenceQuote) sections.push(`    "${r.evidenceQuote}"`);
+      if (r.missingRequired && r.missingRequired.length > 0) {
+        sections.push(`    Missing: ${r.missingRequired.join(", ")}`);
       }
       sections.push("");
     }
   }
 
-  // Notable Quotes
   if (
-    options.includeQuotes &&
-    analysis.results.quotes &&
-    analysis.results.quotes.length > 0
+    options.includeSafetyEvents &&
+    analysis.results.safetyEvents &&
+    analysis.results.safetyEvents.length > 0
   ) {
-    sections.push(sectionHeader("Notable Quotes"));
+    sections.push(sectionHeader("Safety & Accountability Events"));
     sections.push("");
-
-    for (const quote of analysis.results.quotes) {
-      sections.push(`  "${wrapText(quote.text, LINE_WIDTH - 4, "   ").trim()}"`);
-      const attribution: string[] = [];
-      if (quote.speaker) attribution.push(`\u2014 ${quote.speaker}`);
-      attribution.push(`[${formatTimestamp(quote.timestamp)}]`);
-      sections.push(`    ${attribution.join(" ")}`);
+    for (const e of analysis.results.safetyEvents) {
+      sections.push(
+        `${CHARS.BULLET} [${formatTimestamp(e.timestamp)}] ${e.type.replace(/_/g, " ").toUpperCase()} (${e.severity})${e.unitOrRole ? ` | ${e.unitOrRole}` : ""}`
+      );
+      sections.push(`    ${e.details}`);
+      if (e.evidenceQuote) sections.push(`    "${e.evidenceQuote}"`);
       sections.push("");
     }
   }
@@ -265,7 +226,7 @@ export function generateAnalysisText(
   // Footer
   sections.push("");
   sections.push(horizontalLine());
-  sections.push(centerText("Generated with Meeting Transcriber"));
+  sections.push(centerText("Generated with Austin RTASS"));
   sections.push(doubleLine());
 
   return sections.join("\n");

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Transcriptor de Reuniones",
+    "appName": "Austin RTASS",
     "back": "Volver",
     "cancel": "Cancelar",
     "save": "Guardar",
@@ -260,7 +260,7 @@
   },
   "docs": {
     "title": "Documentacion y Ayuda",
-    "subtitle": "Aprenda a usar Meeting Transcriber",
+    "subtitle": "Aprenda a usar Austin RTASS",
     "architecture": "Arquitectura y Seguridad",
     "architectureDesc": "Descripcion tecnica de la aplicacion",
     "bestPractices": "Mejores Practicas",

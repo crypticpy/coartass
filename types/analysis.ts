@@ -2,7 +2,7 @@
  * Analysis Type Definitions
  *
  * Types for AI-powered analysis results, including extracted evidence,
- * action items, decisions, and structured content from transcripts.
+ * structured outputs, and content from transcripts.
  */
 
 import type { AnalysisStrategy } from '@/lib/analysis-strategy';
@@ -56,6 +56,130 @@ export interface AgendaItem {
 
   /** Optional context or notes about the agenda item */
   context?: string;
+}
+
+/**
+ * Benchmark assessment status for fireground review.
+ *
+ * - met: explicitly observed/announced on radio traffic
+ * - missed: expected but not announced (coachability/compliance concern)
+ * - not_observed: not stated; may be unknown applicability
+ * - not_applicable: clearly not applicable to this incident
+ */
+export type BenchmarkStatus = 'met' | 'missed' | 'not_observed' | 'not_applicable';
+
+/**
+ * Benchmark/milestone observation extracted from radio traffic for training/compliance review.
+ */
+export interface BenchmarkObservation {
+  /** Unique identifier for this benchmark row */
+  id: string;
+
+  /** Benchmark label (e.g., "Command established", "Primary search complete") */
+  benchmark: string;
+
+  /** Assessment status */
+  status: BenchmarkStatus;
+
+  /** Timestamp in seconds when the benchmark was announced/observed (if any) */
+  timestamp?: number;
+
+  /** Unit or role associated with the benchmark (if stated) */
+  unitOrRole?: string;
+
+  /** Short verbatim evidence quote from the transcript (if available) */
+  evidenceQuote?: string;
+
+  /** Optional notes for context (kept brief) */
+  notes?: string;
+}
+
+/**
+ * Standard radio report types used in fireground review.
+ */
+export type RadioReportType =
+  | 'initial_radio_report'
+  | 'follow_up_360'
+  | 'entry_report'
+  | 'command_transfer_company_officer'
+  | 'command_transfer_chief'
+  | 'can_report'
+  | 'other';
+
+/**
+ * Structured radio report extracted from transcript.
+ */
+export interface RadioReport {
+  /** Unique identifier for this report */
+  id: string;
+
+  /** Type of report */
+  type: RadioReportType;
+
+  /** Timestamp in seconds when the report occurred */
+  timestamp: number;
+
+  /** Speaking unit or role (if identifiable) */
+  from?: string;
+
+  /**
+   * Structured fields extracted from the report.
+   * Kept flexible to support variations across incidents and policies.
+   */
+  fields?: Record<string, unknown>;
+
+  /** Required fields that were missing/incomplete (for compliance coaching) */
+  missingRequired?: string[];
+
+  /** Short verbatim quote capturing the core of the report (if helpful) */
+  evidenceQuote?: string;
+}
+
+/**
+ * Safety/accountability event types for fireground review.
+ */
+export type SafetyEventType =
+  | 'par'
+  | 'mayday'
+  | 'urgent_traffic'
+  | 'evacuation_order'
+  | 'strategy_change'
+  | 'ric_established'
+  | 'safety_officer_assigned'
+  | 'rehab'
+  | 'utilities_hazard'
+  | 'collapse_hazard'
+  | 'other';
+
+/**
+ * Severity level for safety events.
+ */
+export type SafetyEventSeverity = 'info' | 'warning' | 'critical';
+
+/**
+ * Safety/accountability event extracted from radio traffic.
+ */
+export interface SafetyEvent {
+  /** Unique identifier for this event */
+  id: string;
+
+  /** Type of safety event */
+  type: SafetyEventType;
+
+  /** Severity level for prioritization in review */
+  severity: SafetyEventSeverity;
+
+  /** Timestamp in seconds when the event occurred */
+  timestamp: number;
+
+  /** Unit or role associated with the event (if identifiable) */
+  unitOrRole?: string;
+
+  /** Brief description of what happened */
+  details: string;
+
+  /** Optional evidence quote */
+  evidenceQuote?: string;
 }
 
 /**
@@ -270,6 +394,15 @@ export interface AnalysisResults {
   /** Optional extracted agenda items (for relationship mapping) */
   agendaItems?: AgendaItem[];
 
+  /** Optional benchmark/milestone observations (fireground review) */
+  benchmarks?: BenchmarkObservation[];
+
+  /** Optional structured radio reports/CAN logs (fireground review) */
+  radioReports?: RadioReport[];
+
+  /** Optional safety/accountability events (fireground review) */
+  safetyEvents?: SafetyEvent[];
+
   /** Optional extracted action items */
   actionItems?: ActionItem[];
 
@@ -414,6 +547,15 @@ export interface AnalysisConfig {
   /** Whether to extract evidence citations */
   includeEvidence: boolean;
 
+  /** Whether to extract benchmark/milestone observations */
+  extractBenchmarks: boolean;
+
+  /** Whether to extract structured radio reports/CAN logs */
+  extractRadioReports: boolean;
+
+  /** Whether to extract safety/accountability events */
+  extractSafetyEvents: boolean;
+
   /** Whether to extract action items */
   extractActionItems: boolean;
 
@@ -448,6 +590,9 @@ export interface AnalysisConfig {
  */
 export const DEFAULT_ANALYSIS_CONFIG: AnalysisConfig = {
   includeEvidence: true,
+  extractBenchmarks: true,
+  extractRadioReports: true,
+  extractSafetyEvents: true,
   extractActionItems: true,
   extractDecisions: true,
   extractQuotes: true,
@@ -466,6 +611,15 @@ export interface AnalysisStats {
 
   /** Total number of evidence citations */
   totalEvidence: number;
+
+  /** Number of benchmark observations extracted */
+  benchmarkCount: number;
+
+  /** Number of radio reports extracted */
+  radioReportCount: number;
+
+  /** Number of safety events extracted */
+  safetyEventCount: number;
 
   /** Number of action items extracted */
   actionItemCount: number;
@@ -497,6 +651,9 @@ export function calculateAnalysisStats(results: AnalysisResults): AnalysisStats 
   return {
     totalSections: results.sections.length,
     totalEvidence,
+    benchmarkCount: results.benchmarks?.length || 0,
+    radioReportCount: results.radioReports?.length || 0,
+    safetyEventCount: results.safetyEvents?.length || 0,
     actionItemCount: results.actionItems?.length || 0,
     decisionCount: results.decisions?.length || 0,
     quoteCount: results.quotes?.length || 0,

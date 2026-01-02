@@ -578,7 +578,8 @@ function isRetryableError(error: unknown): boolean {
     message.includes('econnreset') ||
     message.includes('enotfound') ||
     message.includes('econnrefused') ||
-    message.includes('etimedout')
+    message.includes('etimedout') ||
+    message.includes('fetch failed')  // Generic fetch failure (network issue)
   ) {
     return true;
   }

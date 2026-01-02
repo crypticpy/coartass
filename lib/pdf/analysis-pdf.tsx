@@ -51,6 +51,7 @@ const colors = {
   backgroundAlt: "#f9f9f9",
   success: "#22c55e",
   warning: "#f59e0b",
+  danger: "#ef4444",
   tableHeader: "#333333",
 };
 
@@ -245,6 +246,49 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
 
+  // Benchmark/Radio/Safety cards
+  card: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: "solid",
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: colors.backgroundAlt,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  badge: {
+    fontSize: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    color: "#fff",
+  },
+  badgeNeutral: { backgroundColor: colors.textLight },
+  badgeSuccess: { backgroundColor: colors.success },
+  badgeWarning: { backgroundColor: colors.warning },
+  badgeDanger: { backgroundColor: colors.danger },
+  benchmarkRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 4,
+  },
+  benchmarkLabel: {
+    width: 110,
+    fontSize: 9,
+    color: colors.textMuted,
+  },
+  benchmarkValue: {
+    flex: 1,
+    fontSize: 9,
+    color: colors.text,
+  },
+
   // Summary section
   summarySection: {
     marginBottom: 25,
@@ -265,163 +309,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.text,
     lineHeight: 1.7,
-  },
-
-  // Action Items table
-  actionItemsSection: {
-    marginBottom: 25,
-  },
-  table: {
-    width: "100%",
-  },
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: colors.tableHeader,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-  },
-  tableHeaderCell: {
-    color: colors.background,
-    fontSize: 9,
-    fontWeight: "bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-  },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.border,
-    borderBottomStyle: "solid",
-    minHeight: 30,
-  },
-  tableRowAlt: {
-    backgroundColor: colors.backgroundAlt,
-  },
-  tableCell: {
-    fontSize: 9,
-    color: colors.text,
-    lineHeight: 1.4,
-  },
-  taskCell: {
-    width: "45%",
-    paddingRight: 8,
-  },
-  ownerCell: {
-    width: "22%",
-    paddingRight: 8,
-  },
-  deadlineCell: {
-    width: "20%",
-    paddingRight: 8,
-  },
-  timestampCell: {
-    width: "13%",
-    fontSize: 8,
-    color: colors.textMuted,
-  },
-  priorityBadge: {
-    fontSize: 7,
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    borderRadius: 2,
-    alignSelf: "flex-start",
-    marginTop: 2,
-  },
-  priorityHigh: {
-    backgroundColor: "#fee2e2",
-    color: "#dc2626",
-  },
-  priorityMedium: {
-    backgroundColor: "#fef3c7",
-    color: "#d97706",
-  },
-  priorityLow: {
-    backgroundColor: "#dcfce7",
-    color: "#16a34a",
-  },
-
-  // Decisions timeline
-  decisionsSection: {
-    marginBottom: 25,
-  },
-  decisionItem: {
-    marginBottom: 12,
-    paddingLeft: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
-    borderLeftStyle: "solid",
-  },
-  decisionText: {
-    fontSize: 10,
-    color: colors.text,
-    marginBottom: 4,
-    fontWeight: "bold",
-    lineHeight: 1.5,
-  },
-  decisionContext: {
-    fontSize: 9,
-    color: colors.textMuted,
-    marginBottom: 4,
-    fontStyle: "italic",
-    lineHeight: 1.4,
-  },
-  decisionMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  decisionTimestamp: {
-    fontSize: 8,
-    color: colors.textLight,
-    backgroundColor: colors.backgroundAlt,
-    padding: "2 6",
-    borderRadius: 2,
-  },
-
-  // Quotes section
-  quotesSection: {
-    marginBottom: 25,
-  },
-  quoteItem: {
-    marginBottom: 12,
-    padding: 12,
-    backgroundColor: colors.backgroundAlt,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.textLight,
-    borderLeftStyle: "solid",
-    borderRadius: 2,
-  },
-  quoteText: {
-    fontSize: 10,
-    color: colors.text,
-    fontStyle: "italic",
-    marginBottom: 8,
-    lineHeight: 1.6,
-  },
-  quoteFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  quoteSpeaker: {
-    fontSize: 9,
-    color: colors.primary,
-    fontWeight: "bold",
-  },
-  quoteTimestamp: {
-    fontSize: 8,
-    color: colors.textLight,
-  },
-  quoteCategoryBadge: {
-    fontSize: 7,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-    backgroundColor: colors.borderLight,
-    color: colors.textMuted,
-    marginLeft: 8,
   },
 
   // Footer section
@@ -513,6 +400,8 @@ export interface AnalysisPDFDocumentProps {
   transcript: Transcript;
   /** Optional template information */
   template?: Template;
+  /** Whether to include metadata block */
+  includeMetadata?: boolean;
   /** Whether to include table of contents */
   includeTableOfContents?: boolean;
 }
@@ -524,7 +413,7 @@ const PDFFooter: React.FC<{ transcript: Transcript }> = ({ transcript }) => (
   <View style={styles.footer} fixed>
     <View style={styles.footerLeft}>
       <Text>{transcript.filename}</Text>
-      <Text style={styles.branding}>Generated with Meeting Transcriber</Text>
+      <Text style={styles.branding}>Generated with Austin RTASS</Text>
     </View>
     <View style={styles.footerCenter}>
       <Text>Analysis Report</Text>
@@ -595,27 +484,27 @@ const PDFMetadata: React.FC<{
         {analysis.results.sections.length}
       </Text>
     </View>
-    {analysis.results.actionItems && analysis.results.actionItems.length > 0 && (
+    {analysis.results.benchmarks && analysis.results.benchmarks.length > 0 && (
       <View style={styles.metadataRow}>
-        <Text style={styles.metadataLabel}>Action Items:</Text>
+        <Text style={styles.metadataLabel}>Benchmarks:</Text>
         <Text style={styles.metadataValue}>
-          {analysis.results.actionItems.length}
+          {analysis.results.benchmarks.length}
         </Text>
       </View>
     )}
-    {analysis.results.decisions && analysis.results.decisions.length > 0 && (
+    {analysis.results.radioReports && analysis.results.radioReports.length > 0 && (
       <View style={styles.metadataRow}>
-        <Text style={styles.metadataLabel}>Decisions:</Text>
+        <Text style={styles.metadataLabel}>Radio Reports:</Text>
         <Text style={styles.metadataValue}>
-          {analysis.results.decisions.length}
+          {analysis.results.radioReports.length}
         </Text>
       </View>
     )}
-    {analysis.results.quotes && analysis.results.quotes.length > 0 && (
+    {analysis.results.safetyEvents && analysis.results.safetyEvents.length > 0 && (
       <View style={styles.metadataRow}>
-        <Text style={styles.metadataLabel}>Notable Quotes:</Text>
+        <Text style={styles.metadataLabel}>Safety Events:</Text>
         <Text style={styles.metadataValue}>
-          {analysis.results.quotes.length}
+          {analysis.results.safetyEvents.length}
         </Text>
       </View>
     )}
@@ -635,9 +524,9 @@ const PDFMetadata: React.FC<{
  */
 const TableOfContents: React.FC<{ analysis: Analysis }> = ({ analysis }) => {
   const hasSummary = !!analysis.results.summary;
-  const hasActionItems = analysis.results.actionItems && analysis.results.actionItems.length > 0;
-  const hasDecisions = analysis.results.decisions && analysis.results.decisions.length > 0;
-  const hasQuotes = analysis.results.quotes && analysis.results.quotes.length > 0;
+  const hasBenchmarks = analysis.results.benchmarks && analysis.results.benchmarks.length > 0;
+  const hasRadioReports = analysis.results.radioReports && analysis.results.radioReports.length > 0;
+  const hasSafetyEvents = analysis.results.safetyEvents && analysis.results.safetyEvents.length > 0;
 
   return (
     <View>
@@ -666,30 +555,30 @@ const TableOfContents: React.FC<{ analysis: Analysis }> = ({ analysis }) => {
       </View>
 
       {/* Additional Sections */}
-      {(hasActionItems || hasDecisions || hasQuotes) && (
+      {(hasBenchmarks || hasRadioReports || hasSafetyEvents) && (
         <View style={styles.tocSection}>
           <Text style={styles.tocSectionTitle}>Additional Content</Text>
 
-          {hasActionItems && (
+          {hasBenchmarks && (
             <View style={styles.tocItem} wrap={false}>
-              <Link src="#action-items" style={styles.tocItemLink}>
-                Action Items ({analysis.results.actionItems!.length})
+              <Link src="#benchmarks" style={styles.tocItemLink}>
+                Benchmarks &amp; Milestones ({analysis.results.benchmarks!.length})
               </Link>
             </View>
           )}
 
-          {hasDecisions && (
+          {hasRadioReports && (
             <View style={styles.tocItem} wrap={false}>
-              <Link src="#decisions" style={styles.tocItemLink}>
-                Decisions Timeline ({analysis.results.decisions!.length})
+              <Link src="#radio-reports" style={styles.tocItemLink}>
+                Radio Reports ({analysis.results.radioReports!.length})
               </Link>
             </View>
           )}
 
-          {hasQuotes && (
+          {hasSafetyEvents && (
             <View style={styles.tocItem} wrap={false}>
-              <Link src="#notable-quotes" style={styles.tocItemLink}>
-                Notable Quotes ({analysis.results.quotes!.length})
+              <Link src="#safety-events" style={styles.tocItemLink}>
+                Safety Events ({analysis.results.safetyEvents!.length})
               </Link>
             </View>
           )}
@@ -753,7 +642,7 @@ const AnalysisSection: React.FC<{
                   ? [styles.evidenceItem, styles.evidenceItemLast]
                   : styles.evidenceItem
               }
-              wrap={false}
+              minPresenceAhead={40}
             >
               <Text style={styles.evidenceText}>&quot;{evidence.text}&quot;</Text>
               <Text style={styles.evidenceTimestamp}>
@@ -767,126 +656,132 @@ const AnalysisSection: React.FC<{
   );
 };
 
-/**
- * Action Items Table Component with proper row handling
- */
-const ActionItemsTable: React.FC<{
-  actionItems: NonNullable<Analysis["results"]["actionItems"]>;
-}> = ({ actionItems }) => (
-  <View style={styles.actionItemsSection} id="action-items">
+const BenchmarksSection: React.FC<{
+  benchmarks: NonNullable<Analysis["results"]["benchmarks"]>;
+}> = ({ benchmarks }) => (
+  <View style={styles.section} id="benchmarks" wrap>
     <View style={styles.sectionHeader} wrap={false}>
-      <Text style={styles.sectionTitle}>Action Items</Text>
+      <Text style={styles.sectionTitle}>Benchmarks &amp; Milestones</Text>
     </View>
+    {benchmarks.map((b, idx) => {
+      const statusStyle =
+        b.status === "met"
+          ? styles.badgeSuccess
+          : b.status === "missed"
+            ? styles.badgeDanger
+            : b.status === "not_observed"
+              ? styles.badgeWarning
+            : styles.badgeNeutral;
+      return (
+        <View key={idx} style={styles.card} minPresenceAhead={80}>
+          <View style={styles.cardHeader}>
+            <Text style={{ fontSize: 11, fontWeight: "bold", color: colors.text }}>
+              {b.benchmark}
+            </Text>
+            <Text style={[styles.badge, statusStyle]}>{b.status.replace("_", " ")}</Text>
+          </View>
+          <View style={styles.benchmarkRow}>
+            <Text style={styles.benchmarkLabel}>Time</Text>
+            <Text style={styles.benchmarkValue}>
+              {b.timestamp !== undefined ? formatTimestamp(b.timestamp) : "-"}
+            </Text>
+          </View>
+          <View style={styles.benchmarkRow}>
+            <Text style={styles.benchmarkLabel}>Unit/Role</Text>
+            <Text style={styles.benchmarkValue}>{b.unitOrRole || "-"}</Text>
+          </View>
+          <View style={styles.benchmarkRow}>
+            <Text style={styles.benchmarkLabel}>Evidence</Text>
+            <Text style={styles.benchmarkValue}>{b.evidenceQuote || "-"}</Text>
+          </View>
+          {b.notes && (
+            <View style={styles.benchmarkRow}>
+              <Text style={styles.benchmarkLabel}>Notes</Text>
+              <Text style={styles.benchmarkValue}>{b.notes}</Text>
+            </View>
+          )}
+        </View>
+      );
+    })}
+  </View>
+);
 
-    <View style={styles.table}>
-      {/* Table Header - keep with first row */}
-      <View style={styles.tableHeader} wrap={false}>
-        <Text style={[styles.tableHeaderCell, styles.taskCell]}>Task</Text>
-        <Text style={[styles.tableHeaderCell, styles.ownerCell]}>Owner</Text>
-        <Text style={[styles.tableHeaderCell, styles.deadlineCell]}>Deadline</Text>
-        <Text style={[styles.tableHeaderCell, styles.timestampCell]}>Time</Text>
-      </View>
-
-      {/* Table Rows - keep each row together */}
-      {actionItems.map((item, index) => (
-        <View
-          key={index}
-          style={
-            index % 2 === 1
-              ? [styles.tableRow, styles.tableRowAlt]
-              : styles.tableRow
-          }
-          wrap={false}
-          minPresenceAhead={20}
-        >
-          <View style={styles.taskCell}>
-            <Text style={styles.tableCell}>{item.task}</Text>
-            {item.priority && (
-              <Text
-                style={[
-                  styles.priorityBadge,
-                  item.priority === "high"
-                    ? styles.priorityHigh
-                    : item.priority === "medium"
-                      ? styles.priorityMedium
-                      : styles.priorityLow,
-                ]}
-              >
-                {item.priority.toUpperCase()}
+const RadioReportsSection: React.FC<{
+  reports: NonNullable<Analysis["results"]["radioReports"]>;
+}> = ({ reports }) => (
+  <View style={styles.section} id="radio-reports" wrap>
+    <View style={styles.sectionHeader} wrap={false}>
+      <Text style={styles.sectionTitle}>Radio Reports &amp; CAN</Text>
+    </View>
+    {reports.map((r, idx) => (
+      <View key={idx} style={styles.card} minPresenceAhead={90}>
+        <View style={styles.cardHeader}>
+          <Text style={{ fontSize: 11, fontWeight: "bold", color: colors.text }}>
+            {r.type.replace(/_/g, " ").toUpperCase()}
+          </Text>
+          <Text style={[styles.badge, styles.badgeNeutral]}>{formatTimestamp(r.timestamp)}</Text>
+        </View>
+        <Text style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>
+          {r.from || "Unknown unit"}
+        </Text>
+        {r.fields && Object.keys(r.fields).length > 0 && (
+          <View style={{ marginBottom: 4 }}>
+            {Object.entries(r.fields).map(([key, value]) => (
+              <Text key={key} style={{ fontSize: 9, color: colors.text }}>
+                {key}: {String(value)}
               </Text>
-            )}
+            ))}
           </View>
-          <Text style={[styles.tableCell, styles.ownerCell]}>
-            {item.owner || "—"}
-          </Text>
-          <Text style={[styles.tableCell, styles.deadlineCell]}>
-            {item.deadline || "—"}
-          </Text>
-          <Text style={[styles.tableCell, styles.timestampCell]}>
-            {item.timestamp !== undefined ? formatTimestamp(item.timestamp) : "—"}
-          </Text>
-        </View>
-      ))}
-    </View>
-  </View>
-);
-
-/**
- * Decisions Timeline Component
- */
-const DecisionsTimeline: React.FC<{
-  decisions: NonNullable<Analysis["results"]["decisions"]>;
-}> = ({ decisions }) => (
-  <View style={styles.decisionsSection} id="decisions">
-    <View style={styles.sectionHeader} wrap={false}>
-      <Text style={styles.sectionTitle}>Decisions Timeline</Text>
-    </View>
-
-    {decisions.map((decision, index) => (
-      <View key={index} style={styles.decisionItem} wrap={false} minPresenceAhead={30}>
-        <Text style={styles.decisionText}>{decision.decision}</Text>
-        {decision.context && (
-          <Text style={styles.decisionContext}>{decision.context}</Text>
         )}
-        <View style={styles.decisionMeta}>
-          <Text style={styles.decisionTimestamp}>
-            {formatTimestamp(decision.timestamp)}
+        {r.evidenceQuote && (
+          <Text style={{ fontSize: 9, color: colors.textMuted, fontStyle: "italic" }}>
+            “{r.evidenceQuote}”
           </Text>
-        </View>
+        )}
+        {r.missingRequired && r.missingRequired.length > 0 && (
+          <Text style={{ fontSize: 9, color: colors.warning, marginTop: 4 }}>
+            Missing: {r.missingRequired.join(", ")}
+          </Text>
+        )}
       </View>
     ))}
   </View>
 );
 
-/**
- * Quotes Section Component
- */
-const QuotesSection: React.FC<{
-  quotes: NonNullable<Analysis["results"]["quotes"]>;
-}> = ({ quotes }) => (
-  <View style={styles.quotesSection} id="notable-quotes">
+const SafetyEventsSection: React.FC<{
+  events: NonNullable<Analysis["results"]["safetyEvents"]>;
+}> = ({ events }) => (
+  <View style={styles.section} id="safety-events" wrap>
     <View style={styles.sectionHeader} wrap={false}>
-      <Text style={styles.sectionTitle}>Notable Quotes</Text>
+      <Text style={styles.sectionTitle}>Safety &amp; Accountability</Text>
     </View>
-
-    {quotes.map((quote, index) => (
-      <View key={index} style={styles.quoteItem} wrap={false} minPresenceAhead={40}>
-        <Text style={styles.quoteText}>&quot;{quote.text}&quot;</Text>
-        <View style={styles.quoteFooter}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {quote.speaker && (
-              <Text style={styles.quoteSpeaker}>— {quote.speaker}</Text>
-            )}
-            {quote.category && (
-              <Text style={styles.quoteCategoryBadge}>{quote.category}</Text>
-            )}
+    {events.map((e, idx) => {
+      const color =
+        e.severity === "critical"
+          ? styles.badgeDanger
+          : e.severity === "warning"
+            ? styles.badgeWarning
+            : styles.badgeNeutral;
+      return (
+        <View key={idx} style={styles.card} minPresenceAhead={80}>
+          <View style={styles.cardHeader}>
+            <Text style={{ fontSize: 11, fontWeight: "bold", color: colors.text }}>
+              {e.type.replace(/_/g, " ").toUpperCase()}
+            </Text>
+            <Text style={[styles.badge, color]}>{e.severity.toUpperCase()}</Text>
           </View>
-          <Text style={styles.quoteTimestamp}>
-            {formatTimestamp(quote.timestamp)}
+          <Text style={{ fontSize: 10, color: colors.textMuted }}>
+            {e.unitOrRole || "Unknown unit"} • {formatTimestamp(e.timestamp)}
           </Text>
+          <Text style={{ fontSize: 10, color: colors.text, marginTop: 4 }}>{e.details}</Text>
+          {e.evidenceQuote && (
+            <Text style={{ fontSize: 9, color: colors.textMuted, fontStyle: "italic", marginTop: 4 }}>
+              “{e.evidenceQuote}”
+            </Text>
+          )}
         </View>
-      </View>
-    ))}
+      );
+    })}
   </View>
 );
 
@@ -916,32 +811,36 @@ export const AnalysisPDFDocument: React.FC<AnalysisPDFDocumentProps> = ({
   analysis,
   transcript,
   template,
+  includeMetadata = true,
   includeTableOfContents = true,
 }) => {
-  const hasActionItems =
-    analysis.results.actionItems && analysis.results.actionItems.length > 0;
-  const hasDecisions =
-    analysis.results.decisions && analysis.results.decisions.length > 0;
-  const hasQuotes =
-    analysis.results.quotes && analysis.results.quotes.length > 0;
+  const hasBenchmarks =
+    analysis.results.benchmarks && analysis.results.benchmarks.length > 0;
+  const hasRadioReports =
+    analysis.results.radioReports && analysis.results.radioReports.length > 0;
+  const hasSafetyEvents =
+    analysis.results.safetyEvents && analysis.results.safetyEvents.length > 0;
+  const hasStructuredOutputs = hasBenchmarks || hasRadioReports || hasSafetyEvents;
 
   return (
     <Document
       title={`Analysis - ${transcript.filename}`}
-      author="Meeting Transcriber"
+      author="Austin RTASS"
       subject="Transcript Analysis Report"
-      keywords="analysis, transcript, meeting, report"
-      creator="Meeting Transcriber"
+      keywords="analysis, transcript, radio, fire, ems"
+      creator="Austin RTASS"
     >
       {/* Cover/Title Page with TOC */}
       {includeTableOfContents && (
         <Page size="A4" style={styles.tocPage}>
           <PDFHeader transcript={transcript} template={template} />
-          <PDFMetadata
-            analysis={analysis}
-            transcript={transcript}
-            template={template}
-          />
+          {includeMetadata && (
+            <PDFMetadata
+              analysis={analysis}
+              transcript={transcript}
+              template={template}
+            />
+          )}
           <TableOfContents analysis={analysis} />
           <PDFFooter transcript={transcript} />
         </Page>
@@ -953,11 +852,13 @@ export const AnalysisPDFDocument: React.FC<AnalysisPDFDocumentProps> = ({
         {!includeTableOfContents && (
           <>
             <PDFHeader transcript={transcript} template={template} />
-            <PDFMetadata
-              analysis={analysis}
-              transcript={transcript}
-              template={template}
-            />
+            {includeMetadata && (
+              <PDFMetadata
+                analysis={analysis}
+                transcript={transcript}
+                template={template}
+              />
+            )}
           </>
         )}
 
@@ -975,18 +876,11 @@ export const AnalysisPDFDocument: React.FC<AnalysisPDFDocumentProps> = ({
           />
         ))}
 
-        {/* Action Items Table */}
-        {hasActionItems && (
-          <ActionItemsTable actionItems={analysis.results.actionItems!} />
-        )}
+        {hasStructuredOutputs && <View break />}
 
-        {/* Decisions Timeline */}
-        {hasDecisions && (
-          <DecisionsTimeline decisions={analysis.results.decisions!} />
-        )}
-
-        {/* Notable Quotes */}
-        {hasQuotes && <QuotesSection quotes={analysis.results.quotes!} />}
+        {hasBenchmarks && <BenchmarksSection benchmarks={analysis.results.benchmarks!} />}
+        {hasRadioReports && <RadioReportsSection reports={analysis.results.radioReports!} />}
+        {hasSafetyEvents && <SafetyEventsSection events={analysis.results.safetyEvents!} />}
 
         <PDFFooter transcript={transcript} />
       </Page>

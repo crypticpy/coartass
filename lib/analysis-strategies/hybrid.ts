@@ -30,6 +30,8 @@ import type OpenAI from 'openai';
 import {
   formatOutputType,
   postProcessResults,
+  pruneResultsForTemplate,
+  normalizeAnalysisJsonKeys,
   validateTokenLimits,
   ANALYSIS_CONSTANTS,
   logger,
@@ -56,6 +58,51 @@ export interface HybridBatchResponse {
     topic: string;
     timestamp?: number;
     context?: string;
+  }>;
+  benchmarks?: Array<{
+    id: string;
+    benchmark: string;
+    status: 'met' | 'missed' | 'not_observed' | 'not_applicable';
+    timestamp?: number;
+    unitOrRole?: string;
+    evidenceQuote?: string;
+    notes?: string;
+  }>;
+  radioReports?: Array<{
+    id: string;
+    type:
+      | 'initial_radio_report'
+      | 'follow_up_360'
+      | 'entry_report'
+      | 'command_transfer_company_officer'
+      | 'command_transfer_chief'
+      | 'can_report'
+      | 'other';
+    timestamp: number;
+    from?: string;
+    fields?: Record<string, unknown>;
+    missingRequired?: string[];
+    evidenceQuote?: string;
+  }>;
+  safetyEvents?: Array<{
+    id: string;
+    type:
+      | 'par'
+      | 'mayday'
+      | 'urgent_traffic'
+      | 'evacuation_order'
+      | 'strategy_change'
+      | 'ric_established'
+      | 'safety_officer_assigned'
+      | 'rehab'
+      | 'utilities_hazard'
+      | 'collapse_hazard'
+      | 'other';
+    severity: 'info' | 'warning' | 'critical';
+    timestamp: number;
+    unitOrRole?: string;
+    details: string;
+    evidenceQuote?: string;
   }>;
   actionItems?: Array<{
     id: string;
@@ -593,6 +640,9 @@ export function generateBatchPrompt(
   let relationshipInstructions = '';
 
   const hasAgenda = template.sections.some((s) => s.name.toLowerCase().includes('agenda'));
+  const hasBenchmarks = template.outputs.includes('benchmarks');
+  const hasRadioReports = template.outputs.includes('radio_reports');
+  const hasSafetyEvents = template.outputs.includes('safety_events');
   const hasDecisions = template.outputs.includes('decisions');
   const hasActionItems = template.outputs.includes('action_items');
 
@@ -697,6 +747,11 @@ Using the meeting context above, extract action items and next steps as specifie
     if (hasActionItems) {
       structuredOutputs.push('actionItems');
     }
+
+    // Fireground outputs: request once in the final batch to avoid duplicates
+    if (hasBenchmarks) structuredOutputs.push('benchmarks');
+    if (hasRadioReports) structuredOutputs.push('radioReports');
+    if (hasSafetyEvents) structuredOutputs.push('safetyEvents');
   }
 
   // Build structured outputs section
@@ -749,6 +804,33 @@ Using the meeting context above, extract action items and next steps as specifie
 - Focus on memorable, insightful, or decision-driving statements
 `;
     }
+
+    if (structuredOutputs.includes('benchmarks')) {
+      structuredOutputSection += `
+**Benchmarks**: Extract benchmark/milestone observations as structured objects:
+- Assign unique IDs (e.g., "benchmark-1", "benchmark-2")
+- Include: benchmark label, status ("met"|"missed"|"not_observed"|"not_applicable"), timestamp (if observed), unitOrRole (if stated)
+- Keep evidenceQuote short when provided
+`;
+    }
+
+    if (structuredOutputs.includes('radioReports')) {
+      structuredOutputSection += `
+**Radio Reports**: Extract structured radio report events (initial/360/entry/command transfer/CAN) as objects:
+- Assign unique IDs (e.g., "report-1", "report-2")
+- TIMESTAMP IS REQUIRED
+- Include: type, from (unit/role), fields (concise key/values), missingRequired (if incomplete), evidenceQuote (optional)
+`;
+    }
+
+    if (structuredOutputs.includes('safetyEvents')) {
+      structuredOutputSection += `
+**Safety Events**: Extract safety/accountability events (PAR, MAYDAY, evacuation, strategy change, RIC, safety officer, hazards) as objects:
+- Assign unique IDs (e.g., "safety-1", "safety-2")
+- TIMESTAMP IS REQUIRED
+- Include: type, severity (info|warning|critical), unitOrRole (if stated), details (1 sentence), evidenceQuote (optional)
+`;
+    }
   }
 
   // Build JSON output format example
@@ -768,13 +850,13 @@ ${TIMESTAMP_INSTRUCTION}
 
 ## Timestamp Extraction Example
 
-Given: "[2:45] Sarah: Action item - John to prepare budget by Friday"
-Extract: { "task": "John to prepare budget by Friday", "owner": "John", "deadline": "Friday", "timestamp": 165 }
+Given: "[2:45] Engine 25: Engine 25 assuming command, offensive mode"
+Extract: { "type": "initial_radio_report", "timestamp": 165, "from": "Engine 25", "fields": { "command": "assumed", "strategy": "offensive" } }
 Calculation: [2:45] = (2 × 60) + 45 = 165 seconds
 
-Given: "[5:30] Manager: We decided to go with Option B"
-Extract: { "decision": "Go with Option B", "timestamp": 330 }
-Calculation: [5:30] = (5 × 60) + 30 = 330 seconds
+Given: "[11:02] Interior: CAN - conditions heavy heat, actions advancing, needs ventilation"
+Extract: { "type": "can_report", "timestamp": 662, "fields": { "conditions": "heavy heat", "actions": "advancing", "needs": "ventilation" } }
+Calculation: [11:02] = (11 × 60) + 2 = 662 seconds
 
 ${contextSection}
 ${sectionInstructions}
@@ -872,6 +954,47 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
+  if (structuredOutputs.includes('benchmarks')) {
+    parts.push(`  "benchmarks": [
+    {
+      "id": "benchmark-1",
+      "benchmark": "Command established",
+      "status": "met",
+      "timestamp": 120,
+      "unitOrRole": "Engine 25",
+      "evidenceQuote": "Engine 25 assuming command"
+    }
+  ]`);
+  }
+
+  if (structuredOutputs.includes('radioReports')) {
+    parts.push(`  "radioReports": [
+    {
+      "id": "report-1",
+      "type": "initial_radio_report",
+      "timestamp": 120,
+      "from": "Engine 25",
+      "fields": { "strategy": "offensive" },
+      "missingRequired": [],
+      "evidenceQuote": "Engine 25 assuming command, offensive mode"
+    }
+  ]`);
+  }
+
+  if (structuredOutputs.includes('safetyEvents')) {
+    parts.push(`  "safetyEvents": [
+    {
+      "id": "safety-1",
+      "type": "par",
+      "severity": "info",
+      "timestamp": 900,
+      "unitOrRole": "Command",
+      "details": "PAR requested following strategy change.",
+      "evidenceQuote": "All units stand by for PAR"
+    }
+  ]`);
+  }
+
   if (structuredOutputs.includes('summary')) {
     parts.push(`  "summary": "Overall meeting summary"`);
   }
@@ -907,6 +1030,9 @@ function isValidBatchResponse(data: unknown): data is HybridBatchResponse {
 
   // Optional arrays must be valid if present
   if (obj.agendaItems !== undefined && !Array.isArray(obj.agendaItems)) return false;
+  if (obj.benchmarks !== undefined && !Array.isArray(obj.benchmarks)) return false;
+  if (obj.radioReports !== undefined && !Array.isArray(obj.radioReports)) return false;
+  if (obj.safetyEvents !== undefined && !Array.isArray(obj.safetyEvents)) return false;
   if (obj.actionItems !== undefined && !Array.isArray(obj.actionItems)) return false;
   if (obj.decisions !== undefined && !Array.isArray(obj.decisions)) return false;
   if (obj.quotes !== undefined && !Array.isArray(obj.quotes)) return false;
@@ -927,6 +1053,9 @@ function mergeBatchResults(batchResponses: HybridBatchResponse[]): AnalysisResul
   const allSections: AnalysisSection[] = [];
   let summary: string | undefined;
   const allAgendaItems: AgendaItem[] = [];
+  const allBenchmarks: NonNullable<AnalysisResults['benchmarks']> = [];
+  const allRadioReports: NonNullable<AnalysisResults['radioReports']> = [];
+  const allSafetyEvents: NonNullable<AnalysisResults['safetyEvents']> = [];
   const allActionItems: ActionItem[] = [];
   const allDecisions: Decision[] = [];
   const allQuotes: Quote[] = [];
@@ -957,6 +1086,18 @@ function mergeBatchResults(batchResponses: HybridBatchResponse[]): AnalysisResul
           context: item.context,
         });
       }
+    }
+
+    if (response.benchmarks) {
+      allBenchmarks.push(...response.benchmarks);
+    }
+
+    if (response.radioReports) {
+      allRadioReports.push(...response.radioReports);
+    }
+
+    if (response.safetyEvents) {
+      allSafetyEvents.push(...response.safetyEvents);
     }
 
     // Merge action items
@@ -997,6 +1138,9 @@ function mergeBatchResults(batchResponses: HybridBatchResponse[]): AnalysisResul
     summary,
     sections: allSections,
     agendaItems: allAgendaItems.length > 0 ? allAgendaItems : undefined,
+    benchmarks: allBenchmarks.length > 0 ? allBenchmarks : undefined,
+    radioReports: allRadioReports.length > 0 ? allRadioReports : undefined,
+    safetyEvents: allSafetyEvents.length > 0 ? allSafetyEvents : undefined,
     actionItems: allActionItems.length > 0 ? allActionItems : undefined,
     decisions: allDecisions.length > 0 ? allDecisions : undefined,
     quotes: allQuotes.length > 0 ? allQuotes : undefined,
@@ -1163,6 +1307,7 @@ export async function executeHybridAnalysis(
     let parsedResponse: unknown;
     try {
       parsedResponse = JSON.parse(content);
+      parsedResponse = normalizeAnalysisJsonKeys(parsedResponse);
     } catch (error) {
       logger.error('Hybrid Analysis', `Failed to parse JSON for ${batch.name} batch:`, error);
       logger.error('Hybrid Analysis', `Response content:`, content.substring(0, 500));
@@ -1196,6 +1341,9 @@ export async function executeHybridAnalysis(
             context: item.context,
           }))
         : accumulatedResults.agendaItems,
+      benchmarks: parsedResponse.benchmarks || accumulatedResults.benchmarks,
+      radioReports: parsedResponse.radioReports || accumulatedResults.radioReports,
+      safetyEvents: parsedResponse.safetyEvents || accumulatedResults.safetyEvents,
       decisions: parsedResponse.decisions
         ? parsedResponse.decisions.map((item) => ({
             id: item.id,
@@ -1222,6 +1370,9 @@ export async function executeHybridAnalysis(
     logger.info('Hybrid Analysis', `Batch ${batch.name} complete`, {
       sectionCount: parsedResponse.sections.length,
       agendaItemCount: parsedResponse.agendaItems?.length || 0,
+      benchmarkCount: parsedResponse.benchmarks?.length || 0,
+      radioReportCount: parsedResponse.radioReports?.length || 0,
+      safetyEventCount: parsedResponse.safetyEvents?.length || 0,
       decisionCount: parsedResponse.decisions?.length || 0,
       actionItemCount: parsedResponse.actionItems?.length || 0,
       quoteCount: parsedResponse.quotes?.length || 0,
@@ -1233,7 +1384,10 @@ export async function executeHybridAnalysis(
   const rawResults = mergeBatchResults(batchResponses);
 
   // Post-process: ensure unique IDs and validate relationships
-  const draftResults = postProcessResults(rawResults, 'Hybrid Analysis');
+  const draftResults = pruneResultsForTemplate(
+    postProcessResults(rawResults, 'Hybrid Analysis'),
+    template
+  );
 
   logger.info('Hybrid Analysis', 'Hybrid analysis complete', {
     batches: batches.length,
@@ -1257,7 +1411,7 @@ export async function executeHybridAnalysis(
     );
 
     return {
-      results: finalResults,
+      results: pruneResultsForTemplate(finalResults, template),
       draftResults,
       evaluation,
       promptsUsed,

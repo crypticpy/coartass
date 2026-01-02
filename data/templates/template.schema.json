@@ -39,7 +39,15 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "enum": ["summary", "action_items", "quotes", "decisions"]
+        "enum": [
+          "summary",
+          "benchmarks",
+          "radio_reports",
+          "safety_events",
+          "action_items",
+          "quotes",
+          "decisions"
+        ]
       },
       "description": "Types of outputs this template generates"
     },
@@ -50,6 +58,16 @@
         "$ref": "#/definitions/section"
       },
       "description": "Array of sections to extract from transcripts"
+    },
+    "maxStrategy": {
+      "type": "string",
+      "enum": ["basic", "hybrid", "advanced"],
+      "description": "Maximum analysis strategy allowed for this template. Radio traffic templates should use 'basic' or 'hybrid' to avoid truncation issues with advanced cascading."
+    },
+    "contentType": {
+      "type": "string",
+      "enum": ["meeting", "radio-traffic", "interview", "general"],
+      "description": "Type of content this template is designed for. Affects default strategy selection."
     }
   },
   "definitions": {

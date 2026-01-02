@@ -26,6 +26,7 @@ import { buildChatCompletionParams } from '@/lib/openai';
 import {
   ANALYSIS_CONSTANTS,
   postProcessResults,
+  normalizeAnalysisJsonKeys,
   logger,
   validateTokenLimits,
   retryWithBackoff,
@@ -351,6 +352,7 @@ export async function executeEvaluationPass(
   let parsedResponse: unknown;
   try {
     parsedResponse = JSON.parse(content);
+    parsedResponse = normalizeAnalysisJsonKeys(parsedResponse);
   } catch (error) {
     logger.error('Evaluation Pass', 'Failed to parse JSON response', {
       error,

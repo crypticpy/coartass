@@ -9,7 +9,7 @@
 
 export {
   DatabaseError,
-  MeetingTranscriberDB,
+  AustinRTASSDB,
   getDatabase,
   closeDatabase,
   deleteDatabase,

@@ -31,6 +31,8 @@ import type OpenAI from 'openai';
 import {
   formatOutputType,
   postProcessResults,
+  pruneResultsForTemplate,
+  normalizeAnalysisJsonKeys,
   validateTokenLimits,
   ANALYSIS_CONSTANTS,
   retryWithBackoff,
@@ -60,6 +62,51 @@ interface BasicAnalysisResponse {
     topic: string;
     timestamp?: number;
     context?: string;
+  }>;
+  benchmarks?: Array<{
+    id: string;
+    benchmark: string;
+    status: 'met' | 'missed' | 'not_observed' | 'not_applicable';
+    timestamp?: number;
+    unitOrRole?: string;
+    evidenceQuote?: string;
+    notes?: string;
+  }>;
+  radioReports?: Array<{
+    id: string;
+    type:
+      | 'initial_radio_report'
+      | 'follow_up_360'
+      | 'entry_report'
+      | 'command_transfer_company_officer'
+      | 'command_transfer_chief'
+      | 'can_report'
+      | 'other';
+    timestamp: number;
+    from?: string;
+    fields?: Record<string, unknown>;
+    missingRequired?: string[];
+    evidenceQuote?: string;
+  }>;
+  safetyEvents?: Array<{
+    id: string;
+    type:
+      | 'par'
+      | 'mayday'
+      | 'urgent_traffic'
+      | 'evacuation_order'
+      | 'strategy_change'
+      | 'ric_established'
+      | 'safety_officer_assigned'
+      | 'rehab'
+      | 'utilities_hazard'
+      | 'collapse_hazard'
+      | 'other';
+    severity: 'info' | 'warning' | 'critical';
+    timestamp: number;
+    unitOrRole?: string;
+    details: string;
+    evidenceQuote?: string;
   }>;
   actionItems?: Array<{
     id: string;
@@ -123,6 +170,9 @@ export function generateBasicAnalysisPrompt(
   const hasAgenda = template.sections.some((s) =>
     s.name.toLowerCase().includes('agenda')
   );
+  const hasBenchmarks = template.outputs.includes('benchmarks');
+  const hasRadioReports = template.outputs.includes('radio_reports');
+  const hasSafetyEvents = template.outputs.includes('safety_events');
   const hasDecisions = template.outputs.includes('decisions');
   const hasActionItems = template.outputs.includes('action_items');
 
@@ -178,6 +228,39 @@ ${
 }
 
 ${
+  hasBenchmarks
+    ? `
+**Benchmarks**: Extract benchmark/milestone observations as structured objects:
+- Assign unique IDs (e.g., "benchmark-1", "benchmark-2")
+- Include: benchmark label, status ("met"|"missed"|"not_observed"|"not_applicable"), timestamp (if observed), unitOrRole (if stated)
+- Keep evidenceQuote short when provided
+`
+    : ''
+}
+
+${
+  hasRadioReports
+    ? `
+**Radio Reports**: Extract structured radio report events (initial/360/entry/command transfer/CAN) as objects:
+- Assign unique IDs (e.g., "report-1", "report-2")
+- TIMESTAMP IS REQUIRED
+- Include: type, from (unit/role), fields (concise key/values), missingRequired (if incomplete), evidenceQuote (optional)
+`
+    : ''
+}
+
+${
+  hasSafetyEvents
+    ? `
+**Safety Events**: Extract safety/accountability events (PAR, MAYDAY, evacuation, strategy change, RIC, safety officer, hazards) as objects:
+- Assign unique IDs (e.g., "safety-1", "safety-2")
+- TIMESTAMP IS REQUIRED
+- Include: type, severity (info|warning|critical), unitOrRole (if stated), details (1 sentence), evidenceQuote (optional)
+`
+    : ''
+}
+
+${
   hasActionItems
     ? `
 **Action Items**: Extract ALL tasks, assignments, and follow-up items as structured objects:
@@ -213,31 +296,31 @@ ${
 ## Timestamp Extraction Example
 
 Given this transcript line:
-"[2:45] Sarah: Action item - John will prepare the revised budget by Friday"
+"[2:45] Engine 25: Engine 25 assuming command, offensive mode"
 
 You would extract:
 {
-  "id": "action-1",
-  "task": "John will prepare the revised budget by Friday",
-  "owner": "John",
-  "deadline": "Friday",
-  "timestamp": 165
+  "id": "report-1",
+  "type": "initial_radio_report",
+  "timestamp": 165,
+  "from": "Engine 25",
+  "fields": { "command": "assumed", "strategy": "offensive" }
 }
 
 The timestamp [2:45] converts to 165 seconds: (2 × 60) + 45 = 165
 
 Given this transcript line:
-"[5:30] Manager: We've decided to move forward with Option B"
+"[11:02] Interior: CAN - conditions heavy heat, actions advancing, needs ventilation"
 
 You would extract:
 {
-  "id": "decision-1",
-  "decision": "Move forward with Option B",
-  "timestamp": 330,
-  "context": "Selection decision"
+  "id": "report-2",
+  "type": "can_report",
+  "timestamp": 662,
+  "fields": { "conditions": "heavy heat", "actions": "advancing", "needs": "ventilation" }
 }
 
-The timestamp [5:30] converts to 330 seconds: (5 × 60) + 30 = 330
+The timestamp [11:02] converts to 662 seconds: (11 × 60) + 2 = 662
 
 ## Output Format
 
@@ -259,6 +342,51 @@ You MUST respond with valid JSON in this EXACT structure:
       "topic": "Agenda topic",
       "timestamp": 120,
       "context": "Optional context"
+    }
+  ],`
+      : ''
+  }
+  ${
+    hasBenchmarks
+      ? `"benchmarks": [
+    {
+      "id": "benchmark-1",
+      "benchmark": "Command established",
+      "status": "met",
+      "timestamp": 120,
+      "unitOrRole": "Engine 25",
+      "evidenceQuote": "Engine 25 assuming command",
+      "notes": "Initial command"
+    }
+  ],`
+      : ''
+  }
+  ${
+    hasRadioReports
+      ? `"radioReports": [
+    {
+      "id": "report-1",
+      "type": "initial_radio_report",
+      "timestamp": 120,
+      "from": "Engine 25",
+      "fields": { "strategy": "offensive" },
+      "missingRequired": [],
+      "evidenceQuote": "Engine 25 assuming command, offensive mode"
+    }
+  ],`
+      : ''
+  }
+  ${
+    hasSafetyEvents
+      ? `"safetyEvents": [
+    {
+      "id": "safety-1",
+      "type": "par",
+      "severity": "info",
+      "timestamp": 900,
+      "unitOrRole": "Command",
+      "details": "PAR requested following strategy change.",
+      "evidenceQuote": "All units stand by for PAR"
     }
   ],`
       : ''
@@ -353,6 +481,10 @@ export function parseBasicAnalysisResponse(
     context: item.context,
   }));
 
+  const benchmarks = response.benchmarks;
+  const radioReports = response.radioReports;
+  const safetyEvents = response.safetyEvents;
+
   // Convert action items
   const actionItems: ActionItem[] | undefined = response.actionItems?.map((item) => ({
     id: item.id,
@@ -380,6 +512,9 @@ export function parseBasicAnalysisResponse(
     summary: response.summary,
     sections,
     agendaItems,
+    benchmarks,
+    radioReports,
+    safetyEvents,
     actionItems,
     decisions,
     quotes,
@@ -414,6 +549,9 @@ export function isValidBasicAnalysisResponse(data: unknown): data is BasicAnalys
 
   // Optional arrays must be valid if present
   if (obj.agendaItems !== undefined && !Array.isArray(obj.agendaItems)) return false;
+  if (obj.benchmarks !== undefined && !Array.isArray(obj.benchmarks)) return false;
+  if (obj.radioReports !== undefined && !Array.isArray(obj.radioReports)) return false;
+  if (obj.safetyEvents !== undefined && !Array.isArray(obj.safetyEvents)) return false;
   if (obj.actionItems !== undefined && !Array.isArray(obj.actionItems)) return false;
   if (obj.decisions !== undefined && !Array.isArray(obj.decisions)) return false;
   if (obj.quotes !== undefined && !Array.isArray(obj.quotes)) return false;
@@ -574,6 +712,7 @@ export async function executeBasicAnalysis(
   let parsedResponse: unknown;
   try {
     parsedResponse = JSON.parse(content);
+    parsedResponse = normalizeAnalysisJsonKeys(parsedResponse);
   } catch (error) {
     console.error('[Basic Analysis] Failed to parse JSON response:', error);
     console.error('[Basic Analysis] Response content:', content.substring(0, 500));
@@ -590,7 +729,10 @@ export async function executeBasicAnalysis(
   const rawResults = parseBasicAnalysisResponse(parsedResponse);
 
   // Post-process: ensure unique IDs and validate relationships
-  let draftResults = postProcessResults(rawResults, 'Basic Analysis');
+  let draftResults = pruneResultsForTemplate(
+    postProcessResults(rawResults, 'Basic Analysis'),
+    template
+  );
 
   console.log('[Basic Analysis] Analysis complete', {
     sectionCount: draftResults.sections.length,
@@ -605,6 +747,8 @@ export async function executeBasicAnalysis(
   let enrichmentMetadata: EnrichmentMetadata | undefined;
   const shouldRunEnrichment =
     config?.runEnrichment !== false && // Default to true unless explicitly disabled
+    !template.outputs.every((o) => !['action_items', 'decisions', 'quotes'].includes(o)) &&
+    template.contentType !== 'radio-traffic' &&
     isEnrichmentEnabled() &&
     segments &&
     segments.length > 0 &&
@@ -631,18 +775,21 @@ export async function executeBasicAnalysis(
       );
 
       // Merge enriched results back into draft
-      draftResults = {
-        ...draftResults,
-        actionItems: enrichmentResult.results.actionItems?.length
-          ? enrichmentResult.results.actionItems
-          : draftResults.actionItems,
-        decisions: enrichmentResult.results.decisions?.length
-          ? enrichmentResult.results.decisions
-          : draftResults.decisions,
-        quotes: enrichmentResult.results.quotes?.length
-          ? enrichmentResult.results.quotes
-          : draftResults.quotes,
-      };
+      draftResults = pruneResultsForTemplate(
+        {
+          ...draftResults,
+          actionItems: enrichmentResult.results.actionItems?.length
+            ? enrichmentResult.results.actionItems
+            : draftResults.actionItems,
+          decisions: enrichmentResult.results.decisions?.length
+            ? enrichmentResult.results.decisions
+            : draftResults.decisions,
+          quotes: enrichmentResult.results.quotes?.length
+            ? enrichmentResult.results.quotes
+            : draftResults.quotes,
+        },
+        template
+      );
 
       enrichmentMetadata = enrichmentResult.metadata;
 

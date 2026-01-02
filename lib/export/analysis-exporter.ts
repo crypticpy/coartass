@@ -22,12 +22,12 @@ export interface ExportOptions {
   includeSections?: boolean;
   /** Include evidence citations within sections */
   includeEvidence?: boolean;
-  /** Include action items table */
-  includeActionItems?: boolean;
-  /** Include decisions timeline */
-  includeDecisions?: boolean;
-  /** Include notable quotes */
-  includeQuotes?: boolean;
+  /** Include benchmark/milestone observations */
+  includeBenchmarks?: boolean;
+  /** Include structured radio reports/CAN logs */
+  includeRadioReports?: boolean;
+  /** Include safety/accountability events */
+  includeSafetyEvents?: boolean;
   /** Include document metadata */
   includeMetadata?: boolean;
   /** Include table of contents (PDF/DOCX only) */
@@ -41,9 +41,9 @@ export const DEFAULT_EXPORT_OPTIONS: Required<ExportOptions> = {
   includeSummary: true,
   includeSections: true,
   includeEvidence: true,
-  includeActionItems: true,
-  includeDecisions: true,
-  includeQuotes: true,
+  includeBenchmarks: true,
+  includeRadioReports: true,
+  includeSafetyEvents: true,
   includeMetadata: true,
   includeTOC: true,
 };
@@ -273,16 +273,16 @@ function estimatePageCount(
     }
   }
 
-  if (options.includeActionItems && analysis.results.actionItems) {
-    contentLength += analysis.results.actionItems.length * 100; // avg action item length
+  if (options.includeBenchmarks && analysis.results.benchmarks) {
+    contentLength += analysis.results.benchmarks.length * 120;
   }
 
-  if (options.includeDecisions && analysis.results.decisions) {
-    contentLength += analysis.results.decisions.length * 150; // avg decision length
+  if (options.includeRadioReports && analysis.results.radioReports) {
+    contentLength += analysis.results.radioReports.length * 140;
   }
 
-  if (options.includeQuotes && analysis.results.quotes) {
-    contentLength += analysis.results.quotes.length * 100; // avg quote length
+  if (options.includeSafetyEvents && analysis.results.safetyEvents) {
+    contentLength += analysis.results.safetyEvents.length * 130;
   }
 
   // Rough estimate: ~3000 characters per page

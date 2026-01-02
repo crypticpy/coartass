@@ -17,6 +17,11 @@ export type PlaybackState = 'playing' | 'paused' | 'loading' | 'buffering' | 'er
 export type PlaybackSpeed = 0.5 | 0.75 | 1 | 1.25 | 1.5 | 1.75 | 2;
 
 /**
+ * Zoom level preset for DAW-style waveform
+ */
+export type ZoomLevel = '30s' | '1m' | '5m' | 'full';
+
+/**
  * Audio player configuration
  */
 export interface AudioPlayerConfig {
@@ -58,6 +63,15 @@ export interface AudioPlayerConfig {
 
   /** Enable keyboard shortcuts */
   enableKeyboardShortcuts: boolean;
+
+  /** Enable DAW-style scrolling waveform */
+  scrollingWaveform: boolean;
+
+  /** Auto-center playhead during playback */
+  autoCenter: boolean;
+
+  /** Minimum pixels per second (controls zoom) */
+  minPxPerSec: number;
 }
 
 /**
@@ -77,6 +91,9 @@ export const DEFAULT_AUDIO_CONFIG: AudioPlayerConfig = {
   cursorWidth: 2,
   responsive: true,
   enableKeyboardShortcuts: true,
+  scrollingWaveform: true,
+  autoCenter: true,
+  minPxPerSec: 50, // Default zoom showing ~20s of audio per 1000px
 };
 
 /**

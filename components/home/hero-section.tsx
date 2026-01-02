@@ -51,7 +51,7 @@ export function HeroSection({ isLoadingConfig, isConfigured, onConfigureClick }:
               fontWeight: 600,
               }}
             >
-              Fireground Radio Transcription & Scoring
+              Radio Transcription and Scoring System
             </Badge>
           </div>
 
