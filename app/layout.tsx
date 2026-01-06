@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
+import { SkipToContent } from "@/components/layout/skip-to-content";
 import { Notifications } from "@mantine/notifications";
 
 const geistSans = localFont({
@@ -40,9 +41,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <SkipToContent />
         <Providers>
           <Header />
-          <main style={{ minHeight: 'calc(100vh - 120px)' }}>
+          <main id="main-content" tabIndex={-1} style={{ minHeight: 'calc(100vh - 120px)' }}>
             {children}
           </main>
           <Footer />

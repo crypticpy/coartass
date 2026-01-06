@@ -55,7 +55,7 @@ export default function ArchitecturePage() {
           </Badge>
         </Group>
         <Text c="dimmed" size="lg">
-          Understanding how Meeting Transcriber handles your data
+          Understanding how Austin RTASS handles your data
         </Text>
       </Stack>
 

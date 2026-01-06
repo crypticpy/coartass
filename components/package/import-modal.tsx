@@ -1,7 +1,7 @@
 /**
  * Import Modal Component
  *
- * Modal for importing Meeting Transcriber shareable packages.
+ * Modal for importing Austin RTASS shareable packages.
  * Handles file selection, validation, conflict resolution, and displays results.
  */
 
@@ -99,7 +99,7 @@ function formatFileSize(bytes: number): string {
 /**
  * Import Modal Component
  *
- * A modal for importing Meeting Transcriber packages with:
+ * A modal for importing Austin RTASS packages with:
  * - Drag-and-drop file selection
  * - Validation and conflict detection
  * - User-friendly conflict resolution

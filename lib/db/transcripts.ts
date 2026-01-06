@@ -5,6 +5,7 @@
 import type { Transcript } from "@/types/transcript";
 import { DatabaseError, getDatabase } from "./core";
 import type { PaginatedResult, PaginationOptions } from "./pagination";
+import { computeTranscriptSearchTokens, tokenizeSearchQuery } from "./search";
 
 export async function findTranscriptByFingerprint(
   hash: string
@@ -46,6 +47,10 @@ export async function saveTranscript(transcript: Transcript): Promise<string> {
         transcript.createdAt instanceof Date
           ? transcript.createdAt
           : new Date(transcript.createdAt),
+      searchTokens:
+        Array.isArray(transcript.searchTokens) && transcript.searchTokens.length > 0
+          ? transcript.searchTokens
+          : computeTranscriptSearchTokens(transcript),
     };
 
     await db.transcripts.put(transcriptToSave);
@@ -157,25 +162,84 @@ export async function searchTranscriptsPaginated(
   options: PaginationOptions = {}
 ): Promise<PaginatedResult<Transcript>> {
   try {
-    const { limit = 50, offset = 0 } = options;
+    const {
+      limit = 50,
+      offset = 0,
+      orderBy = "createdAt",
+      orderDirection = "desc",
+    } = options;
 
     const db = getDatabase();
-    const lowerSearch = searchTerm.toLowerCase();
 
-    // Get all matching items (IndexedDB doesn't support LIKE queries)
-    // Note: For very large datasets, consider using a separate search index
-    const allMatches = await db.transcripts
-      .filter(
-        (t) =>
-          t.filename.toLowerCase().includes(lowerSearch) ||
-          t.text.toLowerCase().includes(lowerSearch)
-      )
-      .toArray();
+    const trimmedSearch = searchTerm.trim();
+    if (!trimmedSearch) {
+      return await getTranscriptsPaginated(options);
+    }
 
-    // Sort by createdAt desc
-    allMatches.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const tokens = tokenizeSearchQuery(trimmedSearch);
+    let allMatches: Transcript[];
+
+    if (tokens.length === 0) {
+      // Avoid a full-table scan for short/stopword-only searches.
+      // Best-effort fallback: filename prefix match (uses the filename index).
+      allMatches = await db.transcripts
+        .where("filename")
+        .startsWithIgnoreCase(trimmedSearch)
+        .toArray();
+    } else {
+      // Use the rarest token as the seed set to minimize candidate expansion.
+      const tokenCounts = await Promise.all(
+        tokens.map(async (token) => db.transcripts.where("searchTokens").equals(token).count())
+      );
+      let seedIndex = 0;
+      let minCount = tokenCounts[0] ?? 0;
+      for (let i = 1; i < tokenCounts.length; i++) {
+        const count = tokenCounts[i] ?? 0;
+        if (count < minCount) {
+          minCount = count;
+          seedIndex = i;
+        }
+      }
+      const seedToken = tokens[seedIndex]!;
+
+      const candidates = await db.transcripts.where("searchTokens").equals(seedToken).toArray();
+      allMatches = candidates.filter((t) => {
+        const tokenList =
+          Array.isArray(t.searchTokens) && t.searchTokens.length > 0
+            ? t.searchTokens
+            : computeTranscriptSearchTokens(t);
+        return tokens.every((token) => tokenList.includes(token));
+      });
+    }
+
+    allMatches.sort((a, b) => {
+      let aVal: string | number | Date;
+      let bVal: string | number | Date;
+
+      switch (orderBy) {
+        case "filename":
+          aVal = a.filename.toLowerCase();
+          bVal = b.filename.toLowerCase();
+          break;
+        case "metadata.duration":
+          aVal = a.metadata?.duration ?? 0;
+          bVal = b.metadata?.duration ?? 0;
+          break;
+        case "metadata.fileSize":
+          aVal = a.metadata?.fileSize ?? 0;
+          bVal = b.metadata?.fileSize ?? 0;
+          break;
+        case "createdAt":
+        default:
+          aVal = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
+          bVal = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
+          break;
+      }
+
+      if (aVal < bVal) return orderDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return orderDirection === "asc" ? 1 : -1;
+      return 0;
+    });
 
     const total = allMatches.length;
     const items = allMatches.slice(offset, offset + limit);
@@ -206,7 +270,20 @@ export async function deleteTranscript(id: string): Promise<void> {
     const db = getDatabase();
 
     // Use a transaction to ensure all deletions succeed or fail together
-    await db.transaction("rw", [db.transcripts, db.analyses, db.conversations], async () => {
+    await db.transaction(
+      "rw",
+      [db.transcripts, db.analyses, db.conversations, db.audioFiles, db.rtassScorecards],
+      async () => {
+        const transcript = await db.transcripts.get(id);
+        const audioUrl = transcript?.audioUrl;
+
+        if (audioUrl && typeof URL !== "undefined" && audioUrl.startsWith("blob:")) {
+          URL.revokeObjectURL(audioUrl);
+        }
+
+        // Delete audio blob (stored separately) if present
+        await db.audioFiles.delete(id);
+
       // Delete the transcript
       await db.transcripts.delete(id);
 
@@ -215,7 +292,11 @@ export async function deleteTranscript(id: string): Promise<void> {
 
       // Delete all associated conversations
       await db.conversations.where("transcriptId").equals(id).delete();
-    });
+
+        // Delete all associated RTASS scorecards
+        await db.rtassScorecards.where("transcriptId").equals(id).delete();
+      }
+    );
   } catch (error) {
     throw new DatabaseError(
       `Failed to delete transcript with ID: ${id}`,
@@ -244,6 +325,10 @@ export async function saveTranscriptsBulk(transcripts: Transcript[]): Promise<nu
         transcript.createdAt instanceof Date
           ? transcript.createdAt
           : new Date(transcript.createdAt),
+      searchTokens:
+        Array.isArray(transcript.searchTokens) && transcript.searchTokens.length > 0
+          ? transcript.searchTokens
+          : computeTranscriptSearchTokens(transcript),
     }));
 
     // bulkPut is much faster than multiple put() calls
@@ -279,16 +364,21 @@ export async function deleteOldTranscripts(daysOld: number): Promise<number> {
       return 0;
     }
 
-    // Use transaction to ensure both deletions succeed or fail together
-    await db.transaction("rw", [db.transcripts, db.analyses], async () => {
+    // Use transaction to ensure all deletions succeed or fail together
+    await db.transaction(
+      "rw",
+      [db.transcripts, db.analyses, db.conversations, db.audioFiles, db.rtassScorecards],
+      async () => {
       // Delete transcripts
       await db.transcripts.bulkDelete(idsToDelete);
 
-      // Delete all associated analyses
-      for (const transcriptId of idsToDelete) {
-        await db.analyses.where("transcriptId").equals(transcriptId).delete();
+        // Delete all associated records
+        await db.analyses.where("transcriptId").anyOf(idsToDelete).delete();
+        await db.conversations.where("transcriptId").anyOf(idsToDelete).delete();
+        await db.rtassScorecards.where("transcriptId").anyOf(idsToDelete).delete();
+        await db.audioFiles.bulkDelete(idsToDelete);
       }
-    });
+    );
 
     return idsToDelete.length;
   } catch (error) {
@@ -350,16 +440,20 @@ export async function deleteTranscriptsBulk(ids: string[]): Promise<number> {
     const db = getDatabase();
 
     // Use a transaction to ensure all deletions succeed or fail together
-    await db.transaction("rw", [db.transcripts, db.analyses, db.conversations], async () => {
+    await db.transaction(
+      "rw",
+      [db.transcripts, db.analyses, db.conversations, db.audioFiles, db.rtassScorecards],
+      async () => {
       // Delete transcripts
       await db.transcripts.bulkDelete(ids);
 
-      // Delete all associated analyses and conversations
-      for (const id of ids) {
-        await db.analyses.where("transcriptId").equals(id).delete();
-        await db.conversations.where("transcriptId").equals(id).delete();
+        // Delete all associated records
+        await db.analyses.where("transcriptId").anyOf(ids).delete();
+        await db.conversations.where("transcriptId").anyOf(ids).delete();
+        await db.rtassScorecards.where("transcriptId").anyOf(ids).delete();
+        await db.audioFiles.bulkDelete(ids);
       }
-    });
+    );
 
     return ids.length;
   } catch (error) {
@@ -383,4 +477,3 @@ export async function updateTranscriptSummary(id: string, summary: string): Prom
     );
   }
 }
-

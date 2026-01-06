@@ -48,7 +48,7 @@ import { AudioControlsModal } from './audio-controls-modal';
 import { useAudioSync } from '@/hooks/use-audio-sync';
 import { formatTimestamp, formatDuration, formatFileSize } from '@/lib/transcript-utils';
 import type { TranscriptSegment } from '@/types/transcript';
-import type { PlaybackSpeed, AudioPlayerConfig, AudioPlayerControls } from '@/types/audio';
+import type { PlaybackSpeed, PlaybackState, AudioPlayerConfig, AudioPlayerControls } from '@/types/audio';
 
 /** Height of each transcript segment row */
 const SEGMENT_HEIGHT = 48;
@@ -301,10 +301,25 @@ export function RadioPlaybackInterface({
   className = '',
   onReviewModeClick,
 }: RadioPlaybackInterfaceProps) {
+  // Track retry state (used only for the error recovery UI)
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [waveformInstanceKey, setWaveformInstanceKey] = useState(0);
+
+  const handlePlaybackStateChange = useCallback((nextState: PlaybackState) => {
+    if (nextState !== 'loading') {
+      setIsRetrying(false);
+    }
+  }, []);
+
+  const handleWaveformError = useCallback(() => {
+    setIsRetrying(false);
+  }, []);
+
   // Use audio sync hook with enhancement support
   const { syncState, controls, registerWaveSurfer, enhancement } = useAudioSync({
     segments,
     onSegmentChange,
+    onPlaybackStateChange: handlePlaybackStateChange,
   });
 
   // Audio controls modal state
@@ -318,11 +333,7 @@ export function RadioPlaybackInterface({
   const isLoading = state === 'loading';
   const isBuffering = state === 'buffering';
 
-  // Track retry state
-  const [isRetrying, setIsRetrying] = useState(false);
-
   // Derive retry display state: show retrying only while there's still an error
-  // This automatically "resets" visually when error clears
   const showRetrying = isRetrying && hasError;
 
   // Find current segment index based on playback time
@@ -382,7 +393,7 @@ export function RadioPlaybackInterface({
   // Handle retry
   const handleRetry = useCallback(() => {
     setIsRetrying(true);
-    window.location.reload();
+    setWaveformInstanceKey((prev) => prev + 1);
   }, []);
 
   // Handle segment click in mini transcript
@@ -474,10 +485,12 @@ export function RadioPlaybackInterface({
       {/* Large Waveform */}
       <Box style={{ width: '100%' }}>
         <WaveformPlayer
+          key={waveformInstanceKey}
           audioUrl={audioUrl}
           cacheKey={cacheKey}
           config={waveformConfig}
           onReady={registerWaveSurfer}
+          onError={handleWaveformError}
           className="w-full"
         />
       </Box>

@@ -26,7 +26,7 @@ import { WaveformPlayer } from './waveform-player';
 import { useAudioSync } from '@/hooks/use-audio-sync';
 import { formatTimestamp } from '@/lib/transcript-utils';
 import type { TranscriptSegment } from '@/types/transcript';
-import type { PlaybackSpeed, AudioPlayerConfig, AudioPlayerControls } from '@/types/audio';
+import type { PlaybackSpeed, PlaybackState, AudioPlayerConfig, AudioPlayerControls } from '@/types/audio';
 
 /**
  * Props for AudioPlayer component
@@ -79,22 +79,24 @@ export function AudioPlayer({
   config,
   className = '',
 }: AudioPlayerProps) {
+  const [waveformInstanceKey, setWaveformInstanceKey] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handlePlaybackStateChange = useCallback((nextState: PlaybackState) => {
+    if (nextState !== 'loading') {
+      setIsRetrying(false);
+    }
+  }, []);
+
   // Use audio sync hook
   const { syncState, controls, registerWaveSurfer } = useAudioSync({
     segments,
     onSegmentChange,
+    onPlaybackStateChange: handlePlaybackStateChange,
   });
-
-  // Track retry state for recovery UI (error state is derived from syncState)
-  const [isRetrying, setIsRetrying] = useState(false);
 
   // Derive error state from syncState to avoid setState in effect
   const hasError = syncState.state === 'error';
-
-  // Reset retry state when player recovers
-  if (!hasError && isRetrying) {
-    setIsRetrying(false);
-  }
 
   // Expose controls to parent component
   useEffect(() => {
@@ -156,14 +158,18 @@ export function AudioPlayer({
   const isPlaying = state === 'playing';
   const isLoading = state === 'loading';
   const isBuffering = state === 'buffering';
+  const showRetrying = isRetrying && hasError;
+
+  const handleWaveformError = useCallback(() => {
+    setIsRetrying(false);
+  }, []);
 
   /**
    * Handle retry after error
    */
   const handleRetry = useCallback(() => {
     setIsRetrying(true);
-    // Force reload by triggering a re-render
-    window.location.reload();
+    setWaveformInstanceKey((prev) => prev + 1);
   }, []);
 
   return (
@@ -189,10 +195,10 @@ export function AudioPlayer({
               variant="default"
               size="sm"
               onClick={handleRetry}
-              disabled={isRetrying}
-              leftSection={isRetrying ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              disabled={showRetrying}
+              leftSection={showRetrying ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             >
-              {isRetrying ? 'Retrying...' : 'Retry'}
+              {showRetrying ? 'Retrying...' : 'Retry'}
             </Button>
           </Flex>
         </Paper>
@@ -201,9 +207,11 @@ export function AudioPlayer({
       {/* Waveform */}
       <Box style={{ width: '100%' }}>
         <WaveformPlayer
+          key={waveformInstanceKey}
           audioUrl={audioUrl}
           config={config}
           onReady={registerWaveSurfer}
+          onError={handleWaveformError}
           className="w-full"
         />
       </Box>

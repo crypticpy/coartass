@@ -111,38 +111,11 @@ export function useRecentTranscripts(limit: number = 5) {
  * @returns Object containing filtered transcripts array and loading state
  */
 export function useSearchTranscripts(searchTerm: string) {
-  const transcripts = useLiveQuery(
-    async () => {
-      try {
-        const allTranscripts = await getAllTranscripts();
-        // Filter out demo transcripts first
-        const realTranscripts = filterOutDemoTranscripts(allTranscripts);
-
-        if (!searchTerm.trim()) {
-          return realTranscripts;
-        }
-
-        const lowerSearch = searchTerm.toLowerCase();
-        return realTranscripts.filter((transcript) => {
-          return (
-            transcript.filename.toLowerCase().includes(lowerSearch) ||
-            transcript.text.toLowerCase().includes(lowerSearch)
-          );
-        });
-      } catch (error) {
-        log.error('Error searching transcripts', {
-          message: error instanceof Error ? error.message : String(error),
-        });
-        throw error;
-      }
-    },
-    [searchTerm],
-    []
-  );
+  const { result, isLoading } = useSearchTranscriptsPaginated(searchTerm, { limit: 500, offset: 0 });
 
   return {
-    transcripts: transcripts || [],
-    isLoading: transcripts === undefined,
+    transcripts: result.items,
+    isLoading,
   };
 }
 
@@ -252,7 +225,7 @@ export function useSearchTranscriptsPaginated(
         throw error;
       }
     },
-    [searchTerm, options.limit, options.offset],
+    [searchTerm, options.limit, options.offset, options.orderBy, options.orderDirection],
     { items: [], total: 0, hasMore: false, offset: 0, limit: 50 } as PaginatedResult<Transcript>
   );
 

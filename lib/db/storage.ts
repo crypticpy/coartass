@@ -194,22 +194,54 @@ export async function calculateStorageUsage(): Promise<{
   transcriptCount: number;
   templateCount: number;
   analysisCount: number;
+  audioFileCount: number;
+  conversationCount: number;
+  recordingCount: number;
+  rtassScorecardCount: number;
+  rtassRubricTemplateCount: number;
   totalRecords: number;
 }> {
   try {
     const db = getDatabase();
 
-    const [transcriptCount, templateCount, analysisCount] = await Promise.all([
+    const [
+      transcriptCount,
+      templateCount,
+      analysisCount,
+      audioFileCount,
+      conversationCount,
+      recordingCount,
+      rtassScorecardCount,
+      rtassRubricTemplateCount,
+    ] = await Promise.all([
       db.transcripts.count(),
       db.templates.count(),
       db.analyses.count(),
+      db.audioFiles.count(),
+      db.conversations.count(),
+      db.recordings.count(),
+      db.rtassScorecards.count(),
+      db.rtassRubricTemplates.count(),
     ]);
 
     return {
       transcriptCount,
       templateCount,
       analysisCount,
-      totalRecords: transcriptCount + templateCount + analysisCount,
+      audioFileCount,
+      conversationCount,
+      recordingCount,
+      rtassScorecardCount,
+      rtassRubricTemplateCount,
+      totalRecords:
+        transcriptCount +
+        templateCount +
+        analysisCount +
+        audioFileCount +
+        conversationCount +
+        recordingCount +
+        rtassScorecardCount +
+        rtassRubricTemplateCount,
     };
   } catch (error) {
     throw new DatabaseError(
@@ -220,3 +252,42 @@ export async function calculateStorageUsage(): Promise<{
   }
 }
 
+export interface TranscriptStorageBreakdownItem {
+  transcriptId: string;
+  filename: string;
+  createdAt: Date;
+  durationSeconds: number;
+  fileSizeBytes: number;
+  hasAudioFile: boolean;
+}
+
+export async function getLargestTranscriptsBySize(limit: number = 10): Promise<TranscriptStorageBreakdownItem[]> {
+  try {
+    const db = getDatabase();
+
+    const transcripts = await db.transcripts
+      .orderBy("metadata.fileSize")
+      .reverse()
+      .limit(Math.max(1, limit))
+      .toArray();
+
+    const audioIds = new Set<string>(
+      (await db.audioFiles.toCollection().primaryKeys()) as string[]
+    );
+
+    return transcripts.map((t) => ({
+      transcriptId: t.id,
+      filename: t.filename,
+      createdAt: t.createdAt instanceof Date ? t.createdAt : new Date(t.createdAt),
+      durationSeconds: t.metadata?.duration ?? 0,
+      fileSizeBytes: t.metadata?.fileSize ?? 0,
+      hasAudioFile: audioIds.has(t.id),
+    }));
+  } catch (error) {
+    throw new DatabaseError(
+      "Failed to calculate transcript storage breakdown",
+      "TRANSCRIPT_STORAGE_BREAKDOWN_FAILED",
+      error instanceof Error ? error : undefined
+    );
+  }
+}

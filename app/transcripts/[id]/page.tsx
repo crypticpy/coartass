@@ -12,7 +12,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useLiveQuery } from "dexie-react-hooks";
-  import {
+import {
   Container,
   Text,
   Tabs,
@@ -201,15 +201,66 @@ export default function TranscriptDetailPage() {
     return scorecards[0];
   }, [scorecards]);
 
+  function normalizeRubricDates(rubric: RtassRubricTemplate): RtassRubricTemplate {
+    return {
+      ...rubric,
+      createdAt: rubric.createdAt instanceof Date ? rubric.createdAt : new Date(rubric.createdAt),
+      updatedAt:
+        rubric.updatedAt instanceof Date
+          ? rubric.updatedAt
+          : rubric.updatedAt
+            ? new Date(rubric.updatedAt)
+            : undefined,
+    };
+  }
+
   // Load the rubric template for the latest scorecard (for Review Mode benchmarks)
-  const latestRubric = useLiveQuery<RtassRubricTemplate | undefined>(async () => {
-    if (!latestScorecard?.rubricTemplateId) return undefined;
-    try {
-      return await getRtassRubricTemplate(latestScorecard.rubricTemplateId);
-    } catch (error) {
-      console.error("Error loading rubric template:", error);
-      return undefined;
+  const [latestRubric, setLatestRubric] = useState<RtassRubricTemplate | undefined>(undefined);
+
+  useEffect(() => {
+    if (!latestScorecard?.rubricTemplateId) {
+      setLatestRubric(undefined);
+      return;
     }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const rubricId = latestScorecard.rubricTemplateId;
+
+    (async () => {
+      try {
+        const custom = await getRtassRubricTemplate(rubricId);
+        if (cancelled) return;
+        if (custom) {
+          setLatestRubric(custom);
+          return;
+        }
+      } catch (error) {
+        console.error("Error loading rubric template:", error);
+      }
+
+      try {
+        const res = await fetch(`/api/rtass/rubrics?id=${encodeURIComponent(rubricId)}`, {
+          signal: controller.signal,
+        });
+        const payload = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setLatestRubric(undefined);
+          return;
+        }
+        setLatestRubric(normalizeRubricDates(payload.data as RtassRubricTemplate));
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("Error loading built-in rubric:", error);
+        if (!cancelled) setLatestRubric(undefined);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [latestScorecard?.rubricTemplateId]);
 
   const citationsEnabled = process.env.NEXT_PUBLIC_CITATIONS_ENABLED !== "false";

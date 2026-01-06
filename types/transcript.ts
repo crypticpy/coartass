@@ -93,6 +93,12 @@ export interface Transcript {
 
   /** Total number of parts when generated from chunked uploads */
   totalParts?: number;
+
+  /**
+   * Derived search tokens used for fast IndexedDB queries.
+   * Populated automatically when saving to Dexie and backfilled via DB migrations.
+   */
+  searchTokens?: string[];
 }
 
 /**

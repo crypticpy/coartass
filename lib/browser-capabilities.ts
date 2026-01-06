@@ -16,7 +16,8 @@
 import type { BrowserCapabilities, MicCheckError, RecordingMode, RecordingModeConfig } from '@/types/recording';
 
 /** LocalStorage key for mic check preference */
-const MIC_CHECK_PREFERENCE_KEY = 'meeting-transcriber-mic-check-pref';
+const MIC_CHECK_PREFERENCE_KEY = 'austin-rtass-mic-check-pref';
+const LEGACY_MIC_CHECK_PREFERENCE_KEY = 'meeting-transcriber-mic-check-pref';
 
 /**
  * Detect the current browser name from user agent string.
@@ -348,6 +349,20 @@ export function getMicCheckPreference(): boolean {
       const pref = JSON.parse(stored);
       return pref.skipMicCheck === true;
     }
+
+    const legacyStored = localStorage.getItem(LEGACY_MIC_CHECK_PREFERENCE_KEY);
+    if (legacyStored) {
+      try {
+        const pref = JSON.parse(legacyStored);
+        if (typeof pref === 'object' && pref !== null) {
+          localStorage.setItem(MIC_CHECK_PREFERENCE_KEY, JSON.stringify(pref));
+          localStorage.removeItem(LEGACY_MIC_CHECK_PREFERENCE_KEY);
+          return (pref as { skipMicCheck?: boolean }).skipMicCheck === true;
+        }
+      } catch {
+        // Ignore legacy parse errors
+      }
+    }
   } catch {
     // Ignore parse errors
   }
@@ -376,6 +391,7 @@ export function setMicCheckPreference(skip: boolean): void {
       skipMicCheck: skip,
       lastUpdated: new Date().toISOString(),
     }));
+    localStorage.removeItem(LEGACY_MIC_CHECK_PREFERENCE_KEY);
   } catch {
     // Ignore storage errors (quota exceeded, etc.)
   }

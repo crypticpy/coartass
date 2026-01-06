@@ -1,5 +1,5 @@
 /**
- * Mantine Theme Configuration for Meeting Transcriber
+ * Mantine Theme Configuration for Austin RTASS
  *
  * Defines the application's color palette and design system
  * with full support for light and dark modes.

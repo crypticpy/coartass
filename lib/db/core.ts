@@ -12,6 +12,7 @@ import type { AudioMetadata } from "@/types/audio";
 import type { Conversation } from "@/types/chat";
 import type { SavedRecording } from "@/types/recording";
 import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
+import { computeTranscriptSearchTokens } from "./search";
 
 /**
  * Custom error class for database operations.
@@ -174,6 +175,30 @@ export class AustinRTASSDB extends Dexie {
       rtassRubricTemplates: "id, jurisdiction, createdAt, name",
     });
 
+    // Version 10 adds transcript search token indexing for fast keyword search
+    this.version(10)
+      .stores({
+        transcripts:
+          "id, filename, createdAt, metadata.duration, metadata.fileSize, [filename+createdAt], fingerprint.fileHash, *searchTokens",
+        templates: "id, category, isCustom, createdAt, name",
+        analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+        audioFiles: "transcriptId, storedAt",
+        conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
+        recordings: "++id, status, transcriptId, metadata.createdAt",
+        rtassScorecards: "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
+        rtassRubricTemplates: "id, jurisdiction, createdAt, name",
+      })
+      .upgrade(async (tx) => {
+        const transcripts = tx.table<Transcript, string>("transcripts");
+        await transcripts.toCollection().modify((t) => {
+          const transcript = t as Transcript;
+          if (Array.isArray(transcript.searchTokens) && transcript.searchTokens.length > 0) {
+            return;
+          }
+          transcript.searchTokens = computeTranscriptSearchTokens(transcript);
+        });
+      });
+
     // Map tables to classes for better type inference
     this.transcripts = this.table("transcripts");
     this.templates = this.table("templates");
@@ -224,6 +249,17 @@ export function closeDatabase(): void {
   }
 }
 
+async function deleteIndexedDBDatabase(name: string): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
+
+  await new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+    request.onblocked = () => resolve();
+  });
+}
+
 /**
  * Deletes the entire database.
  *
@@ -236,11 +272,20 @@ export async function deleteDatabase(): Promise<void> {
   try {
     closeDatabase();
     await Dexie.delete("AustinRTASSDB");
+    await deleteIndexedDBDatabase("waveform-peaks-cache");
   } catch (error) {
     throw new DatabaseError(
       "Failed to delete database",
       "DATABASE_DELETE_FAILED",
       error instanceof Error ? error : undefined
     );
+  }
+}
+
+export async function deleteWaveformPeaksCache(): Promise<void> {
+  try {
+    await deleteIndexedDBDatabase("waveform-peaks-cache");
+  } catch {
+    // Best-effort cache delete; ignore errors.
   }
 }

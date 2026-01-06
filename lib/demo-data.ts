@@ -1,5 +1,5 @@
 /**
- * Demo Data for Meeting Transcriber
+ * Demo Data for Austin RTASS
  *
  * Provides sample lorem ipsum content for demonstration purposes.
  * This data can be loaded into IndexedDB to showcase the app's features

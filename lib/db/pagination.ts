@@ -13,7 +13,7 @@ export interface PaginationOptions {
   /** Number of items to skip (default: 0) */
   offset?: number;
   /** Field to order results by */
-  orderBy?: "createdAt" | "filename";
+  orderBy?: "createdAt" | "filename" | "metadata.duration" | "metadata.fileSize";
   /** Sort direction (default: 'desc') */
   orderDirection?: "asc" | "desc";
 }
@@ -33,4 +33,3 @@ export interface PaginatedResult<T> {
   /** Current limit */
   limit: number;
 }
-

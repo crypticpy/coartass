@@ -73,7 +73,7 @@ interface WaveformPlayerProps {
   /** Configuration for waveform appearance and behavior */
   config?: Partial<AudioPlayerConfig>;
 
-  /** Callback when WaveSurfer instance is ready */
+  /** Callback when WaveSurfer instance is created (before load completes) */
   onReady?: (wavesurfer: WaveSurfer) => void;
 
   /** Callback when audio loading fails */
@@ -89,6 +89,65 @@ interface WaveformPlayerProps {
 // IndexedDB cache for waveform peaks
 const PEAKS_DB_NAME = 'waveform-peaks-cache';
 const PEAKS_STORE_NAME = 'peaks';
+const PEAKS_CACHE_MAX_ENTRIES = 50;
+const PEAKS_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+type PeaksCacheRecordV2 = {
+  peaks: number[][];
+  storedAt: number;
+};
+
+function isPeaksCacheRecord(value: unknown): value is PeaksCacheRecordV2 {
+  if (!value || typeof value !== 'object') return false;
+  const maybe = value as Partial<PeaksCacheRecordV2>;
+  return Array.isArray(maybe.peaks) && typeof maybe.storedAt === 'number';
+}
+
+async function prunePeaksCache(db: IDBDatabase): Promise<void> {
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(PEAKS_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(PEAKS_STORE_NAME);
+      const entries: Array<{ key: IDBValidKey; storedAt: number }> = [];
+
+      const cursorRequest = store.openCursor();
+      cursorRequest.onsuccess = () => {
+        const cursor = cursorRequest.result;
+        if (cursor) {
+          const value = cursor.value as unknown;
+          const storedAt =
+            isPeaksCacheRecord(value) ? value.storedAt : 0;
+          entries.push({ key: cursor.key, storedAt });
+          cursor.continue();
+          return;
+        }
+
+        const now = Date.now();
+        const keysToDelete = new Set<IDBValidKey>();
+
+        for (const entry of entries) {
+          if (entry.storedAt > 0 && now - entry.storedAt > PEAKS_CACHE_MAX_AGE_MS) {
+            keysToDelete.add(entry.key);
+          }
+        }
+
+        const newestFirst = [...entries].sort((a, b) => b.storedAt - a.storedAt);
+        for (const entry of newestFirst.slice(PEAKS_CACHE_MAX_ENTRIES)) {
+          keysToDelete.add(entry.key);
+        }
+
+        for (const key of keysToDelete) {
+          store.delete(key);
+        }
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
 
 async function getCachedPeaks(key: string): Promise<Float32Array[] | null> {
   return new Promise((resolve) => {
@@ -105,7 +164,13 @@ async function getCachedPeaks(key: string): Promise<Float32Array[] | null> {
         getRequest.onsuccess = () => {
           const data = getRequest.result;
           if (data && Array.isArray(data)) {
-            resolve(data.map((arr: number[]) => new Float32Array(arr)));
+            // Legacy format: number[][]
+            resolve((data as number[][]).map((arr) => new Float32Array(arr)));
+            return;
+          }
+
+          if (isPeaksCacheRecord(data)) {
+            resolve(data.peaks.map((arr) => new Float32Array(arr)));
           } else {
             resolve(null);
           }
@@ -131,8 +196,15 @@ async function cachePeaks(key: string, peaks: Float32Array[]): Promise<void> {
         const tx = db.transaction(PEAKS_STORE_NAME, 'readwrite');
         const store = tx.objectStore(PEAKS_STORE_NAME);
         // Convert to regular arrays for storage
-        store.put(peaks.map(arr => Array.from(arr)), key);
-        tx.oncomplete = () => resolve();
+        const payload: PeaksCacheRecordV2 = {
+          peaks: peaks.map((arr) => Array.from(arr)),
+          storedAt: Date.now(),
+        };
+        store.put(payload, key);
+        tx.oncomplete = () => {
+          void prunePeaksCache(db);
+          resolve();
+        };
         tx.onerror = () => resolve();
       };
       request.onerror = () => resolve();
@@ -287,6 +359,7 @@ export function WaveformPlayer({
         }
 
         wavesurferRef.current = wavesurfer;
+        onReady?.(wavesurfer);
 
         wavesurfer.on('ready', () => {
           if (cancelledRef?.current) {
@@ -319,7 +392,6 @@ export function WaveformPlayer({
             }
           }
 
-          onReady?.(wavesurfer);
         });
 
         wavesurfer.on('error', (err: Error) => {

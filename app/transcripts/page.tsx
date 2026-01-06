@@ -32,12 +32,11 @@ import {
   Checkbox,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useSearchTranscripts } from '@/hooks/use-transcripts';
+import { useSearchTranscriptsPaginated } from '@/hooks/use-transcripts';
 import { useDebounce } from '@/hooks/use-debounce';
 import { deleteTranscript, deleteTranscriptsBulk, type TranscriptSortField } from '@/lib/db';
 import { TranscriptCard, TranscriptTable } from '@/components/transcript';
 import { ImportModal } from '@/components/package';
-import type { Transcript } from '@/types/transcript';
 
 type ViewMode = 'grid' | 'list';
 
@@ -48,50 +47,17 @@ const sortOptions = [
   { value: 'metadata.fileSize', label: 'File Size' },
 ];
 
-function sortTranscripts(
-  transcripts: Transcript[],
-  sortBy: TranscriptSortField,
-  sortOrder: 'asc' | 'desc'
-): Transcript[] {
-  return [...transcripts].sort((a, b) => {
-      let aVal: string | number | Date;
-      let bVal: string | number | Date;
-  
-      switch (sortBy) {
-        case 'filename':
-          aVal = a.filename.toLowerCase();
-          bVal = b.filename.toLowerCase();
-          break;
-        case 'metadata.duration':
-          aVal = a.metadata?.duration ?? 0;
-          bVal = b.metadata?.duration ?? 0;
-          break;
-        case 'metadata.fileSize':
-          aVal = a.metadata?.fileSize ?? 0;
-          bVal = b.metadata?.fileSize ?? 0;
-          break;
-        case 'createdAt':
-        default:
-          aVal = new Date(a.createdAt).getTime();
-          bVal = new Date(b.createdAt).getTime();
-          break;
-      }
-  
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-}
+const PAGE_STEP = 50;
 
 export default function TranscriptsPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const { transcripts: rawTranscripts, isLoading } = useSearchTranscripts(debouncedSearchTerm);
 
   const [viewMode, setViewMode] = React.useState<ViewMode>('grid');
   const [sortBy, setSortBy] = React.useState<TranscriptSortField>('createdAt');
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc');
+  const [pageSize, setPageSize] = React.useState(PAGE_STEP);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
 
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
@@ -99,16 +65,24 @@ export default function TranscriptsPage() {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = React.useState(false);
   const [showImportModal, setShowImportModal] = React.useState(false);
 
-  // Sort transcripts
-  const transcripts = React.useMemo(
-    () => sortTranscripts(rawTranscripts, sortBy, sortOrder),
-    [rawTranscripts, sortBy, sortOrder]
+  const { result, isLoading } = useSearchTranscriptsPaginated(
+    debouncedSearchTerm,
+    {
+      limit: pageSize,
+      offset: 0,
+      orderBy: sortBy,
+      orderDirection: sortOrder,
+    }
   );
+  const transcripts = result.items;
+  const total = result.total;
+  const hasMore = result.hasMore;
 
-  // Clear selection when transcripts change
+  // Reset pagination + selection when search/sort changes
   React.useEffect(() => {
+    setPageSize(PAGE_STEP);
     setSelectedIds(new Set());
-  }, [rawTranscripts]);
+  }, [debouncedSearchTerm, sortBy, sortOrder]);
 
   const handleSortChange = (field: TranscriptSortField) => {
     if (field === sortBy) {
@@ -344,9 +318,10 @@ export default function TranscriptsPage() {
         )}
 
         {/* Transcript Count */}
-        {transcripts.length > 0 && !showBulkActions && (
+        {total > 0 && !showBulkActions && (
           <Text size="sm" c="dimmed">
-            {transcripts.length} transcript{transcripts.length !== 1 ? 's' : ''} found
+            {total} transcript{total !== 1 ? 's' : ''} found
+            {hasMore && ` (showing ${transcripts.length})`}
           </Text>
         )}
 
@@ -463,10 +438,23 @@ export default function TranscriptsPage() {
               </Group>
             </Stack>
           </Card>
-        )}
+	        )}
 
-        {/* Single Delete Confirmation Dialog */}
-        <Modal
+	        {/* Load More */}
+	        {!isLoading && hasMore && (
+	          <Group justify="center">
+	            <Button
+	              variant="light"
+	              onClick={() => setPageSize((prev) => prev + PAGE_STEP)}
+	              styles={{ root: { minHeight: 44 } }}
+	            >
+	              Load More
+	            </Button>
+	          </Group>
+	        )}
+
+	        {/* Single Delete Confirmation Dialog */}
+	        <Modal
           opened={!!deleteId}
           onClose={() => setDeleteId(null)}
           title="Delete Incident"

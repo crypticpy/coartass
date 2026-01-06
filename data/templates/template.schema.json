@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://meeting-transcriber.local/template.schema.json",
+  "$id": "https://austin-rtass.local/template.schema.json",
   "title": "Analysis Template",
-  "description": "Schema for Meeting Transcriber analysis templates",
+  "description": "Schema for Austin RTASS analysis templates",
   "type": "object",
   "required": ["name", "description", "icon", "category", "outputs", "sections"],
   "additionalProperties": false,

@@ -76,8 +76,8 @@ export default function Header() {
                     width={80}
                     height={80}
                     className="coa-header-logo"
-                  priority
-                  style={{
+                    priority
+                    style={{
                       objectFit: "contain",
                     }}
                   />

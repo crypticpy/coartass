@@ -1,5 +1,5 @@
 /**
- * Record Meeting Page
+ * Record Audio Page
  *
  * Standalone recording page for creating audio recordings with three modes:
  * - Microphone: Record from device microphone
@@ -101,7 +101,7 @@ interface CompletedRecording {
 }
 
 /**
- * Record Meeting Page Component
+ * Record Audio Page Component
  *
  * Main page component that orchestrates the recording workflow.
  * Manages page state transitions, audio source acquisition, and recording lifecycle.
@@ -370,7 +370,7 @@ export default function RecordPage() {
             </Box>
             <Box>
               <Title order={1} size="h2">
-                Record Meeting
+                Record Audio
               </Title>
               <Text c="dimmed" mt={4}>
                 {pageState === "mode_selection" &&

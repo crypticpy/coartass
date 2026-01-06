@@ -13,6 +13,7 @@ export {
   getDatabase,
   closeDatabase,
   deleteDatabase,
+  deleteWaveformPeaksCache,
   type AudioFileEntry,
 } from "./db/core";
 
@@ -84,10 +85,12 @@ export {
   type StorageEstimate,
   type StorageQuotaCheckResult,
   type StorageStatus,
+  type TranscriptStorageBreakdownItem,
   getStorageEstimate,
   getStorageStatus,
   checkStorageQuota,
   calculateStorageUsage,
+  getLargestTranscriptsBySize,
 } from "./db/storage";
 
 export { getDatabase as default } from "./db/core";

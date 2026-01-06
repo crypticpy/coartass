@@ -122,13 +122,13 @@ const SUPPORTED_LANGUAGES = [
 const TRANSCRIPTION_MODELS = [
   {
     value: "gpt-4o-transcribe",
-    label: "GPT-4o Transcribe (Default)",
+    label: "GPT-4o Transcribe",
     description: "High-quality transcription with timestamps",
   },
   {
     value: "gpt-4o-transcribe-diarize",
     label: "GPT-4o Transcribe with Diarization (Beta)",
-    description: "Transcription with speaker detection (experimental)",
+    description: "Transcription with speaker labels (experimental)",
   },
 ] as const;
 
@@ -159,9 +159,9 @@ export default function UploadPage() {
   const [language, setLanguage] = React.useState<string>("auto");
   const [model, setModel] = React.useState<string>("gpt-4o-transcribe-diarize");
   const [department, setDepartment] = React.useState<string>("");
-  const [enableSpeakerDetection, setEnableSpeakerDetection] =
-    React.useState<boolean>(true);
   const [isUploading, setIsUploading] = React.useState(false);
+
+  const enableSpeakerDetection = model === "gpt-4o-transcribe-diarize";
 
   // Source recording ID (when coming from recordings page)
   const [sourceRecordingId, setSourceRecordingId] = React.useState<number | null>(null);
@@ -603,11 +603,15 @@ export default function UploadPage() {
                         ? `Speaker detection is ${
                             enableSpeakerDetection ? "enabled" : "disabled"
                           }`
-                        : "Identify and label different speakers in the transcript (recommended)"
+                        : "Uses the diarization model to label speakers (beta)"
                     }
                     checked={enableSpeakerDetection}
                     onChange={(event) =>
-                      setEnableSpeakerDetection(event.currentTarget.checked)
+                      setModel(
+                        event.currentTarget.checked
+                          ? "gpt-4o-transcribe-diarize"
+                          : "gpt-4o-transcribe"
+                      )
                     }
                     disabled={isUploading}
                     size="md"

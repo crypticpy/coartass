@@ -11,7 +11,8 @@ import { getTemplateCategory } from './template-categories';
 /**
  * localStorage key for user category settings
  */
-const STORAGE_KEY = 'meeting-transcriber-user-categories';
+const STORAGE_KEY = 'austin-rtass-user-categories';
+const LEGACY_STORAGE_KEY = 'meeting-transcriber-user-categories';
 
 /**
  * User category settings interface
@@ -51,6 +52,30 @@ export function getUserCategorySettings(): UserCategorySettings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
+      const legacyStored = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (!legacyStored) {
+        return DEFAULT_SETTINGS;
+      }
+
+      // Best-effort migration from legacy key
+      try {
+        const legacyParsed = JSON.parse(legacyStored);
+        if (
+          typeof legacyParsed === 'object' &&
+          legacyParsed !== null &&
+          Array.isArray(legacyParsed.customCategories) &&
+          typeof legacyParsed.templateAssignments === 'object' &&
+          legacyParsed.templateAssignments !== null
+        ) {
+          const migrated = legacyParsed as UserCategorySettings;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+          return migrated;
+        }
+      } catch {
+        // Ignore legacy parse/migration errors; fall back to defaults.
+      }
+
       return DEFAULT_SETTINGS;
     }
 
@@ -89,6 +114,8 @@ export function saveUserCategorySettings(settings: UserCategorySettings): void {
   try {
     const json = JSON.stringify(settings);
     localStorage.setItem(STORAGE_KEY, json);
+    // Clean up legacy key if present
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch (error) {
     console.error('Error saving user category settings:', error);
   }
@@ -105,6 +132,7 @@ export function resetUserCategorySettings(): void {
 
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch (error) {
     console.error('Error resetting user category settings:', error);
   }
