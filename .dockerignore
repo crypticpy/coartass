@@ -105,6 +105,10 @@ sample-*.json
 *.example
 examples/
 samples/
+OLD_Sites/
+MEF_Interviews/
+user_input_files/
+*.mp4
 
 # ============================================================================
 # CI/CD and Deployment
@@ -186,6 +190,7 @@ $RECYCLE.BIN/
 # Keep build-templates.mjs for template compilation during Docker build
 scripts/
 !scripts/build-templates.mjs
+!scripts/copy-pdf-worker.mjs
 *.sh
 !entrypoint.sh
 
@@ -199,6 +204,8 @@ scripts/
 # Keep data/templates for YAML template files needed at build time
 data/
 !data/templates/
+!data/rtass-rubrics/
+!data/rtass-rubrics/**
 storage/
 
 # ============================================================================

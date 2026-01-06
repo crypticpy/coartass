@@ -1,5 +1,5 @@
 # ============================================================================
-# Meeting Transcriber - Production Docker Image
+# Austin RTASS - Production Docker Image
 # ============================================================================
 # Multi-stage build for optimal size and security
 # Target platforms: linux/amd64, linux/arm64
@@ -27,12 +27,10 @@ WORKDIR /app
 # If package.json hasn't changed, Docker reuses the cached layer
 COPY package.json package-lock.json ./
 
-# Install dependencies with npm cache mount for faster builds
-# --frozen-lockfile: ensure exact versions from package-lock.json
-# --prefer-offline: use cached packages when available
-# --no-audit: skip security audit for faster installs (run separately in CI)
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --frozen-lockfile --prefer-offline --no-audit
+# Install dependencies.
+# Note: Avoid BuildKit-only features (e.g. RUN --mount=type=cache) so remote builders
+# like `az acr build` work reliably without special configuration.
+RUN npm ci --frozen-lockfile --prefer-offline --no-audit
 
 # ============================================================================
 # Stage 2: Builder
@@ -101,6 +99,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# RTASS built-in rubrics are loaded at runtime by the API route.
+COPY --from=builder --chown=nextjs:nodejs /app/data/rtass-rubrics ./data/rtass-rubrics
+
 # Switch to non-root user
 USER nextjs
 
@@ -128,18 +129,18 @@ CMD ["node", "server.js"]
 # Local Build (macOS):
 # -------------------
 # Build for local testing (ARM64 for M1/M2 Macs):
-#   docker build -t meeting-transcriber:local .
+#   docker build -t austin-rtass:local .
 #
 # Build for Azure deployment (x86_64):
-#   docker buildx build --platform linux/amd64 -t meeting-transcriber:azure .
+#   docker buildx build --platform linux/amd64 -t austin-rtass:azure .
 #
 # Multi-platform build (both ARM64 and x86_64):
 #   docker buildx build --platform linux/amd64,linux/arm64 \
-#     -t meeting-transcriber:latest .
+#     -t austin-rtass:latest .
 #
 # Build with Azure Container Registry:
 #   docker build --platform linux/amd64 \
-#     -t myregistry.azurecr.io/meeting-transcriber:latest .
+#     -t myregistry.azurecr.io/austin-rtass:latest .
 #
 # ============================================================================
 # Run Instructions
@@ -149,11 +150,11 @@ CMD ["node", "server.js"]
 #   docker run -p 3000:3000 \
 #     -e AZURE_OPENAI_API_KEY=your-key \
 #     -e AZURE_OPENAI_ENDPOINT=your-endpoint \
-#     meeting-transcriber:local
+#     austin-rtass:local
 #
 # Run with env file:
 #   docker run -p 3000:3000 --env-file .env.local \
-#     meeting-transcriber:local
+#     austin-rtass:local
 #
 # Run with docker-compose:
 #   docker-compose up
