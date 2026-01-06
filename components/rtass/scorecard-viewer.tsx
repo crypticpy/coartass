@@ -46,6 +46,73 @@ function statusIcon(status: RtassScorecard["overall"]["status"]) {
   }
 }
 
+function escapeCsvCell(value: unknown): string {
+  const str = value === null || value === undefined ? "" : String(value);
+  const escaped = str.replace(/"/g, "\"\"");
+  if (/[",\n\r]/.test(escaped)) {
+    return `"${escaped}"`;
+  }
+  return escaped;
+}
+
+function buildScorecardCsv(scorecard: RtassScorecard): string {
+  const rows: string[][] = [];
+
+  rows.push([
+    "scorecardId",
+    "transcriptId",
+    "rubricTemplateId",
+    "createdAt",
+    "overallScore",
+    "overallStatus",
+    "sectionId",
+    "sectionTitle",
+    "sectionScore",
+    "sectionStatus",
+    "criterionId",
+    "criterionTitle",
+    "verdict",
+    "score",
+    "confidence",
+    "rationale",
+    "evidenceQuotes",
+    "evidenceStarts",
+    "evidenceSpeakers",
+  ]);
+
+  for (const section of scorecard.sections) {
+    for (const criterion of section.criteria) {
+      const evidenceQuotes = criterion.evidence.map((e) => e.quote).join(" | ");
+      const evidenceStarts = criterion.evidence.map((e) => e.start).join(" | ");
+      const evidenceSpeakers = criterion.evidence.map((e) => e.speaker ?? "").join(" | ");
+
+      rows.push([
+        scorecard.id,
+        scorecard.transcriptId,
+        scorecard.rubricTemplateId,
+        new Date(scorecard.createdAt).toISOString(),
+        scorecard.overall.score,
+        scorecard.overall.status,
+        section.sectionId,
+        section.title,
+        section.score,
+        section.status,
+        criterion.criterionId,
+        criterion.title,
+        criterion.verdict,
+        criterion.score ?? "",
+        criterion.confidence,
+        criterion.rationale,
+        evidenceQuotes,
+        evidenceStarts,
+        evidenceSpeakers,
+      ].map(escapeCsvCell));
+    }
+  }
+
+  return rows.map((r) => r.join(",")).join("\n");
+}
+
 export function ScorecardViewer({
   scorecard,
   rubric,
@@ -65,6 +132,69 @@ export function ScorecardViewer({
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
+  const handleExportJSON = () => {
+    try {
+      const blob = new Blob([JSON.stringify(scorecard, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const baseName = transcriptFilename
+        ? `${transcriptFilename.replace(/\.[^/.]+$/, "")}-scorecard`
+        : `rtass-scorecard-${scorecard.id.slice(0, 8)}`;
+      a.download = `${baseName}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: "JSON Exported",
+        message: "Scorecard JSON has been downloaded",
+        color: "green",
+      });
+    } catch (error) {
+      console.error("JSON export error:", error);
+      notifications.show({
+        title: "Export Failed",
+        message: error instanceof Error ? error.message : "Failed to export JSON",
+        color: "red",
+      });
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      const csv = buildScorecardCsv(scorecard);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const baseName = transcriptFilename
+        ? `${transcriptFilename.replace(/\.[^/.]+$/, "")}-scorecard`
+        : `rtass-scorecard-${scorecard.id.slice(0, 8)}`;
+      a.download = `${baseName}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      notifications.show({
+        title: "CSV Exported",
+        message: "Scorecard CSV has been downloaded",
+        color: "green",
+      });
+    } catch (error) {
+      console.error("CSV export error:", error);
+      notifications.show({
+        title: "Export Failed",
+        message: error instanceof Error ? error.message : "Failed to export CSV",
+        color: "red",
+      });
+    }
+  };
+
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
@@ -80,8 +210,13 @@ export function ScorecardViewer({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to generate PDF");
+        const payload = await response.json().catch(() => null);
+        const message =
+          payload?.error ||
+          payload?.message ||
+          payload?.details?.message ||
+          "Failed to generate PDF";
+        throw new Error(message);
       }
 
       const blob = await response.blob();
@@ -138,6 +273,22 @@ export function ScorecardViewer({
               onClick={handleExportPDF}
             >
               Export PDF
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              leftSection={<Download size={16} />}
+              onClick={handleExportCSV}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              leftSection={<Download size={16} />}
+              onClick={handleExportJSON}
+            >
+              Export JSON
             </Button>
             <Badge
               color={statusColor(scorecard.overall.status)}

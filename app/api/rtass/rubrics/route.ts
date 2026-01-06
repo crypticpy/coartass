@@ -29,6 +29,7 @@ export async function GET(request: Request) {
     const dir = path.join(process.cwd(), "data", "rtass-rubrics");
     const url = new URL(request.url);
     const file = url.searchParams.get("file");
+    const id = url.searchParams.get("id");
 
     if (file) {
       if (!isSafeRubricFilename(file)) {
@@ -40,6 +41,30 @@ export async function GET(request: Request) {
       const parsed = JSON.parse(raw) as unknown;
       const rubric = rubricSchema.parse(parsed);
       return successResponse(rubric);
+    }
+
+    if (id) {
+      if (id.length > 200) {
+        return errorResponse("Invalid rubric id", 400, { type: "invalid_id" });
+      }
+
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        if (!entry.name.endsWith(".json")) continue;
+        if (entry.name.endsWith(".schema.json")) continue;
+
+        const filePath = path.join(dir, entry.name);
+        const raw = await fs.readFile(filePath, "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        const rubric = rubricSchema.parse(parsed);
+
+        if (rubric.id === id) {
+          return successResponse(rubric);
+        }
+      }
+
+      return errorResponse("Rubric not found", 404, { type: "not_found", id });
     }
 
     const entries = await fs.readdir(dir, { withFileTypes: true });

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ActionIcon,
   Badge,
@@ -22,11 +23,13 @@ import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
 import {
   BookOpen,
+  Download,
   Edit,
   MoreVertical,
   Plus,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { useRtassRubrics } from "@/hooks/use-rtass-rubrics";
 import type { RtassRubricTemplate } from "@/types/rtass";
@@ -46,11 +49,14 @@ interface BuiltInRubric {
  * Shows all available RTASS rubric templates (built-in + custom)
  */
 export default function RubricsPage() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [builtInRubrics, setBuiltInRubrics] = useState<BuiltInRubric[]>([]);
   const [builtInLoading, setBuiltInLoading] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const { rubrics: customRubrics, isLoading, deleteRubric, isDeleting } =
+  const { rubrics: customRubrics, isLoading, deleteRubric, isDeleting, saveRubric } =
     useRtassRubrics();
 
   // Fetch built-in rubrics from API
@@ -59,8 +65,8 @@ export default function RubricsPage() {
       try {
         const response = await fetch("/api/rtass/rubrics");
         if (response.ok) {
-          const data = await response.json();
-          setBuiltInRubrics(data.rubrics || []);
+          const payload = await response.json();
+          setBuiltInRubrics(Array.isArray(payload?.data) ? payload.data : []);
         }
       } catch (error) {
         console.error("Error fetching built-in rubrics:", error);
@@ -120,6 +126,79 @@ export default function RubricsPage() {
 
   const loading = isLoading || builtInLoading;
 
+  const exportRubric = (rubric: RtassRubricTemplate) => {
+    const blob = new Blob([JSON.stringify(rubric, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const base = rubric.name ? rubric.name.replace(/[^\w.-]+/g, "-").toLowerCase() : rubric.id;
+    a.download = `${base}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  const handleImportFile = async (file: File) => {
+    setIsImporting(true);
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw) as Partial<RtassRubricTemplate>;
+
+      if (!parsed || typeof parsed !== "object") {
+        throw new Error("Invalid JSON");
+      }
+      if (!parsed.name || !parsed.description || !parsed.version) {
+        throw new Error("Missing required fields (name, description, version)");
+      }
+      if (!Array.isArray(parsed.sections) || parsed.sections.length === 0) {
+        throw new Error("Rubric must include at least one section");
+      }
+      if (!parsed.scoring || !parsed.llm) {
+        throw new Error("Rubric must include scoring and llm configuration");
+      }
+
+      const now = new Date();
+      const baseId = typeof parsed.id === "string" && parsed.id.trim().length > 0
+        ? parsed.id.trim()
+        : parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+      const allExistingIds = new Set([
+        ...builtInRubrics.map((r) => r.id),
+        ...customRubrics.map((r) => r.id),
+      ]);
+      const id = allExistingIds.has(baseId) ? `${baseId}-imported-${now.getTime().toString(36)}` : baseId;
+
+      const rubricToSave: RtassRubricTemplate = {
+        ...(parsed as RtassRubricTemplate),
+        id,
+        createdAt: parsed.createdAt instanceof Date ? parsed.createdAt : parsed.createdAt ? new Date(parsed.createdAt) : now,
+        updatedAt: now,
+      };
+
+      await saveRubric(rubricToSave);
+
+      notifications.show({
+        title: "Imported",
+        message: "Rubric imported to your custom rubrics.",
+        color: "green",
+      });
+
+      router.push(`/rubrics/${id}/edit`);
+    } catch (error) {
+      notifications.show({
+        title: "Import failed",
+        message: error instanceof Error ? error.message : "Failed to import rubric",
+        color: "red",
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <Container size="xl" py={{ base: "md", md: "xl" }}>
       <Stack gap="xl">
@@ -131,9 +210,29 @@ export default function RubricsPage() {
               Manage rubric templates for radio traffic analysis scoring
             </Text>
           </div>
-          <Link href="/rubrics/new">
-            <Button leftSection={<Plus size={16} />}>Create Rubric</Button>
-          </Link>
+          <Group gap="sm">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.currentTarget.files?.[0];
+                if (file) void handleImportFile(file);
+              }}
+            />
+            <Button
+              variant="light"
+              leftSection={<Upload size={16} />}
+              onClick={handleImportClick}
+              loading={isImporting}
+            >
+              Import
+            </Button>
+            <Link href="/rubrics/new">
+              <Button leftSection={<Plus size={16} />}>Create Rubric</Button>
+            </Link>
+          </Group>
         </Group>
 
         {/* Search */}
@@ -199,6 +298,13 @@ export default function RubricsPage() {
                         ))}
                       </Group>
                     )}
+                    <Group justify="flex-end">
+                      <Link href={`/rubrics/${rubric.id}`}>
+                        <Button size="xs" variant="subtle">
+                          View
+                        </Button>
+                      </Link>
+                    </Group>
                   </Stack>
                 </Card>
               ))}
@@ -258,11 +364,24 @@ export default function RubricsPage() {
                           </Menu.Target>
                           <Menu.Dropdown>
                             <Menu.Item
+                              leftSection={<BookOpen size={14} />}
+                              component={Link}
+                              href={`/rubrics/${rubric.id}`}
+                            >
+                              View
+                            </Menu.Item>
+                            <Menu.Item
                               leftSection={<Edit size={14} />}
                               component={Link}
                               href={`/rubrics/${rubric.id}/edit`}
                             >
                               Edit
+                            </Menu.Item>
+                            <Menu.Item
+                              leftSection={<Download size={14} />}
+                              onClick={() => exportRubric(rubric)}
+                            >
+                              Export JSON
                             </Menu.Item>
                             <Menu.Item
                               leftSection={<Trash2 size={14} />}

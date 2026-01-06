@@ -7,30 +7,40 @@ import {
   Button,
   Group,
   Loader,
+  MultiSelect,
   Paper,
+  Progress,
   Select,
   Stack,
   Text,
   Title,
 } from "@mantine/core";
-import { AlertCircle, Sparkles, Trash2 } from "lucide-react";
+import { AlertCircle, Ban, Sparkles, Trash2 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
 import { deleteRtassScorecard, getRtassScorecardsByTranscript, saveRtassScorecard } from "@/lib/db";
+import { useAllRtassRubrics, type RubricWithSource } from "@/hooks/use-rtass-rubrics";
 import type { Transcript } from "@/types/transcript";
-import type { RtassRubricTemplate, RtassScorecard } from "@/types/rtass";
+import type { RtassRubricTemplate, RtassScorecard, RtassScorecardSection } from "@/types/rtass";
 import { ScorecardViewer } from "./scorecard-viewer";
+import { ScorecardCompare } from "./scorecard-compare";
 
-type RubricListItem = Pick<RtassRubricTemplate, "id" | "name" | "description" | "version"> & {
-  _sourceFile?: string;
+type SectionScoreResponse = {
+  section: RtassScorecardSection;
+  warnings?: string[];
+  modelInfo: RtassScorecard["modelInfo"];
 };
 
-async function fetchRubrics(): Promise<RubricListItem[]> {
-  const res = await fetch("/api/rtass/rubrics");
-  const payload = await res.json();
-  if (!res.ok) {
-    throw new Error(payload?.error || "Failed to load rubrics");
-  }
-  return payload.data as RubricListItem[];
+function normalizeRubricDates(rubric: RtassRubricTemplate): RtassRubricTemplate {
+  return {
+    ...rubric,
+    createdAt: rubric.createdAt instanceof Date ? rubric.createdAt : new Date(rubric.createdAt),
+    updatedAt:
+      rubric.updatedAt instanceof Date
+        ? rubric.updatedAt
+        : rubric.updatedAt
+          ? new Date(rubric.updatedAt)
+          : undefined,
+  };
 }
 
 function normalizeScorecardDates(scorecard: RtassScorecard): RtassScorecard {
@@ -51,6 +61,44 @@ function normalizeScorecardDates(scorecard: RtassScorecard): RtassScorecard {
   };
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function statusFromScore(score: number, rubric: RtassRubricTemplate): RtassScorecard["overall"]["status"] {
+  if (score >= rubric.scoring.thresholds.pass) return "pass";
+  if (score >= rubric.scoring.thresholds.needsImprovement) return "needs_improvement";
+  return "fail";
+}
+
+async function scoreSection(params: {
+  transcript: Transcript;
+  rubric: RtassRubricTemplate;
+  sectionId: string;
+  signal: AbortSignal;
+}): Promise<SectionScoreResponse> {
+  const { transcript, rubric, sectionId, signal } = params;
+
+  const res = await fetch("/api/rtass/score/section", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal,
+    body: JSON.stringify({
+      transcriptId: transcript.id,
+      transcript: { text: transcript.text, segments: transcript.segments },
+      rubric,
+      sectionId,
+    }),
+  });
+
+  const payload = await res.json();
+  if (!res.ok) {
+    throw new Error(payload?.error || "Failed to score rubric section");
+  }
+
+  return payload.data as SectionScoreResponse;
+}
+
 export function ScorecardRunner({
   transcript,
   onTimestampClick,
@@ -58,14 +106,26 @@ export function ScorecardRunner({
   transcript: Transcript;
   onTimestampClick?: (seconds: number) => void;
 }) {
-  const [rubrics, setRubrics] = React.useState<RubricListItem[] | null>(null);
-  const [rubricId, setRubricId] = React.useState<string | null>(null);
-  const [isLoadingRubrics, setIsLoadingRubrics] = React.useState(true);
+  const { rubrics: allRubrics, customRubrics, isLoading: isLoadingRubrics, error: rubricsError } =
+    useAllRtassRubrics();
+  const [selectedRubricIds, setSelectedRubricIds] = React.useState<string[]>([]);
   const [isRunning, setIsRunning] = React.useState(false);
   const [activeScorecardId, setActiveScorecardId] = React.useState<string | null>(null);
+  const [compareScorecardId, setCompareScorecardId] = React.useState<string | null>(null);
+  const [activeRubric, setActiveRubric] = React.useState<RtassRubricTemplate | undefined>(undefined);
+  const abortRef = React.useRef<AbortController | null>(null);
+
+  const [runProgress, setRunProgress] = React.useState<{
+    totalSections: number;
+    completedSections: number;
+    label?: string;
+  } | null>(null);
 
   const scorecards = useLiveQuery<RtassScorecard[]>(
-    async () => getRtassScorecardsByTranscript(transcript.id),
+    async () => {
+      const stored = await getRtassScorecardsByTranscript(transcript.id);
+      return stored.map(normalizeScorecardDates);
+    },
     [transcript.id]
   );
 
@@ -78,84 +138,172 @@ export function ScorecardRunner({
   }, [scorecards, activeScorecardId]);
 
   React.useEffect(() => {
-    let mounted = true;
+    if (selectedRubricIds.length > 0) return;
+    const defaultRubricId =
+      allRubrics.find((r) => r.id === "rtass-afd-a1016-radio-compliance")?.id ?? allRubrics[0]?.id;
+    if (defaultRubricId) {
+      setSelectedRubricIds([defaultRubricId]);
+    }
+  }, [allRubrics, selectedRubricIds.length]);
+
+  React.useEffect(() => {
+    if (!activeScorecard) {
+      setActiveRubric(undefined);
+      return;
+    }
+
+    const rubricId = activeScorecard.rubricTemplateId;
+    const custom = customRubrics.find((r) => r.id === rubricId);
+    if (custom) {
+      setActiveRubric(custom);
+      return;
+    }
+
+    const controller = new AbortController();
     (async () => {
       try {
-        setIsLoadingRubrics(true);
-        const list = await fetchRubrics();
-        if (!mounted) return;
-        setRubrics(list);
-
-        const defaultRubric =
-          list.find((r) => r.id === "rtass-afd-a1016-radio-compliance") ?? list[0] ?? null;
-        setRubricId(defaultRubric?.id ?? null);
-      } catch (error) {
-        notifications.show({
-          title: "Failed to load rubrics",
-          message: error instanceof Error ? error.message : String(error),
-          color: "red",
+        const res = await fetch(`/api/rtass/rubrics?id=${encodeURIComponent(rubricId)}`, {
+          signal: controller.signal,
         });
-      } finally {
-        if (mounted) setIsLoadingRubrics(false);
+        const payload = await res.json();
+        if (!res.ok) return;
+        setActiveRubric(normalizeRubricDates(payload.data as RtassRubricTemplate));
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
       }
     })();
 
     return () => {
-      mounted = false;
+      controller.abort();
     };
+  }, [activeScorecard, customRubrics]);
+
+  const cancelRun = React.useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsRunning(false);
+    setRunProgress(null);
+    notifications.show({
+      title: "Cancelled",
+      message: "Stopped scorecard generation.",
+      color: "yellow",
+    });
   }, []);
 
-  const runScorecard = async () => {
-    if (!rubricId) return;
+  const resolveRubricTemplate = React.useCallback(async (rubric: RubricWithSource): Promise<RtassRubricTemplate> => {
+    if (!rubric.isBuiltIn) {
+      return rubric;
+    }
+
+    const res = await fetch(`/api/rtass/rubrics?id=${encodeURIComponent(rubric.id)}`);
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload?.error || "Failed to load rubric");
+    }
+    return normalizeRubricDates(payload.data as RtassRubricTemplate);
+  }, []);
+
+  const runScorecards = async () => {
+    if (selectedRubricIds.length === 0) return;
     if (!transcript.text || transcript.segments.length === 0) return;
-    if (!rubrics) return;
+
+    const selectedRubrics = selectedRubricIds
+      .map((id) => allRubrics.find((r) => r.id === id))
+      .filter(Boolean) as RubricWithSource[];
+
+    if (selectedRubrics.length === 0) return;
 
     setIsRunning(true);
     try {
-      const match = rubrics.find((r) => r.id === rubricId);
-      if (!match || !match._sourceFile) {
-        throw new Error("Rubric source not found");
-      }
+      const rubricTemplates = await Promise.all(selectedRubrics.map(resolveRubricTemplate));
+      const totalSections = rubricTemplates.reduce((sum, r) => sum + r.sections.length, 0);
 
-      const rubricFileRes = await fetch(`/api/rtass/rubrics?file=${encodeURIComponent(match._sourceFile)}`);
-      const rubricFilePayload = await rubricFileRes.json();
-      if (!rubricFileRes.ok) {
-        throw new Error(rubricFilePayload?.error || "Failed to load rubric");
-      }
-      const rubric = rubricFilePayload.data as RtassRubricTemplate;
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setRunProgress({ totalSections, completedSections: 0 });
 
-      const res = await fetch("/api/rtass/score", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      let lastScorecardId: string | null = null;
+
+      for (const rubric of rubricTemplates) {
+        const concurrency = Math.max(1, Math.min(10, rubric.llm.concurrency));
+        const sectionOrder = new Map(rubric.sections.map((s, idx) => [s.id, idx]));
+
+        const sectionResults: RtassScorecardSection[] = [];
+        const warnings: string[] = [];
+        let modelInfo: RtassScorecard["modelInfo"] | undefined;
+
+        for (let i = 0; i < rubric.sections.length; i += concurrency) {
+          const batch = rubric.sections.slice(i, i + concurrency);
+          const results = await Promise.all(
+            batch.map(async (section) => {
+              const label = `${rubric.name}: ${section.title}`;
+              setRunProgress((prev) => prev ? { ...prev, label } : prev);
+              const result = await scoreSection({
+                transcript,
+                rubric,
+                sectionId: section.id,
+                signal: controller.signal,
+              });
+
+              modelInfo = modelInfo ?? result.modelInfo;
+              if (result.warnings) warnings.push(...result.warnings);
+              sectionResults.push(result.section);
+
+              setRunProgress((prev) => prev ? { ...prev, completedSections: prev.completedSections + 1 } : prev);
+              return result.section;
+            })
+          );
+
+          // Preserve section ordering regardless of concurrency completion order
+          results.sort((a, b) => (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0));
+        }
+
+        sectionResults.sort((a, b) => (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0));
+
+        const overallNumerator = sectionResults.reduce((sum, s) => sum + (s.weight * s.score), 0);
+        const overallDenominator = sectionResults.reduce((sum, s) => sum + s.weight, 0);
+        const overallScore = overallDenominator > 0 ? clamp01(overallNumerator / overallDenominator) : 0;
+
+        const scorecard: RtassScorecard = {
+          id: crypto.randomUUID(),
+          incidentId: transcript.id,
           transcriptId: transcript.id,
-          transcript: { text: transcript.text, segments: transcript.segments },
-          rubric,
-        }),
-      });
-      const payload = await res.json();
-      if (!res.ok) {
-        throw new Error(payload?.error || "Scorecard request failed");
+          rubricTemplateId: rubric.id,
+          createdAt: new Date(),
+          modelInfo: modelInfo ?? { provider: "openai", model: "unknown" },
+          overall: {
+            score: overallScore,
+            status: statusFromScore(overallScore, rubric),
+          },
+          sections: sectionResults,
+          warnings: warnings.length > 0 ? Array.from(new Set(warnings)) : undefined,
+          humanReview: { reviewed: false },
+        };
+
+        await saveRtassScorecard(scorecard);
+        lastScorecardId = scorecard.id;
       }
 
-      const rawScorecard = payload.data as RtassScorecard;
-      const scorecard = normalizeScorecardDates(rawScorecard);
-      await saveRtassScorecard(scorecard);
-      setActiveScorecardId(scorecard.id);
+      setActiveScorecardId(lastScorecardId);
 
       notifications.show({
-        title: "Scorecard generated",
-        message: "RTASS scorecard saved to this browser.",
+        title: "Scorecards generated",
+        message: `${rubricTemplates.length} scorecard${rubricTemplates.length === 1 ? "" : "s"} saved to this browser.`,
         color: "green",
       });
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       notifications.show({
         title: "Scorecard failed",
         message: error instanceof Error ? error.message : String(error),
         color: "red",
       });
     } finally {
+      abortRef.current = null;
       setIsRunning(false);
+      setRunProgress(null);
     }
   };
 
@@ -164,6 +312,7 @@ export function ScorecardRunner({
     try {
       await deleteRtassScorecard(activeScorecard.id);
       setActiveScorecardId(null);
+      setCompareScorecardId(null);
       notifications.show({
         title: "Scorecard deleted",
         message: "Removed from this browser.",
@@ -178,14 +327,18 @@ export function ScorecardRunner({
     }
   };
 
-  const rubricOptions = (rubrics ?? []).map((r) => ({
-    value: r.id,
-    label: `${r.name} (v${r.version})`,
-  }));
-
   const rubricNameById = React.useMemo(() => {
-    return new Map((rubrics ?? []).map((r) => [r.id, r.name]));
-  }, [rubrics]);
+    return new Map(allRubrics.map((r) => [r.id, r.name]));
+  }, [allRubrics]);
+
+  const compareScorecard = React.useMemo(() => {
+    if (!scorecards || !compareScorecardId) return null;
+    return scorecards.find((s) => s.id === compareScorecardId) ?? null;
+  }, [scorecards, compareScorecardId]);
+
+  const progressValue = runProgress && runProgress.totalSections > 0
+    ? (runProgress.completedSections / runProgress.totalSections) * 100
+    : 0;
 
   return (
     <Stack gap="lg">
@@ -203,38 +356,78 @@ export function ScorecardRunner({
           <Group gap="sm">
             <Button
               leftSection={isRunning ? <Loader size={16} /> : <Sparkles size={16} />}
-              onClick={runScorecard}
+              onClick={runScorecards}
               loading={isRunning}
-              disabled={isLoadingRubrics || !rubricId}
+              disabled={isLoadingRubrics || selectedRubricIds.length === 0}
               styles={{ root: { minHeight: 44 } }}
             >
-              Generate Scorecard
+              Generate Scorecard{selectedRubricIds.length > 1 ? "s" : ""}
             </Button>
+            {isRunning && (
+              <Button
+                variant="default"
+                color="gray"
+                leftSection={<Ban size={16} />}
+                onClick={cancelRun}
+                styles={{ root: { minHeight: 44 } }}
+              >
+                Cancel
+              </Button>
+            )}
           </Group>
         </Group>
 
         <Stack gap="md" mt="md">
+          {rubricsError && (
+            <Alert icon={<AlertCircle size={16} />} title="Rubrics unavailable" color="red" variant="light">
+              {rubricsError.message}
+            </Alert>
+          )}
+
           {isLoadingRubrics ? (
             <Group gap="xs" c="dimmed">
               <Loader size={16} />
               <Text size="sm">Loading rubrics…</Text>
             </Group>
           ) : (
-            <Select
-              label="Rubric"
-              value={rubricId}
-              onChange={setRubricId}
-              data={rubricOptions}
+            <MultiSelect
+              label="Rubrics to score"
+              value={selectedRubricIds}
+              onChange={setSelectedRubricIds}
+              data={allRubrics.map((r) => ({
+                value: r.id,
+                label: `${r.name} (v${r.version})${r.isBuiltIn ? " • Built-in" : " • Custom"}`,
+              }))}
               searchable
+              clearable
               styles={{ input: { minHeight: 44 } }}
             />
+          )}
+
+          {runProgress && (
+            <Stack gap={6}>
+              <Group justify="space-between">
+                <Text size="sm" fw={500}>
+                  Generating scorecards
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {runProgress.completedSections}/{runProgress.totalSections} sections
+                </Text>
+              </Group>
+              <Progress value={progressValue} animated striped />
+              {runProgress.label && (
+                <Text size="xs" c="dimmed">
+                  {runProgress.label}
+                </Text>
+              )}
+            </Stack>
           )}
         </Stack>
       </Paper>
 
       {scorecards && scorecards.length > 0 && (
         <Paper p="lg" radius="md" withBorder>
-          <Group justify="space-between" wrap="wrap">
+          <Group justify="space-between" align="flex-end" wrap="wrap">
             <Select
               label="Saved scorecards"
               value={activeScorecard?.id ?? null}
@@ -243,6 +436,19 @@ export function ScorecardRunner({
                 value: s.id,
                 label: `${new Date(s.createdAt).toLocaleString()} • ${rubricNameById.get(s.rubricTemplateId) ?? s.rubricTemplateId}`,
               }))}
+              styles={{ input: { minHeight: 44 } }}
+              style={{ flex: 1, minWidth: 280 }}
+            />
+            <Select
+              label="Compare with"
+              placeholder="Optional"
+              value={compareScorecardId}
+              onChange={setCompareScorecardId}
+              data={(scorecards ?? []).filter((s) => s.id !== activeScorecard?.id).map((s) => ({
+                value: s.id,
+                label: `${new Date(s.createdAt).toLocaleString()} • ${rubricNameById.get(s.rubricTemplateId) ?? s.rubricTemplateId}`,
+              }))}
+              clearable
               styles={{ input: { minHeight: 44 } }}
               style={{ flex: 1, minWidth: 280 }}
             />
@@ -268,7 +474,21 @@ export function ScorecardRunner({
           Generate your first scorecard to see results here.
         </Alert>
       ) : activeScorecard ? (
-        <ScorecardViewer scorecard={activeScorecard} onTimestampClick={onTimestampClick} />
+        <Stack gap="lg">
+          {compareScorecard && (
+            <ScorecardCompare
+              left={activeScorecard}
+              right={compareScorecard}
+              rubricNameById={rubricNameById}
+            />
+          )}
+          <ScorecardViewer
+            scorecard={activeScorecard}
+            rubric={activeRubric}
+            transcriptFilename={transcript.filename}
+            onTimestampClick={onTimestampClick}
+          />
+        </Stack>
       ) : (
         <Alert icon={<AlertCircle size={16} />} title="No scorecard selected" color="gray" variant="light">
           Select a saved scorecard to view.

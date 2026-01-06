@@ -4,7 +4,7 @@
  */
 
 import { useLiveQuery } from "dexie-react-hooks";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getAllRtassRubricTemplates,
   getRtassRubricTemplate,
@@ -24,12 +24,11 @@ export interface BuiltInRubric {
   version: string;
   jurisdiction?: string;
   tags?: string[];
+  _sourceFile?: string;
   isBuiltIn: true;
 }
 
-export interface RubricWithSource extends RtassRubricTemplate {
-  isBuiltIn: boolean;
-}
+export type RubricWithSource = BuiltInRubric | (RtassRubricTemplate & { isBuiltIn: false });
 
 /**
  * Hook to fetch all custom RTASS rubric templates with live updates
@@ -147,35 +146,48 @@ export function useAllRtassRubrics() {
   const [builtInError, setBuiltInError] = useState<Error | null>(null);
 
   // Fetch built-in rubrics from API on mount
-  useState(() => {
+  useEffect(() => {
+    let cancelled = false;
+
     async function fetchBuiltIn() {
       try {
         const response = await fetch("/api/rtass/rubrics");
         if (!response.ok) {
           throw new Error("Failed to fetch built-in rubrics");
         }
-        const data = await response.json();
-        setBuiltInRubrics(
-          data.rubrics.map((r: BuiltInRubric) => ({ ...r, isBuiltIn: true }))
-        );
+        const payload = await response.json();
+        const rubrics = Array.isArray(payload?.data)
+          ? (payload.data as Array<Omit<BuiltInRubric, "isBuiltIn">>)
+          : [];
+        if (!cancelled) {
+          setBuiltInRubrics(rubrics.map((r) => ({ ...r, isBuiltIn: true as const })));
+        }
       } catch (error) {
         log.error("Error fetching built-in rubrics", {
           message: error instanceof Error ? error.message : String(error),
         });
-        setBuiltInError(error instanceof Error ? error : new Error(String(error)));
+        if (!cancelled) {
+          setBuiltInError(error instanceof Error ? error : new Error(String(error)));
+        }
       } finally {
-        setBuiltInLoading(false);
+        if (!cancelled) {
+          setBuiltInLoading(false);
+        }
       }
     }
     fetchBuiltIn();
-  });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Fetch custom rubrics from IndexedDB with live updates
   const customRubrics = useLiveQuery(
     async () => {
       try {
         const rubrics = await getAllRtassRubricTemplates();
-        return rubrics.map((r) => ({ ...r, isBuiltIn: false }));
+        return rubrics.map((r) => ({ ...r, isBuiltIn: false as const }));
       } catch (error) {
         log.error("Error fetching custom rubrics", {
           message: error instanceof Error ? error.message : String(error),
@@ -188,10 +200,7 @@ export function useAllRtassRubrics() {
   );
 
   // Merge both sources
-  const allRubrics: RubricWithSource[] = [
-    ...(builtInRubrics as unknown as RubricWithSource[]),
-    ...(customRubrics || []),
-  ];
+  const allRubrics: RubricWithSource[] = [...builtInRubrics, ...(customRubrics || [])];
 
   return {
     rubrics: allRubrics,
