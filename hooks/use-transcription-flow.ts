@@ -326,7 +326,7 @@ export function useTranscriptionFlow(
     onError,
     language,
     model = 'gpt-4o-transcribe',
-    enableSpeakerDetection = true,
+    enableSpeakerDetection = model === 'gpt-4o-transcribe-diarize',
   } = options;
 
   // State management

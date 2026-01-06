@@ -15,7 +15,7 @@
  * @route POST /api/transcribe
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import type {
   TranscriptionCreateResponse,
@@ -940,28 +940,25 @@ export async function GET() {
   const maxSize = getMaxFileSize();
   const maxSizeMB = getMaxFileSizeMB();
 
-  return NextResponse.json({
-    success: true,
-    data: {
-      endpoint: '/api/transcribe',
-      method: 'POST',
-      contentType: 'multipart/form-data',
-      supportedFormats: supportedTypes,
-      maxFileSize: maxSize,
-      maxFileSizeMB: maxSizeMB,
-      features: [
-        'Audio transcription using Azure OpenAI Whisper',
-        'Timestamp segments for each phrase',
-        'Language detection and specification',
-        'Automatic retry on transient failures',
-        'MP4 video to MP3 audio conversion (client-side)',
-        'Large file splitting at silence points (client-side)',
-        'Speaker detection (UI ready, implementation pending)',
-      ],
-      usage: {
-        description: 'Upload an audio file for transcription',
-        example: 'POST /api/transcribe with FormData containing "file" field',
-      },
+  return successResponse({
+    endpoint: '/api/transcribe',
+    method: 'POST',
+    contentType: 'multipart/form-data',
+    supportedFormats: supportedTypes,
+    maxFileSize: maxSize,
+    maxFileSizeMB: maxSizeMB,
+    features: [
+      'Audio transcription using Azure OpenAI Whisper',
+      'Timestamp segments for each phrase',
+      'Language detection and specification',
+      'Automatic retry on transient failures',
+      'MP4 video to MP3 audio conversion (client-side)',
+      'Large file splitting at silence points (client-side)',
+      'Speaker diarization via gpt-4o-transcribe-diarize (beta)',
+    ],
+    usage: {
+      description: 'Upload an audio file for transcription',
+      example: 'POST /api/transcribe with FormData containing "file" field',
     },
   });
 }

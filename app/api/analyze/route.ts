@@ -19,7 +19,7 @@
  * @route POST /api/analyze
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import {
   getOpenAIClient,
@@ -350,65 +350,62 @@ export async function POST(request: NextRequest) {
  * Returns API information and usage instructions.
  */
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    data: {
-      endpoint: '/api/analyze',
-      method: 'POST',
-      description: 'AI-powered transcript analysis using GPT-5 with multi-strategy system',
-      requestBody: {
-        transcriptId: 'string (required)',
-        templateId: 'string (required)',
-        transcript: {
-          text: 'string (required)',
-          segments: 'TranscriptSegment[] (required)',
-        },
-        template: {
-          name: 'string (required)',
-          sections: 'TemplateSection[] (required)',
-          outputs: 'OutputType[] (required)',
-        },
-        strategy: 'string (optional, default: "auto", values: "basic" | "hybrid" | "advanced" | "auto")',
-        runEvaluation: 'boolean (optional, default: true)',
+  return successResponse({
+    endpoint: '/api/analyze',
+    method: 'POST',
+    description: 'AI-powered transcript analysis using GPT-5 with multi-strategy system',
+    requestBody: {
+      transcriptId: 'string (required)',
+      templateId: 'string (required)',
+      transcript: {
+        text: 'string (required)',
+        segments: 'TranscriptSegment[] (required)',
       },
-      strategies: {
-        basic: {
-          description: 'Fast single-pass analysis (2-4 min)',
-          bestFor: 'Short meetings, quick overviews',
-          apiCalls: '1 call',
-        },
-        hybrid: {
-          description: 'Balanced batched analysis (4-6 min)',
-          bestFor: 'Medium meetings, good quality/speed balance',
-          apiCalls: '3 calls',
-        },
-        advanced: {
-          description: 'Deep contextual cascading (6-8 min)',
-          bestFor: 'Long meetings, maximum quality',
-          apiCalls: '9-10 calls',
-        },
-        auto: {
-          description: 'Automatically selects strategy based on transcript length',
-          bestFor: 'Recommended for most use cases',
-        },
+      template: {
+        name: 'string (required)',
+        sections: 'TemplateSection[] (required)',
+        outputs: 'OutputType[] (required)',
       },
-      features: [
-        'Multi-strategy analysis system (basic, hybrid, advanced)',
-        'Automatic strategy selection based on transcript length',
-        'Self-evaluation pass for quality improvement',
-        'Template-based analysis configuration',
-        'GPT-5 powered content analysis',
-        'Agenda item extraction with relationship mapping',
-        'Action item extraction linked to decisions',
-        'Decision extraction linked to agenda items',
-        'Notable quote extraction',
-        'Comprehensive error handling',
-        'Progress tracking',
-      ],
-      usage: {
-        description: 'Send transcript and template for AI analysis',
-        example: 'POST /api/analyze with JSON body containing transcript and template data',
+      strategy: 'string (optional, default: "auto", values: "basic" | "hybrid" | "advanced" | "auto")',
+      runEvaluation: 'boolean (optional, default: true)',
+    },
+    strategies: {
+      basic: {
+        description: 'Fast single-pass analysis (2-4 min)',
+        bestFor: 'Short meetings, quick overviews',
+        apiCalls: '1 call',
       },
+      hybrid: {
+        description: 'Balanced batched analysis (4-6 min)',
+        bestFor: 'Medium meetings, good quality/speed balance',
+        apiCalls: '3 calls',
+      },
+      advanced: {
+        description: 'Deep contextual cascading (6-8 min)',
+        bestFor: 'Long meetings, maximum quality',
+        apiCalls: '9-10 calls',
+      },
+      auto: {
+        description: 'Automatically selects strategy based on transcript length',
+        bestFor: 'Recommended for most use cases',
+      },
+    },
+    features: [
+      'Multi-strategy analysis system (basic, hybrid, advanced)',
+      'Automatic strategy selection based on transcript length',
+      'Self-evaluation pass for quality improvement',
+      'Template-based analysis configuration',
+      'GPT-5 powered content analysis',
+      'Agenda item extraction with relationship mapping',
+      'Action item extraction linked to decisions',
+      'Decision extraction linked to agenda items',
+      'Notable quote extraction',
+      'Comprehensive error handling',
+      'Progress tracking',
+    ],
+    usage: {
+      description: 'Send transcript and template for AI analysis',
+      example: 'POST /api/analyze with JSON body containing transcript and template data',
     },
   });
 }

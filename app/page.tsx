@@ -25,13 +25,14 @@ export default function HomePage() {
     [transcripts]
   );
 
-  // Check if OpenAI is configured
+  // Check if API is configured
   React.useEffect(() => {
     const checkConfig = async () => {
       try {
-        const response = await fetch("/api/transcribe");
-        const data = await response.json();
-        setIsConfigured(data.success);
+        const response = await fetch("/api/config/status");
+        const payload = await response.json();
+        const status = (payload?.data ?? payload) as { configured?: unknown };
+        setIsConfigured(Boolean(status?.configured));
       } catch (error) {
         console.error("Failed to check configuration:", error);
         setIsConfigured(false);
@@ -46,7 +47,7 @@ export default function HomePage() {
   const handleConfigureClick = () => {
     notifications.show({
       title: "Configuration Required",
-      message: "Please set up your Azure OpenAI credentials in the .env.local file.",
+      message: "Please set up your AI provider credentials in the .env.local file.",
       color: "blue",
       autoClose: 5000,
     });

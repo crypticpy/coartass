@@ -14,8 +14,9 @@
  * @route GET /api/analyze/[id]
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createLogger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-utils';
 
 const log = createLogger('Analysis');
 
@@ -46,80 +47,74 @@ export async function GET(
 
   log.debug('Retrieval request', { transcriptId });
 
-  // Current implementation: client-side storage
-  // Return information about how to access analyses
-  return NextResponse.json(
-    {
-      success: false,
-      error: 'Server-side analysis storage not implemented',
-      message:
-        'Analyses are currently stored client-side in IndexedDB. Use client-side database functions to retrieve analyses.',
-      clientSideAccess: {
-        library: '@/lib/db',
-        function: 'getAnalysisByTranscript',
-        usage: `import { getAnalysisByTranscript } from '@/lib/db';
+  return errorResponse('Server-side analysis storage not implemented', 501, {
+    type: 'not_implemented',
+    transcriptId,
+    message:
+      'Analyses are currently stored client-side in IndexedDB. Use client-side database functions to retrieve analyses.',
+    clientSideAccess: {
+      library: '@/lib/db',
+      function: 'getAnalysisByTranscript',
+      usage: `import { getAnalysisByTranscript } from '@/lib/db';
 const analyses = await getAnalysisByTranscript('${transcriptId}');`,
-      },
-      futureImplementation: {
-        description:
-          'This endpoint is reserved for server-side analysis storage when implemented.',
-        roadmap: [
-          'Add server-side database (PostgreSQL, MongoDB, etc.)',
-          'Implement analysis persistence in server database',
-          'Update this endpoint to query server database',
-          'Add authentication and authorization',
-        ],
-      },
-      dataStructure: {
-        Analysis: {
-          id: 'string',
-          transcriptId: 'string',
-          templateId: 'string',
-          results: {
-            summary: 'string (optional)',
-            sections: [
-              {
-                name: 'string',
-                content: 'string',
-                evidence: [
-                  {
-                    text: 'string',
-                    start: 'number (seconds)',
-                    end: 'number (seconds)',
-                    relevance: 'number (0-1)',
-                  },
-                ],
-              },
-            ],
-            actionItems: [
-              {
-                task: 'string',
-                owner: 'string (optional)',
-                deadline: 'string (optional)',
-                timestamp: 'number (optional, seconds)',
-              },
-            ],
-            decisions: [
-              {
-                decision: 'string',
-                timestamp: 'number (seconds)',
-                context: 'string (optional)',
-              },
-            ],
-            quotes: [
-              {
-                text: 'string',
-                speaker: 'string (optional)',
-                timestamp: 'number (seconds)',
-              },
-            ],
-          },
-          createdAt: 'Date',
+    },
+    futureImplementation: {
+      description: 'This endpoint is reserved for server-side analysis storage when implemented.',
+      roadmap: [
+        'Add server-side database (PostgreSQL, MongoDB, etc.)',
+        'Implement analysis persistence in server database',
+        'Update this endpoint to query server database',
+        'Add authentication and authorization',
+      ],
+    },
+    dataStructure: {
+      Analysis: {
+        id: 'string',
+        transcriptId: 'string',
+        templateId: 'string',
+        results: {
+          summary: 'string (optional)',
+          sections: [
+            {
+              name: 'string',
+              content: 'string',
+              evidence: [
+                {
+                  text: 'string',
+                  start: 'number (seconds)',
+                  end: 'number (seconds)',
+                  relevance: 'number (0-1)',
+                },
+              ],
+            },
+          ],
+          actionItems: [
+            {
+              task: 'string',
+              owner: 'string (optional)',
+              deadline: 'string (optional)',
+              timestamp: 'number (optional, seconds)',
+            },
+          ],
+          decisions: [
+            {
+              decision: 'string',
+              timestamp: 'number (seconds)',
+              context: 'string (optional)',
+            },
+          ],
+          quotes: [
+            {
+              text: 'string',
+              speaker: 'string (optional)',
+              timestamp: 'number (seconds)',
+            },
+          ],
         },
+        createdAt: 'Date',
       },
     },
-    { status: 501 } // 501 Not Implemented
-  );
+  });
 }
 
 /**
@@ -138,19 +133,16 @@ export async function DELETE(
 
   log.debug('Delete request', { analysisId });
 
-  return NextResponse.json(
-    {
-      success: false,
-      error: 'Server-side analysis deletion not implemented',
-      message:
-        'Analyses are currently stored client-side in IndexedDB. Use client-side database functions to delete analyses.',
-      clientSideAccess: {
-        library: '@/lib/db',
-        function: 'deleteAnalysis',
-        usage: `import { deleteAnalysis } from '@/lib/db';
+  return errorResponse('Server-side analysis deletion not implemented', 501, {
+    type: 'not_implemented',
+    analysisId,
+    message:
+      'Analyses are currently stored client-side in IndexedDB. Use client-side database functions to delete analyses.',
+    clientSideAccess: {
+      library: '@/lib/db',
+      function: 'deleteAnalysis',
+      usage: `import { deleteAnalysis } from '@/lib/db';
 await deleteAnalysis('${analysisId}');`,
-      },
     },
-    { status: 501 } // 501 Not Implemented
-  );
+  });
 }

@@ -5,7 +5,7 @@
  * Returns 200 OK if the application is running and ready to serve requests
  */
 
-import { NextResponse } from 'next/server';
+import { successResponse } from '@/lib/api-utils';
 
 export async function GET() {
   // Basic health check - application is running
@@ -15,12 +15,9 @@ export async function GET() {
   // - Memory usage
   // - Disk space
 
-  return NextResponse.json(
-    {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-    },
-    { status: 200 }
-  );
+  return successResponse({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
 }

@@ -11,13 +11,13 @@
  * - NEVER returns API keys or full endpoints
  */
 
-import { NextResponse } from 'next/server';
 import {
   getConfiguration,
   OpenAIConfigError,
   getWhisperDeployment,
   getGPT4Deployment,
 } from '@/lib/openai';
+import { errorResponse, successResponse } from '@/lib/api-utils';
 
 /**
  * Configuration status response type
@@ -39,7 +39,7 @@ export interface ConfigStatusResponse {
  *
  * @returns {ConfigStatusResponse} Configuration status information
  */
-export async function GET(): Promise<NextResponse<ConfigStatusResponse>> {
+export async function GET() {
   try {
     // Attempt to get configuration from environment variables
     const config = getConfiguration();
@@ -82,44 +82,34 @@ export async function GET(): Promise<NextResponse<ConfigStatusResponse>> {
       response.analysisDeployment = 'gpt-5';
     }
 
-    return NextResponse.json(response, {
-      status: 200,
-      headers: {
-        'Cache-Control': 'private, max-age=60', // Cache for 1 minute
-      },
+    return successResponse(response, 200, {
+      'Cache-Control': 'private, max-age=60', // Cache for 1 minute
     });
   } catch (error) {
     // Configuration is not valid or missing
     if (error instanceof OpenAIConfigError) {
       // Return a safe error message without exposing details
-      return NextResponse.json(
+      return successResponse(
         {
           configured: false,
           provider: 'none' as const,
-          error: 'OpenAI API not configured. Please set up environment variables.',
+          error: 'AI API not configured. Please set up environment variables.',
         },
+        200, // Not a server error, just not configured
         {
-          status: 200, // Not a server error, just not configured
-          headers: {
-            'Cache-Control': 'private, no-cache', // Don't cache error state
-          },
+          'Cache-Control': 'private, no-cache', // Don't cache error state
         }
       );
     }
 
     // Unexpected error
     console.error('Unexpected error in config status endpoint:', error);
-    return NextResponse.json(
+    return errorResponse(
+      'Failed to check configuration status',
+      500,
+      { type: 'unexpected_error' },
       {
-        configured: false,
-        provider: 'none' as const,
-        error: 'Failed to check configuration status',
-      },
-      {
-        status: 500,
-        headers: {
-          'Cache-Control': 'private, no-cache',
-        },
+        'Cache-Control': 'private, no-cache',
       }
     );
   }

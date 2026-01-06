@@ -13,7 +13,7 @@
  * @route POST /api/citations
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { errorResponse, successResponse } from '@/lib/api-utils';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
@@ -175,17 +175,14 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    data: {
-      endpoint: '/api/citations',
-      method: 'POST',
-      description: 'Selects supporting evidence excerpts for analysis sections using a small LLM.',
-      requiredConfig: {
-        azure: {
-          deploymentEnv: 'AZURE_OPENAI_CITATIONS_DEPLOYMENT (defaults to "gpt-4.1-mini")',
-          apiVersionEnv: 'AZURE_OPENAI_CITATIONS_API_VERSION (defaults to "2024-12-01-preview")',
-        },
+  return successResponse({
+    endpoint: '/api/citations',
+    method: 'POST',
+    description: 'Selects supporting evidence excerpts for analysis sections using a small LLM.',
+    requiredConfig: {
+      azure: {
+        deploymentEnv: 'AZURE_OPENAI_CITATIONS_DEPLOYMENT (defaults to "gpt-4.1-mini")',
+        apiVersionEnv: 'AZURE_OPENAI_CITATIONS_API_VERSION (defaults to "2024-12-01-preview")',
       },
     },
   });

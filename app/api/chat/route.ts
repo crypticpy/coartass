@@ -23,19 +23,20 @@
  * @route POST /api/chat
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import {
   getOpenAIClient,
   OpenAIConfigError,
 } from '@/lib/openai';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import {
   estimateTokens,
   selectDeploymentByTokens,
   getDeploymentInfo,
 } from '@/lib/token-utils';
 import { createLogger } from '@/lib/logger';
+import { errorResponse, successResponse } from '@/lib/api-utils';
 
 const log = createLogger('Chat');
 /**
@@ -84,9 +85,6 @@ const chatRequestSchema = z.object({
 
 type ChatRequest = z.infer<typeof chatRequestSchema>;
 
-/**
- * Error response helper with custom error structure for chat endpoint
- */
 function chatErrorResponse(
   type: 'validation' | 'token_limit' | 'api_failure' | 'unknown',
   message: string,
@@ -94,32 +92,14 @@ function chatErrorResponse(
   details?: Record<string, unknown>,
   headers?: HeadersInit
 ) {
-  const errorBody: Record<string, unknown> = {
-    success: false,
-    error: {
-      type,
-      message,
-      details,
-    },
-  };
-
-  return NextResponse.json(errorBody, { status, headers });
+  return errorResponse(message, status, { type, ...(details ?? {}) }, headers);
 }
 
 /**
  * Success response helper with custom structure for chat endpoint
  */
 function chatSuccessResponse(answer: string, model: string) {
-  return NextResponse.json(
-    {
-      success: true,
-      data: {
-        answer,
-        model,
-      },
-    },
-    { status: 200 }
-  );
+  return successResponse({ answer, model }, 200);
 }
 
 /**
@@ -229,7 +209,7 @@ function truncateHistory(
  *
  * Response:
  * - Success (200): { success: true, data: { answer: string } }
- * - Error (4xx/5xx): { success: false, error: { type, message, details? } }
+ * - Error (4xx/5xx): { success: false, error: string, details?: object }
  */
 export async function POST(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
@@ -239,26 +219,7 @@ export async function POST(request: NextRequest) {
       max: 60,
     });
     if (!decision.allowed) {
-      const headers: Record<string, string> = {
-        'X-RateLimit-Limit': String(decision.limit),
-        'X-RateLimit-Remaining': String(decision.remaining),
-        'X-RateLimit-Reset': String(Math.floor(decision.resetAt / 1000)),
-      };
-      if (decision.retryAfterSeconds) {
-        headers['Retry-After'] = String(decision.retryAfterSeconds);
-      }
-
-      return chatErrorResponse(
-        'api_failure',
-        'Too many requests. Please wait and try again.',
-        429,
-        {
-          type: 'rate_limited',
-          limit: decision.limit,
-          resetAt: decision.resetAt,
-        },
-        headers
-      );
+      return rateLimitResponse(decision);
     }
   }
 
@@ -494,45 +455,42 @@ export async function POST(request: NextRequest) {
  * Returns API information and usage instructions.
  */
 export async function GET() {
-  return NextResponse.json({
-    success: true,
-    data: {
-      endpoint: '/api/chat',
-      method: 'POST',
-      description: 'Q&A chat with transcripts using OpenAI GPT models (STATELESS endpoint)',
-      privacyModel: {
-        storage: 'CLIENT-SIDE ONLY (browser IndexedDB)',
-        serverStorage: 'NONE - endpoint is completely stateless',
-        dataRetention: 'No conversation data stored on server',
-      },
-      requestBody: {
-        transcriptId: 'string (UUID, required)',
-        transcriptText: 'string (required, max 4M chars)',
-        question: 'string (required, max 2000 chars)',
-        conversationHistory: 'ChatMessage[] (optional, for context)',
-      },
-      responseFormat: {
-        success: '{ success: true, data: { answer: string } }',
-        error: '{ success: false, error: { type, message, details? } }',
-      },
-      features: [
-        'GPT-5/GPT-41 powered Q&A',
-        'Automatic deployment selection based on transcript size',
-        'Multi-turn conversation support',
-        'Token limit validation and truncation',
-        'Completely stateless (no server-side storage)',
-        'Privacy-first design (all data stored client-side)',
-      ],
-      errorTypes: {
-        validation: 'Invalid request format or parameters',
-        token_limit: 'Transcript or conversation too large',
-        api_failure: 'OpenAI API error or rate limit',
-        unknown: 'Unexpected server error',
-      },
-      usage: {
-        description: 'Send transcript and question to get AI-powered answers',
-        example: 'POST /api/chat with JSON body containing transcript and question',
-      },
+  return successResponse({
+    endpoint: '/api/chat',
+    method: 'POST',
+    description: 'Q&A chat with transcripts using OpenAI GPT models (STATELESS endpoint)',
+    privacyModel: {
+      storage: 'CLIENT-SIDE ONLY (browser IndexedDB)',
+      serverStorage: 'NONE - endpoint is completely stateless',
+      dataRetention: 'No conversation data stored on server',
+    },
+    requestBody: {
+      transcriptId: 'string (UUID, required)',
+      transcriptText: 'string (required, max 4M chars)',
+      question: 'string (required, max 2000 chars)',
+      conversationHistory: 'ChatMessage[] (optional, for context)',
+    },
+    responseFormat: {
+      success: '{ success: true, data: { answer: string } }',
+      error: '{ success: false, error: string, details?: object }',
+    },
+    features: [
+      'GPT-5/GPT-41 powered Q&A',
+      'Automatic deployment selection based on transcript size',
+      'Multi-turn conversation support',
+      'Token limit validation and truncation',
+      'Completely stateless (no server-side storage)',
+      'Privacy-first design (all data stored client-side)',
+    ],
+    errorTypes: {
+      validation: 'Invalid request format or parameters',
+      token_limit: 'Transcript or conversation too large',
+      api_failure: 'OpenAI API error or rate limit',
+      unknown: 'Unexpected server error',
+    },
+    usage: {
+      description: 'Send transcript and question to get AI-powered answers',
+      example: 'POST /api/chat with JSON body containing transcript and question',
     },
   });
 }

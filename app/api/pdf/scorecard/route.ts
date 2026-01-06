@@ -8,6 +8,7 @@ import React from "react";
 import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { ScorecardPDFDocument } from "@/lib/pdf/scorecard-pdf";
+import { errorResponse, successResponse } from "@/lib/api-utils";
 import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
 
 /**
@@ -115,14 +116,10 @@ export async function POST(request: NextRequest) {
 
     // Validate scorecard
     if (!validateScorecard(scorecard)) {
-      return NextResponse.json(
-        {
-          error: "Invalid scorecard data",
-          message:
-            "The provided scorecard data is missing required fields or is malformed",
-        },
-        { status: 400 }
-      );
+      return errorResponse("Invalid scorecard data", 400, {
+        type: "invalid_scorecard",
+        message: "The provided scorecard data is missing required fields or is malformed",
+      });
     }
 
     // Convert date strings to Date objects if needed
@@ -189,24 +186,17 @@ export async function POST(request: NextRequest) {
 
     // Handle specific error types
     if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        {
-          error: "Invalid JSON",
-          message: "The request body contains invalid JSON",
-        },
-        { status: 400 }
-      );
+      return errorResponse("Invalid JSON", 400, {
+        type: "invalid_json",
+        message: "The request body contains invalid JSON",
+      });
     }
 
     // Generic error response
-    return NextResponse.json(
-      {
-        error: "PDF generation failed",
-        message:
-          error instanceof Error ? error.message : "An unexpected error occurred",
-      },
-      { status: 500 }
-    );
+    return errorResponse("PDF generation failed", 500, {
+      type: "pdf_generation_failed",
+      message: error instanceof Error ? error.message : "An unexpected error occurred",
+    });
   }
 }
 
@@ -216,7 +206,7 @@ export async function POST(request: NextRequest) {
  * Returns API information and usage instructions.
  */
 export async function GET() {
-  return NextResponse.json({
+  return successResponse({
     endpoint: "/api/pdf/scorecard",
     method: "POST",
     description: "Generates a PDF report from RTASS scorecard results",

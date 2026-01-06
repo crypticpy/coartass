@@ -6,7 +6,15 @@ import { Modal, Button, Text, Badge, Card, Alert, Stack, Group, Loader } from "@
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
 import { clearAllPreferences } from "@/lib/storage";
-import { getStorageEstimate, deleteDatabase } from "@/lib/db";
+import {
+  calculateStorageUsage,
+  deleteDatabase,
+  deleteWaveformPeaksCache,
+  getLargestTranscriptsBySize,
+  getStorageEstimate,
+  getStorageStatus,
+  type TranscriptStorageBreakdownItem,
+} from "@/lib/db";
 import type { ConfigStatusResponse } from "@/app/api/config/status/route";
 
 interface SettingsDialogProps {
@@ -24,8 +32,20 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [configStatus, setConfigStatus] = React.useState<ConfigStatusResponse | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = React.useState(false);
   const [storageUsage, setStorageUsage] = React.useState("");
+  const [storageStatus, setStorageStatus] = React.useState<Awaited<ReturnType<typeof getStorageStatus>> | null>(null);
+  const [usageBreakdown, setUsageBreakdown] = React.useState<Awaited<ReturnType<typeof calculateStorageUsage>> | null>(null);
+  const [largestTranscripts, setLargestTranscripts] = React.useState<TranscriptStorageBreakdownItem[]>([]);
   const [isLoadingStorage, setIsLoadingStorage] = React.useState(false);
+  const [isClearingPeaksCache, setIsClearingPeaksCache] = React.useState(false);
   const [isClearingData, setIsClearingData] = React.useState(false);
+
+  const formatBytes = (bytes: number): string => {
+    if (!bytes || bytes <= 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  };
 
   // Load configuration status and storage info when dialog opens
   // RACE CONDITION FIX: Added cancellation for async operations
@@ -41,7 +61,19 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         const response = await fetch('/api/config/status');
         if (cancelled) return;
 
-        const data: ConfigStatusResponse = await response.json();
+        const payload = await response.json();
+        if (payload?.success === false) {
+          if (!cancelled) {
+            setConfigStatus({
+              configured: false,
+              provider: 'none',
+              error: payload.error || 'Failed to load configuration status',
+            });
+          }
+          return;
+        }
+
+        const data: ConfigStatusResponse = payload?.data ?? payload;
         if (!cancelled) {
           setConfigStatus(data);
         }
@@ -63,7 +95,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       // Load storage usage with cancellation check
       setIsLoadingStorage(true);
       try {
-        const estimate = await getStorageEstimate();
+        const [estimate, status, breakdown, topTranscripts] = await Promise.all([
+          getStorageEstimate(),
+          getStorageStatus(),
+          calculateStorageUsage(),
+          getLargestTranscriptsBySize(10),
+        ]);
         if (cancelled) return;
 
         if (estimate.quotaFormatted) {
@@ -73,10 +110,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         } else {
           setStorageUsage(estimate.usageFormatted);
         }
+
+        setStorageStatus(status);
+        setUsageBreakdown(breakdown);
+        setLargestTranscripts(topTranscripts);
       } catch (error) {
         if (!cancelled) {
           console.error("Error loading storage usage:", error);
           setStorageUsage("Unable to determine storage usage");
+          setStorageStatus(null);
+          setUsageBreakdown(null);
+          setLargestTranscripts([]);
         }
       } finally {
         if (!cancelled) {
@@ -120,6 +164,37 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       });
     } finally {
       setIsClearingData(false);
+    }
+  };
+
+  const handleClearWaveformCache = async () => {
+    setIsClearingPeaksCache(true);
+    try {
+      await deleteWaveformPeaksCache();
+
+      notifications.show({
+        title: "Waveform cache cleared",
+        message: "Waveform peak cache has been deleted from this browser.",
+        color: "green",
+      });
+
+      const estimate = await getStorageEstimate();
+      if (estimate.quotaFormatted) {
+        setStorageUsage(
+          `${estimate.usageFormatted} / ${estimate.quotaFormatted} (${estimate.percentUsed?.toFixed(1)}%)`
+        );
+      } else {
+        setStorageUsage(estimate.usageFormatted);
+      }
+    } catch (error) {
+      console.error("Error clearing waveform cache:", error);
+      notifications.show({
+        title: "Error",
+        message: "Failed to clear waveform cache. Please try again.",
+        color: "red",
+      });
+    } finally {
+      setIsClearingPeaksCache(false);
     }
   };
 
@@ -182,7 +257,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             </Group>
 
             <Text size="sm" c="dimmed">
-              OpenAI API configuration is managed via environment variables
+              API configuration is managed via environment variables
             </Text>
 
             {isLoadingConfig ? (
@@ -230,7 +305,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </Stack>
             ) : (
               <Alert icon={<AlertCircle size={16} />} title="Not Configured" color="red">
-                {configStatus?.error || 'OpenAI API is not configured'}
+                {configStatus?.error || "API is not configured"}
               </Alert>
             )}
 
@@ -308,22 +383,95 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         </Card>
 
         {/* Storage Usage Section */}
-        <Stack gap="xs">
-          <Group justify="space-between">
-            <Group gap="xs">
-              <HardDrive size={16} />
-              <Text size="sm" fw={500}>Local Storage Usage</Text>
+        <Card withBorder shadow="sm" padding="lg">
+          <Stack gap="md">
+            <Group justify="space-between" align="center">
+              <Group gap="xs">
+                <HardDrive size={16} />
+                <Text size="lg" fw={600}>Storage</Text>
+              </Group>
+              {isLoadingStorage ? (
+                <Loader size="sm" />
+              ) : (
+                <Text size="sm" c="dimmed">{storageUsage}</Text>
+              )}
             </Group>
-            {isLoadingStorage ? (
-              <Loader size="sm" />
-            ) : (
-              <Text size="sm" c="dimmed">{storageUsage}</Text>
+
+            {storageStatus?.isLow && (
+              <Alert icon={<AlertCircle size={16} />} title="Storage running low" color="yellow" variant="light">
+                You may hit browser storage limits soon. Consider deleting large transcripts, clearing waveform cache, or using another browser profile/device.
+              </Alert>
             )}
-          </Group>
-          <Text size="xs" c="dimmed">
-            Transcripts and analyses stored locally in your browser
-          </Text>
-        </Stack>
+
+            {usageBreakdown && (
+              <Stack gap={6}>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>Transcripts</Text>
+                  <Text size="sm" c="dimmed">{usageBreakdown.transcriptCount}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>Audio files</Text>
+                  <Text size="sm" c="dimmed">{usageBreakdown.audioFileCount}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>Analyses</Text>
+                  <Text size="sm" c="dimmed">{usageBreakdown.analysisCount}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>RTASS scorecards</Text>
+                  <Text size="sm" c="dimmed">{usageBreakdown.rtassScorecardCount}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>RTASS rubrics</Text>
+                  <Text size="sm" c="dimmed">{usageBreakdown.rtassRubricTemplateCount}</Text>
+                </Group>
+              </Stack>
+            )}
+
+            {largestTranscripts.length > 0 && (
+              <Stack gap="xs">
+                <Text size="sm" fw={500}>Largest transcripts</Text>
+                <Card withBorder padding="sm">
+                  <Stack gap="xs">
+                    {largestTranscripts.map((t) => (
+                      <Group key={t.transcriptId} justify="space-between" wrap="nowrap" gap="sm">
+                        <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
+                          <Text size="sm" fw={500} lineClamp={1}>
+                            {t.filename}
+                          </Text>
+                          <Text size="xs" c="dimmed" lineClamp={1}>
+                            {new Date(t.createdAt).toLocaleDateString()} • {Math.round(t.durationSeconds)}s
+                          </Text>
+                        </Stack>
+                        <Badge variant="light" color={t.hasAudioFile ? "blue" : "gray"}>
+                          {t.hasAudioFile ? "audio" : "no audio"}
+                        </Badge>
+                        <Text size="sm" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                          {formatBytes(t.fileSizeBytes)}
+                        </Text>
+                      </Group>
+                    ))}
+                  </Stack>
+                </Card>
+              </Stack>
+            )}
+
+            <Group justify="space-between" wrap="wrap">
+              <Button
+                variant="light"
+                leftSection={<HardDrive size={16} />}
+                onClick={handleClearWaveformCache}
+                loading={isClearingPeaksCache}
+              >
+                Clear Waveform Cache
+              </Button>
+            </Group>
+
+            <Text size="xs" c="dimmed">
+              Everything is stored locally in this browser (IndexedDB). No server-side persistence.
+            </Text>
+          </Stack>
+        </Card>
 
         {/* Clear All Data Section */}
         <Stack gap="xs">

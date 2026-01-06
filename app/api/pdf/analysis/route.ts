@@ -10,6 +10,7 @@ import React from "react";
 import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { AnalysisPDFDocument } from "@/lib/pdf/analysis-pdf";
+import { errorResponse, successResponse } from "@/lib/api-utils";
 import type { Analysis, Transcript, Template } from "@/types";
 
 /**
@@ -139,24 +140,18 @@ export async function POST(request: NextRequest) {
 
     // Validate analysis
     if (!validateAnalysis(analysis)) {
-      return NextResponse.json(
-        {
-          error: "Invalid analysis data",
-          message: "The provided analysis data is missing required fields or is malformed",
-        },
-        { status: 400 }
-      );
+      return errorResponse("Invalid analysis data", 400, {
+        type: "invalid_analysis",
+        message: "The provided analysis data is missing required fields or is malformed",
+      });
     }
 
     // Validate transcript
     if (!validateTranscript(transcript)) {
-      return NextResponse.json(
-        {
-          error: "Invalid transcript data",
-          message: "The provided transcript data is missing required fields or is malformed",
-        },
-        { status: 400 }
-      );
+      return errorResponse("Invalid transcript data", 400, {
+        type: "invalid_transcript",
+        message: "The provided transcript data is missing required fields or is malformed",
+      });
     }
 
     // Convert date strings to Date objects if needed
@@ -208,23 +203,17 @@ export async function POST(request: NextRequest) {
 
     // Handle specific error types
     if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        {
-          error: "Invalid JSON",
-          message: "The request body contains invalid JSON",
-        },
-        { status: 400 }
-      );
+      return errorResponse("Invalid JSON", 400, {
+        type: "invalid_json",
+        message: "The request body contains invalid JSON",
+      });
     }
 
     // Generic error response
-    return NextResponse.json(
-      {
-        error: "PDF generation failed",
-        message: error instanceof Error ? error.message : "An unexpected error occurred",
-      },
-      { status: 500 }
-    );
+    return errorResponse("PDF generation failed", 500, {
+      type: "pdf_generation_failed",
+      message: error instanceof Error ? error.message : "An unexpected error occurred",
+    });
   }
 }
 
@@ -234,7 +223,7 @@ export async function POST(request: NextRequest) {
  * Returns API information and usage instructions.
  */
 export async function GET() {
-  return NextResponse.json({
+  return successResponse({
     endpoint: "/api/pdf/analysis",
     method: "POST",
     description: "Generates a PDF report from analysis results",

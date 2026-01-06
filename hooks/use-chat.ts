@@ -39,6 +39,62 @@ const conversationInfoLog = createLogger('useConversationInfo');
  */
 const MAX_HISTORY_MESSAGES = 20;
 
+function normalizeChatErrorType(rawType: unknown): ChatError["type"] {
+  if (typeof rawType !== "string") return "unknown";
+
+  switch (rawType) {
+    case "validation":
+    case "validation_error":
+      return "validation";
+    case "token_limit":
+      return "token_limit";
+    case "api_failure":
+    case "configuration_error":
+    case "rate_limited":
+      return "api_failure";
+    default:
+      return "unknown";
+  }
+}
+
+function normalizeChatError(payload: unknown): ChatError {
+  if (!payload || typeof payload !== "object") {
+    return { type: "unknown", message: "API request failed" };
+  }
+
+  const maybe = payload as Record<string, unknown>;
+
+  // Legacy shape: { success: false, error: { type, message, details? } }
+  const legacyError = maybe.error as unknown;
+  if (legacyError && typeof legacyError === "object") {
+    const legacy = legacyError as Record<string, unknown>;
+    if (typeof legacy.type === "string" && typeof legacy.message === "string") {
+      return {
+        type: normalizeChatErrorType(legacy.type),
+        message: legacy.message,
+        details: typeof legacy.details === "object" && legacy.details !== null
+          ? (legacy.details as Record<string, unknown>)
+          : undefined,
+      };
+    }
+  }
+
+  // Standard shape: { success: false, error: string, details?: object }
+  if (typeof maybe.error === "string") {
+    const details = typeof maybe.details === "object" && maybe.details !== null
+      ? (maybe.details as Record<string, unknown>)
+      : undefined;
+
+    return {
+      type: normalizeChatErrorType(details?.type),
+      message: maybe.error,
+      details,
+    };
+  }
+
+  return { type: "unknown", message: "API request failed" };
+}
+
 /**
  * Return type for the useChat hook
  */
@@ -217,14 +273,14 @@ export function useChat(
 
       // Handle error responses
       if (!response.ok) {
-        let errorData: { error: ChatError };
+        let errorData: unknown;
         try {
           errorData = await response.json();
         } catch {
           throw new Error(`API request failed with status ${response.status}`);
         }
 
-        const chatError = errorData.error;
+        const chatError = normalizeChatError(errorData);
         log.error('API error', { type: chatError.type, message: chatError.message });
 
         // Log detailed validation errors for debugging
