@@ -22,9 +22,9 @@ import type {
 } from '@/types';
 import type OpenAI from 'openai';
 import { generateEvaluatorPrompt } from '@/lib/evaluator-prompt';
-import { buildChatCompletionParams } from '@/lib/openai';
 import {
   ANALYSIS_CONSTANTS,
+  buildAnalysisChatCompletionParams,
   postProcessResults,
   normalizeAnalysisJsonKeys,
   logger,
@@ -272,12 +272,9 @@ export async function executeEvaluationPass(
   });
 
   // Make API call with retry logic
-  // Use buildChatCompletionParams for consistent model params with medium reasoning effort
-  const modelParams = buildChatCompletionParams(
+  const modelParams = buildAnalysisChatCompletionParams(
     deployment,
-    ANALYSIS_CONSTANTS.MAX_COMPLETION_TOKENS,
-    undefined, // temperature not used for GPT-5
-    'medium'   // reasoning_effort for gpt-5.2
+    ANALYSIS_CONSTANTS.EVALUATION_TEMPERATURE
   );
 
   const response = await retryWithBackoff(

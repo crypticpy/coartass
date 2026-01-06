@@ -9,6 +9,7 @@ import type { AnalysisResults, OutputFormat, TranscriptSegment } from '@/types';
 import type { AnalysisStrategy } from '@/lib/analysis-strategy';
 import type { Template } from '@/types/template';
 import { estimateTokens } from '@/lib/token-utils';
+import { buildChatCompletionParams } from '@/lib/openai-chat-params';
 import {
   AnalysisError,
   AnalysisErrorCode,
@@ -94,12 +95,70 @@ export const ANALYSIS_CONSTANTS = {
   HYBRID_TEMPERATURE: 0.3,
   ADVANCED_TEMPERATURE: 0.2,
   EVALUATION_TEMPERATURE: 0.3, // Slightly higher than advanced for improvement creativity
+  // Keep this high for capable deployments, but we cap per-deployment below to avoid slow responses/timeouts.
   MAX_COMPLETION_TOKENS: 32000,
   /** Per-section timeout for Advanced mode (45 seconds) - prevents hung API calls */
   ADVANCED_SECTION_TIMEOUT_MS: 45000,
   /** Overall analysis timeout to prevent 504 errors (210 seconds - leaves buffer before 240s gateway timeout) */
   ANALYSIS_OVERALL_TIMEOUT_MS: 210000,
 } as const;
+
+/**
+ * Conservative default output-token caps by deployment name.
+ *
+ * Azure deployment names are user-defined, but in this repo we typically name
+ * them after the model (e.g. "gpt-5", "gpt-41", "gpt-4o"). When names don't
+ * match this convention, the fallback is intentionally conservative to avoid
+ * hard failures from exceeding model output limits.
+ */
+export function getDefaultMaxOutputTokens(deployment: string): number {
+  const name = deployment.toLowerCase();
+
+  // GPT-5 / reasoning-style deployments: allow large outputs.
+  if (name.includes('gpt-5') || name.includes('o1') || name.includes('o3')) {
+    // Default: cap to 8k to reduce latency and avoid gateway timeouts in ACA.
+    // Can be overridden via ANALYSIS_MAX_OUTPUT_TOKENS / AZURE_OPENAI_MAX_OUTPUT_TOKENS.
+    return 8192;
+  }
+
+  // GPT-4.1 / "gpt-41" extended-context deployments: allow medium-large outputs.
+  if (name.includes('gpt-41') || name.includes('gpt-4.1') || name.includes('4.1')) {
+    return 16000;
+  }
+
+  // Default: keep small enough to be broadly compatible (e.g. gpt-4o).
+  return 4096;
+}
+
+export function buildAnalysisChatCompletionParams(
+  deployment: string,
+  temperature?: number
+): ReturnType<typeof buildChatCompletionParams> {
+  const envEffortRaw =
+    process.env.AZURE_OPENAI_REASONING_EFFORT ||
+    process.env.OPENAI_REASONING_EFFORT ||
+    process.env.NEXT_PUBLIC_REASONING_EFFORT;
+
+  const reasoningEffort =
+    envEffortRaw === 'low' || envEffortRaw === 'high' || envEffortRaw === 'medium'
+      ? envEffortRaw
+      : 'medium';
+
+  const envMaxRaw =
+    process.env.ANALYSIS_MAX_OUTPUT_TOKENS ||
+    process.env.AZURE_OPENAI_MAX_OUTPUT_TOKENS ||
+    process.env.NEXT_PUBLIC_ANALYSIS_MAX_OUTPUT_TOKENS;
+
+  const parsedMax = envMaxRaw ? Number.parseInt(envMaxRaw, 10) : NaN;
+  const configuredMax = Number.isFinite(parsedMax) ? Math.max(256, Math.min(parsedMax, 32000)) : null;
+
+  return buildChatCompletionParams(
+    deployment,
+    configuredMax ?? getDefaultMaxOutputTokens(deployment),
+    temperature,
+    reasoningEffort
+  );
+}
 
 /**
  * Format output type description for prompts

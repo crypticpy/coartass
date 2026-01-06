@@ -23,6 +23,7 @@ import type {
 } from '@/types/enrichment';
 import type { AnalysisResults, TranscriptSegment } from '@/types';
 import { DEFAULT_ENRICHMENT_CONFIG } from '@/types/enrichment';
+import { buildChatCompletionParams } from '@/lib/openai-chat-params';
 
 import { buildCombinedEnrichmentPrompt, buildPatternPrompt } from './prompts';
 import {
@@ -148,8 +149,7 @@ export function createMiningEngine(
               },
               { role: 'user', content: prompt },
             ],
-            temperature: 0.2,
-            max_completion_tokens: 4000,
+            ...buildChatCompletionParams(deployment, 4000, 0.2, 'medium'),
             response_format: { type: 'json_object' },
           });
 
@@ -280,8 +280,7 @@ export function createMiningEngine(
                 },
                 { role: 'user', content: prompt },
               ],
-              temperature: 0.2,
-              max_completion_tokens: 2500,
+              ...buildChatCompletionParams(deployment, 2500, 0.2, 'medium'),
               response_format: { type: 'json_object' },
             });
 
@@ -500,8 +499,7 @@ export function createMiningEngine(
                 },
                 { role: 'user', content: prompt },
               ],
-              temperature: 0.2,
-              max_completion_tokens: 4000,
+              ...buildChatCompletionParams(deployment, 4000, 0.2, 'medium'),
               response_format: { type: 'json_object' },
             });
 

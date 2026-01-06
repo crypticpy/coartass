@@ -35,6 +35,7 @@ import {
   normalizeAnalysisJsonKeys,
   validateTokenLimits,
   ANALYSIS_CONSTANTS,
+  buildAnalysisChatCompletionParams,
   retryWithBackoff,
   TIMESTAMP_INSTRUCTION,
 } from './shared';
@@ -657,7 +658,7 @@ export async function executeBasicAnalysis(
             content: prompt,
           },
         ],
-        max_completion_tokens: ANALYSIS_CONSTANTS.MAX_COMPLETION_TOKENS, // GPT-5 requires max_completion_tokens
+        ...buildAnalysisChatCompletionParams(deployment, ANALYSIS_CONSTANTS.BASIC_TEMPERATURE),
         response_format: { type: 'json_object' }, // Enforce JSON response
       });
 

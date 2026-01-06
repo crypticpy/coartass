@@ -19,6 +19,7 @@ import {
   type EnvironmentVariables,
 } from './validations/config';
 import { isKeyVaultAvailable, getKeyVaultSummary } from './azure-key-vault';
+import { buildChatCompletionParams, type ReasoningEffort } from './openai-chat-params';
 
 /**
  * Configuration Error Class
@@ -530,77 +531,8 @@ export async function initializeAndValidate(): Promise<void> {
   });
 }
 
-/**
- * Check if a model/deployment requires GPT-5 style parameters
- * (max_completion_tokens instead of max_tokens, no temperature)
- */
-function isGPT5StyleModel(deployment: string): boolean {
-  const lowerDeployment = deployment.toLowerCase();
-  return lowerDeployment.includes('gpt-5') ||
-         lowerDeployment.includes('o1') ||
-         lowerDeployment.includes('o3');
-}
-
-/**
- * Check if a model/deployment supports reasoning_effort parameter
- * (o1, o3, and gpt-5.2+ reasoning models)
- */
-function supportsReasoningEffort(deployment: string): boolean {
-  const lowerDeployment = deployment.toLowerCase();
-  return lowerDeployment.includes('o1') ||
-         lowerDeployment.includes('o3') ||
-         lowerDeployment.includes('gpt-5.2');
-}
-
-/**
- * Reasoning effort level for reasoning models (o1, o3, gpt-5.2)
- */
-export type ReasoningEffort = 'low' | 'medium' | 'high';
-
-/**
- * Build model-appropriate chat completion parameters
- *
- * GPT-5 and reasoning models (o1, o3, gpt-5.2) have different parameter requirements:
- * - Use max_completion_tokens instead of max_tokens
- * - Do not support temperature parameter
- * - Reasoning models support reasoning_effort parameter
- *
- * @param deployment - The model/deployment name
- * @param maxTokens - Maximum tokens for the response
- * @param temperature - Temperature for non-GPT-5 models (ignored for GPT-5)
- * @param reasoningEffort - Reasoning effort for o1/o3/gpt-5.2 models (default: 'medium')
- * @returns Object with appropriate parameters for the model
- */
-export function buildChatCompletionParams(
-  deployment: string,
-  maxTokens?: number,
-  temperature?: number,
-  reasoningEffort: ReasoningEffort = 'medium'
-): {
-  max_completion_tokens?: number;
-  max_tokens?: number;
-  temperature?: number;
-  reasoning_effort?: ReasoningEffort;
-} {
-  if (isGPT5StyleModel(deployment)) {
-    // GPT-5 and reasoning models: use max_completion_tokens, no temperature
-    const params: { max_completion_tokens?: number; reasoning_effort?: ReasoningEffort } = {};
-    if (maxTokens) params.max_completion_tokens = maxTokens;
-
-    // Add reasoning_effort for models that support it
-    if (supportsReasoningEffort(deployment)) {
-      params.reasoning_effort = reasoningEffort;
-    }
-
-    return params;
-  }
-
-  // Standard models: use max_tokens and temperature
-  const params: { max_tokens?: number; temperature?: number } = {};
-  if (maxTokens) params.max_tokens = maxTokens;
-  if (temperature !== undefined) params.temperature = temperature;
-  return params;
-}
+// Re-export for backwards compatibility (other modules import from '@/lib/openai')
+export { buildChatCompletionParams, type ReasoningEffort };
 
 /**
  * Get Azure credentials for direct REST API calls

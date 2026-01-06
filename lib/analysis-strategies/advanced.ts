@@ -32,6 +32,7 @@ import {
   normalizeAnalysisJsonKeys,
   validateTokenLimits,
   ANALYSIS_CONSTANTS,
+  buildAnalysisChatCompletionParams,
   logger,
   retryWithBackoff,
   TIMESTAMP_INSTRUCTION,
@@ -1323,7 +1324,7 @@ export async function executeAdvancedAnalysis(
               content: prompt,
             },
           ],
-          max_completion_tokens: ANALYSIS_CONSTANTS.MAX_COMPLETION_TOKENS,
+          ...buildAnalysisChatCompletionParams(deployment, ANALYSIS_CONSTANTS.ADVANCED_TEMPERATURE),
           response_format: { type: 'json_object' },
         });
 
