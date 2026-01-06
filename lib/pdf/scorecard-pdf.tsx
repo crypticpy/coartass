@@ -679,7 +679,7 @@ const CoverPage: React.FC<{
           const sectionStatusStyles = getStatusStyles(section.status);
           return (
             <View key={section.sectionId} style={styles.sectionCard}>
-              <Text style={styles.sectionCardTitle}>{section.title}</Text>
+              <Text style={styles.sectionCardTitle}>{String(section.title || '')}</Text>
               <Text
                 style={[styles.sectionCardScore, sectionStatusStyles.cardScore]}
               >
@@ -710,7 +710,7 @@ const CoverPage: React.FC<{
           <Text style={styles.warningsTitle}>Warnings</Text>
           {scorecard.warnings.slice(0, 5).map((warning, idx) => (
             <Text key={idx} style={styles.warningItem}>
-              • {warning}
+              • {String(warning)}
             </Text>
           ))}
           {scorecard.warnings.length > 5 && (
@@ -742,8 +742,8 @@ const CriteriaRow: React.FC<{
     >
       {/* Criterion */}
       <View style={styles.criterionCol}>
-        <Text style={styles.criterionTitle}>{criterion.title}</Text>
-        <Text style={styles.criterionRationale}>{criterion.rationale}</Text>
+        <Text style={styles.criterionTitle}>{String(criterion.title || '')}</Text>
+        <Text style={styles.criterionRationale}>{String(criterion.rationale || '')}</Text>
       </View>
 
       {/* Verdict */}
@@ -772,22 +772,26 @@ const CriteriaRow: React.FC<{
 
       {/* Evidence */}
       <View style={styles.evidenceCol}>
-        {criterion.evidence.length > 0 ? (
-          criterion.evidence.slice(0, 2).map((e, idx) => (
-            <View key={idx} style={styles.evidenceItem}>
-              <Text style={styles.evidenceQuote}>
-                &quot;{e.quote.length > 80 ? e.quote.slice(0, 80) + "..." : e.quote}&quot;
-              </Text>
-              <Text style={styles.evidenceTimestamp}>
-                @ {formatTimestamp(e.start)}
-                {e.speaker ? ` • ${e.speaker}` : ""}
-              </Text>
-            </View>
-          ))
+        {criterion.evidence && criterion.evidence.length > 0 ? (
+          criterion.evidence.slice(0, 2).map((e, idx) => {
+            const quote = String(e.quote || '');
+            const truncatedQuote = quote.length > 80 ? quote.slice(0, 80) + "..." : quote;
+            return (
+              <View key={idx} style={styles.evidenceItem}>
+                <Text style={styles.evidenceQuote}>
+                  &quot;{truncatedQuote}&quot;
+                </Text>
+                <Text style={styles.evidenceTimestamp}>
+                  @ {formatTimestamp(e.start)}
+                  {e.speaker ? ` • ${String(e.speaker)}` : ""}
+                </Text>
+              </View>
+            );
+          })
         ) : (
           <Text style={styles.noEvidence}>No evidence provided</Text>
         )}
-        {criterion.evidence.length > 2 && (
+        {criterion.evidence && criterion.evidence.length > 2 && (
           <Text style={styles.evidenceTimestamp}>
             + {criterion.evidence.length - 2} more...
           </Text>
@@ -809,7 +813,7 @@ const SectionDetailPage: React.FC<{
     <Page size="A4" style={styles.page} wrap>
       {/* Section Header */}
       <View style={styles.sectionHeader} wrap={false}>
-        <Text style={styles.sectionTitle}>{section.title}</Text>
+        <Text style={styles.sectionTitle}>{String(section.title || '')}</Text>
         <View style={[styles.sectionScoreBadge, statusStyles.statusBadge]}>
           <Text style={[styles.sectionScoreText, statusStyles.statusText]}>
             {formatPercent(section.score)}
