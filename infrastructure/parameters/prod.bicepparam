@@ -22,6 +22,8 @@ param azureOpenAIApiVersion = '2024-12-01-preview'
 param azureOpenAIWhisperDeployment = 'gpt-4o-transcribe-diarize'
 param azureOpenAIGPTDeployment = 'gpt-5'
 param azureOpenAIExtendedGPTDeployment = ''
+param analysisReasoningEffort = 'medium'
+param analysisMaxOutputTokens = 4096
 
 // Production-specific tags
 param tags = {

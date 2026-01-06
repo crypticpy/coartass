@@ -61,6 +61,19 @@ param azureOpenAIGPTDeployment string = ''
 @description('Azure OpenAI extended-context GPT deployment name (optional, for long transcripts)')
 param azureOpenAIExtendedGPTDeployment string = ''
 
+@description('Reasoning effort for analysis models that support it (low, medium, high)')
+@allowed([
+  'low'
+  'medium'
+  'high'
+])
+param analysisReasoningEffort string = 'medium'
+
+@description('Max output tokens for analysis responses (used to reduce latency/timeouts)')
+@minValue(256)
+@maxValue(32000)
+param analysisMaxOutputTokens int = 4096
+
 @description('Tags to apply to all resources')
 param tags object = {
   project: 'austin-rtass'
@@ -184,6 +197,14 @@ module containerApp 'modules/container-app.bicep' = {
       {
         name: 'AZURE_OPENAI_EXTENDED_GPT_DEPLOYMENT'
         value: azureOpenAIExtendedGPTDeployment
+      }
+      {
+        name: 'AZURE_OPENAI_REASONING_EFFORT'
+        value: analysisReasoningEffort
+      }
+      {
+        name: 'ANALYSIS_MAX_OUTPUT_TOKENS'
+        value: string(analysisMaxOutputTokens)
       }
     ]
 

@@ -32,6 +32,12 @@
     "azureOpenAIExtendedGPTDeployment": {
       "value": ""
     },
+    "analysisReasoningEffort": {
+      "value": "medium"
+    },
+    "analysisMaxOutputTokens": {
+      "value": 4096
+    },
     "tags": {
       "value": {
         "project": "austin-rtass",

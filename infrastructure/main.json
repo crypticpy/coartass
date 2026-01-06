@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.39.26.7824",
-      "templateHash": "14616680809423965308"
+      "templateHash": "9468919280333459075"
     }
   },
   "parameters": {
@@ -30,7 +30,7 @@
     },
     "baseName": {
       "type": "string",
-      "defaultValue": "mtranscriber",
+      "defaultValue": "austin-rtass",
       "minLength": 3,
       "maxLength": 20,
       "metadata": {
@@ -93,6 +93,27 @@
         "description": "Azure OpenAI extended-context GPT deployment name (optional, for long transcripts)"
       }
     },
+    "analysisReasoningEffort": {
+      "type": "string",
+      "defaultValue": "medium",
+      "allowedValues": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "metadata": {
+        "description": "Reasoning effort for analysis models that support it (low, medium, high)"
+      }
+    },
+    "analysisMaxOutputTokens": {
+      "type": "int",
+      "defaultValue": 4096,
+      "minValue": 256,
+      "maxValue": 32000,
+      "metadata": {
+        "description": "Max output tokens for analysis responses (used to reduce latency/timeouts)"
+      }
+    },
     "tags": {
       "type": "object",
       "defaultValue": {
@@ -102,6 +123,20 @@
       },
       "metadata": {
         "description": "Tags to apply to all resources"
+      }
+    },
+    "corsAllowedOrigins": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "CORS allowed origins for the Container App. Empty array disables CORS (recommended for production if accessed via same-origin). Set to specific domain(s) if cross-origin access is required."
+      }
+    },
+    "externalIngress": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Whether the Container App should be publicly accessible (external ingress)"
       }
     }
   },
@@ -637,6 +672,9 @@
             "value": "[parameters('imageTag')]"
           },
           "keyVaultUri": "[if(parameters('enableKeyVault'), createObject('value', reference(resourceId('Microsoft.Resources/deployments', 'keyVault'), '2025-04-01').outputs.vaultUri.value), createObject('value', ''))]",
+          "externalIngress": {
+            "value": "[parameters('externalIngress')]"
+          },
           "environmentVariables": {
             "value": [
               {
@@ -662,6 +700,14 @@
               {
                 "name": "AZURE_OPENAI_EXTENDED_GPT_DEPLOYMENT",
                 "value": "[parameters('azureOpenAIExtendedGPTDeployment')]"
+              },
+              {
+                "name": "AZURE_OPENAI_REASONING_EFFORT",
+                "value": "[parameters('analysisReasoningEffort')]"
+              },
+              {
+                "name": "ANALYSIS_MAX_OUTPUT_TOKENS",
+                "value": "[string(parameters('analysisMaxOutputTokens'))]"
               }
             ]
           },
@@ -677,6 +723,9 @@
                 "secretRef": "azure-openai-endpoint"
               }
             ]
+          },
+          "corsAllowedOrigins": {
+            "value": "[parameters('corsAllowedOrigins')]"
           }
         },
         "template": {
@@ -686,7 +735,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.39.26.7824",
-              "templateHash": "17673289302788232488"
+              "templateHash": "1141058278986169144"
             }
           },
           "parameters": {
@@ -764,7 +813,7 @@
             },
             "minReplicas": {
               "type": "int",
-              "defaultValue": 0,
+              "defaultValue": 1,
               "minValue": 0,
               "maxValue": 30,
               "metadata": {
@@ -793,6 +842,20 @@
               "metadata": {
                 "description": "Memory allocation"
               }
+            },
+            "externalIngress": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Whether ingress is external (public) or internal (VNet only)"
+              }
+            },
+            "corsAllowedOrigins": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "CORS allowed origins. Use specific domains in production, empty array disables CORS."
+              }
             }
           },
           "variables": {
@@ -808,6 +871,8 @@
             ],
             "imageName": "[format('{0}/austin-rtass:{1}', parameters('containerRegistryLoginServer'), parameters('imageTag'))]",
             "useKeyVault": "[not(empty(parameters('keyVaultUri')))]",
+            "corsEnabled": "[not(empty(parameters('corsAllowedOrigins')))]",
+            "corsConfig": "[if(variables('corsEnabled'), createObject('allowedOrigins', parameters('corsAllowedOrigins'), 'allowedMethods', createArray('GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'), 'allowedHeaders', createArray('Content-Type', 'Authorization', 'X-Requested-With'), 'maxAge', 86400), null())]",
             "allEnvVars": "[concat(parameters('environmentVariables'), variables('secretEnvVarsFormatted'))]"
           },
           "resources": [
@@ -825,7 +890,7 @@
                 "configuration": {
                   "activeRevisionsMode": "Single",
                   "ingress": {
-                    "external": true,
+                    "external": "[parameters('externalIngress')]",
                     "targetPort": 3000,
                     "transport": "http",
                     "allowInsecure": false,
@@ -835,22 +900,7 @@
                         "weight": 100
                       }
                     ],
-                    "corsPolicy": {
-                      "allowedOrigins": [
-                        "*"
-                      ],
-                      "allowedMethods": [
-                        "GET",
-                        "POST",
-                        "PUT",
-                        "DELETE",
-                        "OPTIONS"
-                      ],
-                      "allowedHeaders": [
-                        "*"
-                      ],
-                      "maxAge": 86400
-                    }
+                    "corsPolicy": "[variables('corsConfig')]"
                   },
                   "registries": [
                     {
@@ -979,9 +1029,17 @@
       "type": "string",
       "value": "[resourceGroup().name]"
     },
+    "containerRegistryName": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'containerRegistry'), '2025-04-01').outputs.registryName.value]"
+    },
     "containerRegistryLoginServer": {
       "type": "string",
       "value": "[reference(resourceId('Microsoft.Resources/deployments', 'containerRegistry'), '2025-04-01').outputs.loginServer.value]"
+    },
+    "containerAppName": {
+      "type": "string",
+      "value": "[variables('containerAppName')]"
     },
     "containerAppFqdn": {
       "type": "string",
