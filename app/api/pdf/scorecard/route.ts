@@ -9,7 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { ScorecardPDFDocument } from "@/lib/pdf/scorecard-pdf";
 import { errorResponse, successResponse } from "@/lib/api-utils";
+import { createLogger } from "@/lib/logger";
 import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
+
+const log = createLogger("PDF.Scorecard");
 
 /**
  * Request body interface for PDF generation
@@ -108,6 +111,8 @@ function validateScorecard(scorecard: unknown): scorecard is RtassScorecard {
  * ```
  */
 export async function POST(request: NextRequest) {
+  log.debug("Received PDF generation request");
+
   try {
     // Parse request body
     const body = await request.json();
@@ -116,11 +121,18 @@ export async function POST(request: NextRequest) {
 
     // Validate scorecard
     if (!validateScorecard(scorecard)) {
+      log.warn("Invalid scorecard data received");
       return errorResponse("Invalid scorecard data", 400, {
         type: "invalid_scorecard",
         message: "The provided scorecard data is missing required fields or is malformed",
       });
     }
+
+    log.debug("Generating PDF", {
+      scorecardId: scorecard.id,
+      sectionCount: scorecard.sections?.length || 0,
+      hasRubric: !!rubric,
+    });
 
     // Convert date strings to Date objects if needed
     const scorecardData: RtassScorecard = {
@@ -171,6 +183,12 @@ export async function POST(request: NextRequest) {
       ? `${transcriptFilename.replace(/\.[^/.]+$/, "")}-scorecard.pdf`
       : `rtass-scorecard-${scorecardData.id.slice(0, 8)}.pdf`;
 
+    log.info("PDF generated successfully", {
+      scorecardId: scorecardData.id,
+      filename,
+      bufferSize: pdfBuffer.length,
+    });
+
     // Return PDF as response
     return new NextResponse(pdfBuffer as BodyInit, {
       status: 200,
@@ -182,7 +200,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Scorecard PDF generation error:", error);
+    log.error("Scorecard PDF generation error", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
 
     // Handle specific error types
     if (error instanceof SyntaxError) {

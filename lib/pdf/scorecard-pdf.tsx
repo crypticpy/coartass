@@ -17,7 +17,6 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
 } from "@react-pdf/renderer";
 import type {
   RtassScorecard,
@@ -26,17 +25,8 @@ import type {
   RtassRubricTemplate,
 } from "@/types/rtass";
 
-/**
- * Register fonts for better typography
- */
-Font.register({
-  family: "Helvetica",
-  fonts: [
-    { src: "Helvetica" },
-    { src: "Helvetica-Bold", fontWeight: "bold" },
-    { src: "Helvetica-Oblique", fontStyle: "italic" },
-  ],
-});
+// Note: Helvetica is a built-in font in @react-pdf/renderer and doesn't need registration.
+// The styles use fontFamily: "Helvetica" which works out of the box.
 
 /**
  * AFD Brand Color palette

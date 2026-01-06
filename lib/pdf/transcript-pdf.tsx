@@ -12,21 +12,11 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
 } from "@react-pdf/renderer";
 import { Transcript } from "@/types";
 
-/**
- * Register fonts for better typography
- * Using system fonts as fallback for reliability
- */
-Font.register({
-  family: "Helvetica",
-  fonts: [
-    { src: "Helvetica" },
-    { src: "Helvetica-Bold", fontWeight: "bold" },
-  ],
-});
+// Note: Helvetica is a built-in font in @react-pdf/renderer and doesn't need registration.
+// The styles use fontFamily: "Helvetica" which works out of the box.
 
 /**
  * PDF Stylesheet with professional business report styling

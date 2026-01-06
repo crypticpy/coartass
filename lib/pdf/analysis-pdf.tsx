@@ -17,24 +17,14 @@ import {
   Text,
   View,
   StyleSheet,
-  Font,
   Link,
 } from "@react-pdf/renderer";
 import { Analysis, Transcript } from "@/types";
 import type { Template } from "@/types";
 import { stripTimestamps } from "@/lib/analysis-utils";
 
-/**
- * Register fonts for better typography
- */
-Font.register({
-  family: "Helvetica",
-  fonts: [
-    { src: "Helvetica" },
-    { src: "Helvetica-Bold", fontWeight: "bold" },
-    { src: "Helvetica-Oblique", fontStyle: "italic" },
-  ],
-});
+// Note: Helvetica is a built-in font in @react-pdf/renderer and doesn't need registration.
+// The styles use fontFamily: "Helvetica" which works out of the box.
 
 /**
  * Color palette for consistent styling
