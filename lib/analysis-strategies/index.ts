@@ -46,7 +46,7 @@ import {
 } from './errors';
 
 // Import shared utilities
-import { logger, classifyError } from './shared';
+import { logger, classifyError, setAnalysisReasoningEffort } from './shared';
 
 // Re-export shared utilities
 export * from './shared';
@@ -113,6 +113,13 @@ export interface AnalysisConfig {
    * timestamp citation logic.
    */
   supplementalMaterial?: string;
+
+  /**
+   * User-configurable reasoning effort for GPT-5/reasoning models.
+   * Low = faster but may miss nuance, High = slower but more thorough.
+   * Overrides the server-side AZURE_OPENAI_REASONING_EFFORT env var.
+   */
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
 
 /**
@@ -550,7 +557,15 @@ export async function executeAnalysis(
     maxFallbackAttempts = 3,
     segments,
     supplementalMaterial,
+    reasoningEffort,
   } = config;
+
+  // Set reasoning effort override for this analysis run
+  // This affects buildAnalysisChatCompletionParams in all strategies
+  setAnalysisReasoningEffort(reasoningEffort || null);
+  if (reasoningEffort) {
+    logger.info('Analysis', `Using user-specified reasoning effort: ${reasoningEffort}`);
+  }
 
   // Determine initial strategy to use
   let strategy: AnalysisStrategy;

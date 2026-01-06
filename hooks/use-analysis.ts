@@ -38,6 +38,10 @@ import {
   getStrategyPhases,
   calculatePhaseProgress,
 } from '@/lib/analysis-progress-metadata';
+import {
+  getAnalysisModelPreference,
+  getReasoningEffortPreference,
+} from '@/lib/storage';
 
 const log = createLogger('useAnalysis');
 
@@ -457,6 +461,12 @@ export function useAnalysis(): UseAnalysisReturn {
           });
         }
 
+        // Get user preferences for model and reasoning effort
+        const modelOverride = getAnalysisModelPreference();
+        const reasoningEffort = getReasoningEffortPreference();
+
+        log.debug('Using analysis settings', { modelOverride, reasoningEffort });
+
         // Call the analysis API endpoint with abort signal
         const response = await fetch('/api/analyze', {
           method: 'POST',
@@ -475,6 +485,9 @@ export function useAnalysis(): UseAnalysisReturn {
             runEvaluation: runEvaluation !== false,
             // Include supplemental material if provided (from uploaded Word, PDF, PPT, or pasted text)
             ...(supplementalMaterial && { supplementalMaterial }),
+            // User-configurable model and reasoning settings from Settings
+            modelOverride,
+            reasoningEffort,
           }),
           signal: abortController.signal,
         });

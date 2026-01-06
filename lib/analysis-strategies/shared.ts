@@ -130,19 +130,43 @@ export function getDefaultMaxOutputTokens(deployment: string): number {
   return 4096;
 }
 
-export function buildAnalysisChatCompletionParams(
-  deployment: string,
-  temperature?: number
-): ReturnType<typeof buildChatCompletionParams> {
+/**
+ * Module-level reasoning effort override.
+ * Set via setAnalysisReasoningEffort() before analysis execution.
+ */
+let reasoningEffortOverride: 'low' | 'medium' | 'high' | null = null;
+
+/**
+ * Set the reasoning effort for the current analysis run.
+ * This overrides the server-side environment variable.
+ */
+export function setAnalysisReasoningEffort(effort: 'low' | 'medium' | 'high' | null): void {
+  reasoningEffortOverride = effort;
+}
+
+/**
+ * Get the current reasoning effort (user override or env var).
+ */
+export function getAnalysisReasoningEffort(): 'low' | 'medium' | 'high' {
+  if (reasoningEffortOverride) {
+    return reasoningEffortOverride;
+  }
+
   const envEffortRaw =
     process.env.AZURE_OPENAI_REASONING_EFFORT ||
     process.env.OPENAI_REASONING_EFFORT ||
     process.env.NEXT_PUBLIC_REASONING_EFFORT;
 
-  const reasoningEffort =
-    envEffortRaw === 'low' || envEffortRaw === 'high' || envEffortRaw === 'medium'
-      ? envEffortRaw
-      : 'medium';
+  return envEffortRaw === 'low' || envEffortRaw === 'high' || envEffortRaw === 'medium'
+    ? envEffortRaw
+    : 'medium';
+}
+
+export function buildAnalysisChatCompletionParams(
+  deployment: string,
+  temperature?: number
+): ReturnType<typeof buildChatCompletionParams> {
+  const reasoningEffort = getAnalysisReasoningEffort();
 
   const envMaxRaw =
     process.env.ANALYSIS_MAX_OUTPUT_TOKENS ||

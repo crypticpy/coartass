@@ -1,11 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Trash2, HardDrive, CheckCircle2, XCircle, AlertCircle, ExternalLink } from "lucide-react";
-import { Modal, Button, Text, Badge, Card, Alert, Stack, Group, Loader } from "@mantine/core";
+import { Trash2, HardDrive, CheckCircle2, XCircle, AlertCircle, ExternalLink, Cpu } from "lucide-react";
+import { Modal, Button, Text, Badge, Card, Alert, Stack, Group, Loader, Select, SegmentedControl } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { notifications } from "@mantine/notifications";
-import { clearAllPreferences } from "@/lib/storage";
+import {
+  clearAllPreferences,
+  getAnalysisModelPreference,
+  setAnalysisModelPreference,
+  getReasoningEffortPreference,
+  setReasoningEffortPreference,
+  type AnalysisModel,
+  type ReasoningEffort,
+} from "@/lib/storage";
 import {
   calculateStorageUsage,
   deleteDatabase,
@@ -38,6 +46,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [isLoadingStorage, setIsLoadingStorage] = React.useState(false);
   const [isClearingPeaksCache, setIsClearingPeaksCache] = React.useState(false);
   const [isClearingData, setIsClearingData] = React.useState(false);
+  const [analysisModel, setAnalysisModel] = React.useState<AnalysisModel>('gpt-5');
+  const [reasoningEffort, setReasoningEffort] = React.useState<ReasoningEffort>('medium');
 
   const formatBytes = (bytes: number): string => {
     if (!bytes || bytes <= 0) return "0 Bytes";
@@ -46,6 +56,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
+
+  // Load analysis preferences when dialog opens
+  React.useEffect(() => {
+    if (!open) return;
+    setAnalysisModel(getAnalysisModelPreference());
+    setReasoningEffort(getReasoningEffortPreference());
+  }, [open]);
 
   // Load configuration status and storage info when dialog opens
   // RACE CONDITION FIX: Added cancellation for async operations
@@ -232,6 +249,25 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     return 'Not Configured';
   };
 
+  const handleModelChange = (value: string | null) => {
+    if (value === 'gpt-5' || value === 'gpt-5.2') {
+      setAnalysisModel(value);
+      setAnalysisModelPreference(value);
+      notifications.show({
+        title: 'Model Updated',
+        message: `Analysis will now use ${value}`,
+        color: 'blue',
+      });
+    }
+  };
+
+  const handleReasoningChange = (value: string) => {
+    if (value === 'low' || value === 'medium' || value === 'high') {
+      setReasoningEffort(value);
+      setReasoningEffortPreference(value);
+    }
+  };
+
   return (
     <Modal
       opened={open}
@@ -378,6 +414,61 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   </a>
                 </Stack>
               </Stack>
+            </Alert>
+          </Stack>
+        </Card>
+
+        {/* Analysis Settings Section */}
+        <Card withBorder shadow="sm" padding="lg">
+          <Stack gap="md">
+            <Group justify="space-between" align="center">
+              <Group gap="xs">
+                <Cpu size={16} />
+                <Text size="lg" fw={600}>Analysis Settings</Text>
+              </Group>
+            </Group>
+
+            <Text size="sm" c="dimmed">
+              Configure model and reasoning effort for transcript analysis.
+              Faster settings reduce analysis time but may affect quality.
+            </Text>
+
+            <Stack gap="md">
+              <Select
+                label="Analysis Model"
+                description="GPT-5.2 is faster with lower reasoning overhead"
+                value={analysisModel}
+                onChange={handleModelChange}
+                data={[
+                  { value: 'gpt-5', label: 'GPT-5 (Standard)' },
+                  { value: 'gpt-5.2', label: 'GPT-5.2 (Faster)' },
+                ]}
+                allowDeselect={false}
+              />
+
+              <Stack gap="xs">
+                <Text size="sm" fw={500}>Reasoning Effort</Text>
+                <Text size="xs" c="dimmed">
+                  Low = fastest (may miss nuance), High = slowest (most thorough)
+                </Text>
+                <SegmentedControl
+                  value={reasoningEffort}
+                  onChange={handleReasoningChange}
+                  data={[
+                    { value: 'low', label: 'Low' },
+                    { value: 'medium', label: 'Medium' },
+                    { value: 'high', label: 'High' },
+                  ]}
+                  fullWidth
+                />
+              </Stack>
+            </Stack>
+
+            <Alert icon={<AlertCircle size={16} />} color="yellow" variant="light">
+              <Text size="sm">
+                These settings apply to new analyses only. Lower reasoning effort speeds up analysis
+                but may reduce accuracy for complex transcripts.
+              </Text>
             </Alert>
           </Stack>
         </Card>

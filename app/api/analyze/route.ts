@@ -96,8 +96,9 @@ const analyzeRequestSchema = z.object({
   // Supplemental material: extracted text from uploaded Word docs, PDFs, PowerPoints, or pasted text
   // Sent separately from transcript to preserve timestamp citation logic
   supplementalMaterial: z.string().optional(),
-  // Note: config field reserved for future use (advanced configuration options)
-  // Currently not implemented in analysis execution
+  // User-configurable model and reasoning settings
+  modelOverride: z.enum(['gpt-5', 'gpt-5.2']).optional(),
+  reasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
 });
 
 type AnalyzeRequest = z.infer<typeof analyzeRequestSchema>;
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
       return errorResponse('Failed to parse request body', 400);
     }
 
-    const { transcriptId, templateId, transcript, template, strategy, runEvaluation, supplementalMaterial } = body;
+    const { transcriptId, templateId, transcript, template, strategy, runEvaluation, supplementalMaterial, modelOverride, reasoningEffort } = body;
 
     // Fireground mode: this platform no longer produces meeting-era structured outputs.
     // Always request the fireground structured logs, preserving summary only if selected.
@@ -225,8 +226,13 @@ export async function POST(request: NextRequest) {
     let deployment: string;
     let openaiClient;
     try {
-      // Use token-based deployment selection
-      deployment = selectDeploymentByTokens(estimatedTokens);
+      // Use user-specified model if provided, otherwise use token-based selection
+      if (modelOverride) {
+        deployment = modelOverride;
+        log.debug('Using user-specified model override', { modelOverride });
+      } else {
+        deployment = selectDeploymentByTokens(estimatedTokens);
+      }
       openaiClient = getOpenAIClient();
     } catch (error) {
       if (error instanceof OpenAIConfigError) {
@@ -273,6 +279,8 @@ export async function POST(request: NextRequest) {
           // Supplemental material from uploaded docs (Word, PDF, PPT) or pasted text
           // This is passed separately to prompts to preserve transcript timestamp citation logic
           supplementalMaterial,
+          // User-specified reasoning effort (low/medium/high)
+          reasoningEffort,
         }
       );
     } catch (error) {
