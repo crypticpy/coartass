@@ -1,4 +1,4 @@
-# Meeting Transcriber - Security Architecture Document
+# Austin RTASS - Security Architecture Document
 
 **Document Version:** 1.2
 **Last Updated:** December 2025
@@ -28,7 +28,7 @@
 
 ### 1.1 Application Purpose
 
-Meeting Transcriber is a web application that transcribes audio recordings using Azure OpenAI's GPT-4o Transcribe model with speaker diarization, and provides AI-powered analysis using GPT models. The application is designed with a **privacy-first approach** where all user data is stored client-side only (browser IndexedDB).
+Austin RTASS is a web application that transcribes audio recordings using Azure OpenAI's GPT-4o Transcribe model with speaker diarization, and provides AI-powered analysis using GPT models. The application is designed with a **privacy-first approach** where all user data is stored client-side only (browser IndexedDB).
 
 ### 1.2 Key Security Highlights
 
@@ -147,13 +147,13 @@ Microservices would be reconsidered if:
 |  |              AZURE CONTAINER APPS ENVIRONMENT                     |  |
 |  |                                                                   |  |
 |  |  +-------------------------------------------------------------+  |  |
-|  |  |              CONTAINER APP (meeting-transcriber)            |  |  |
+|  |  |                 CONTAINER APP (austin-rtass)                |  |  |
 |  |  |                                                             |  |  |
 |  |  |  +-------------------------------------------------------+  |  |  |
 |  |  |  |              SINGLE DOCKER CONTAINER                  |  |  |  |
 |  |  |  |                                                       |  |  |  |
 |  |  |  |  +------------------------------------------------+   |  |  |  |
-|  |  |  |  |           NEXT.JS 14 APPLICATION               |   |  |  |  |
+|  |  |  |  |           NEXT.JS 15 APPLICATION               |   |  |  |  |
 |  |  |  |  |                                                |   |  |  |  |
 |  |  |  |  |   +--------------+    +------------------+     |   |  |  |  |
 |  |  |  |  |   |   Frontend   |    |   API Routes     |     |   |  |  |  |
@@ -325,7 +325,7 @@ Microservices would be reconsidered if:
 ```
 +=========================================================================+
 |                        AZURE RESOURCE GROUP                             |
-|                   (rg-meeting-transcriber-{env})                        |
+|                      (rg-austin-rtass-{env})                            |
 +=========================================================================+
 |                                                                         |
 |  NETWORKING & ACCESS                                                    |

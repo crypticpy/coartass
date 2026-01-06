@@ -1,7 +1,7 @@
 // ============================================================================
 // Azure Container App Module
 // ============================================================================
-// Deploys the Meeting Transcriber application as a Container App
+// Deploys the Austin RTASS application as a Container App
 // ============================================================================
 
 @description('Name of the Container App')
@@ -63,7 +63,7 @@ param corsAllowedOrigins array = []
 // Variables
 // ============================================================================
 
-var imageName = '${containerRegistryLoginServer}/meeting-transcriber:${imageTag}'
+var imageName = '${containerRegistryLoginServer}/austin-rtass:${imageTag}'
 var useKeyVault = !empty(keyVaultUri)
 
 // CORS configuration: use provided origins or disable if empty
@@ -127,7 +127,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
     template: {
       containers: [
         {
-          name: 'meeting-transcriber'
+          name: 'austin-rtass'
           image: imageName
           resources: {
             cpu: json(cpu)

@@ -12,17 +12,19 @@ using '../main.bicep'
 
 param environment = 'dev'
 // Location defaults to resource group location (southcentralus)
-param baseName = 'mtranscriber'
+param baseName = 'austin-rtass'
 param imageTag = 'latest'
 param enableKeyVault = true
+param externalIngress = true
 
 // Azure OpenAI Configuration
-param azureOpenAIApiVersion = '2024-08-01-preview'
-param azureOpenAIWhisperDeployment = 'whisper-1'
-param azureOpenAIGPTDeployment = 'gpt-4o'
+param azureOpenAIApiVersion = '2024-12-01-preview'
+param azureOpenAIWhisperDeployment = 'gpt-4o-transcribe-diarize'
+param azureOpenAIGPTDeployment = 'gpt-5'
+param azureOpenAIExtendedGPTDeployment = ''
 
 // Note: After deployment, add secrets to Key Vault:
-//   az keyvault secret set --vault-name kv-mtranscriber-dev \
+//   az keyvault secret set --vault-name kv-austin-rtass-dev \
 //     --name azure-openai-api-key --value 'your-key'
-//   az keyvault secret set --vault-name kv-mtranscriber-dev \
+//   az keyvault secret set --vault-name kv-austin-rtass-dev \
 //     --name azure-openai-endpoint --value 'https://your-endpoint.openai.azure.com/'

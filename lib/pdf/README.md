@@ -393,4 +393,4 @@ See `/lib/pdf/examples/` for complete working examples.
 
 ## License
 
-Part of the Meeting Transcriber application.
+Part of the Austin RTASS application.

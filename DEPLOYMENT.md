@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide provides comprehensive instructions for deploying the Meeting Transcriber application. The app is designed to run in Docker containers and can be deployed to any infrastructure that supports containerized applications.
+This guide provides comprehensive instructions for deploying the Austin RTASS application. The app is designed to run in Docker containers and can be deployed to any infrastructure that supports containerized applications.
 
 ## Table of Contents
 
@@ -44,8 +44,8 @@ For most organizations, we recommend starting with **Docker locally** for testin
 
 ```bash
 # 1. Clone and enter the repository
-git clone https://github.com/your-org/meeting-transcriber.git
-cd meeting-transcriber
+git clone https://github.com/your-org/austin-rtass.git
+cd austin-rtass
 
 # 2. Create environment file
 cp .env.local.example .env.local
@@ -62,7 +62,7 @@ The application will be available at `http://localhost:3000`.
 #### For Local Testing (Your Machine's Architecture)
 
 ```bash
-docker build -t meeting-transcriber:local .
+docker build -t austin-rtass:local .
 ```
 
 #### For Azure/Cloud Deployment (x86_64/AMD64)
@@ -70,7 +70,7 @@ docker build -t meeting-transcriber:local .
 Most cloud platforms run on x86_64 architecture. If you're building on an Apple Silicon Mac (M1/M2/M3), you need to specify the platform:
 
 ```bash
-docker buildx build --platform linux/amd64 -t meeting-transcriber:azure .
+docker buildx build --platform linux/amd64 -t austin-rtass:azure .
 ```
 
 #### Multi-Architecture Build
@@ -79,7 +79,7 @@ To build for both ARM64 (Apple Silicon) and AMD64 (Intel/AMD):
 
 ```bash
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t meeting-transcriber:latest .
+  -t austin-rtass:latest .
 ```
 
 ### Running the Container
@@ -89,13 +89,13 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ```bash
 docker run -p 3000:3000 \
   -e OPENAI_API_KEY=sk-your-key \
-  meeting-transcriber:local
+  austin-rtass:local
 ```
 
 #### With Environment File
 
 ```bash
-docker run -p 3000:3000 --env-file .env.local meeting-transcriber:local
+docker run -p 3000:3000 --env-file .env.local austin-rtass:local
 ```
 
 #### With Docker Compose
@@ -147,6 +147,8 @@ Azure Container Apps is our recommended production deployment target. It provide
 - Managed infrastructure
 - Integration with Azure Key Vault
 
+For the Austin RTASS MVP’s full Azure configuration (IaC deploy script, Key Vault secrets, Entra ID auth, IP allowlisting, troubleshooting, and cleanup), see `docs/AZURE_CONTAINER_APPS_GUIDE.md`.
+
 ### Prerequisites for Azure
 
 1. **Azure CLI** installed and configured
@@ -164,14 +166,14 @@ az login
 #### 2. Create Resource Group (if needed)
 
 ```bash
-az group create --name rg-meeting-transcriber --location eastus
+az group create --name rg-austin-rtass --location eastus
 ```
 
 #### 3. Create Container Registry
 
 ```bash
 az acr create \
-  --resource-group rg-meeting-transcriber \
+  --resource-group rg-austin-rtass \
   --name youracrname \
   --sku Basic
 ```
@@ -191,13 +193,13 @@ VERSION=$(node -p "require('./package.json').version")
 
 # Build for AMD64 with version tag
 docker buildx build --platform linux/amd64 \
-  -t youracrname.azurecr.io/meeting-transcriber:v${VERSION} \
+  -t youracrname.azurecr.io/austin-rtass:v${VERSION} \
   --push .
 
 # Also tag as latest for convenience (but deploy with version tag!)
-docker tag youracrname.azurecr.io/meeting-transcriber:v${VERSION} \
-  youracrname.azurecr.io/meeting-transcriber:latest
-docker push youracrname.azurecr.io/meeting-transcriber:latest
+docker tag youracrname.azurecr.io/austin-rtass:v${VERSION} \
+  youracrname.azurecr.io/austin-rtass:latest
+docker push youracrname.azurecr.io/austin-rtass:latest
 ```
 
 **Deploy with the versioned tag:**
@@ -205,7 +207,7 @@ docker push youracrname.azurecr.io/meeting-transcriber:latest
 az containerapp update \
   --name your-container-app \
   --resource-group your-resource-group \
-  --image youracrname.azurecr.io/meeting-transcriber:v${VERSION}
+  --image youracrname.azurecr.io/austin-rtass:v${VERSION}
 ```
 
 #### 5. Deploy Using Infrastructure Scripts
@@ -214,7 +216,8 @@ The repository includes Bicep templates for Azure deployment:
 
 ```bash
 cd infrastructure
-./deploy.sh prod
+./deploy.sh prod            # infra only
+./deploy.sh prod --push     # infra + build/push image + update app
 ```
 
 This creates:
@@ -227,26 +230,27 @@ This creates:
 
 ```bash
 # Set your OpenAI credentials
+VAULT_NAME="<your-key-vault-name>"  # Printed by `./infrastructure/deploy.sh` (or shown in Azure Portal)
 az keyvault secret set \
-  --vault-name kv-mtranscriber-prod \
+  --vault-name "$VAULT_NAME" \
   --name azure-openai-api-key \
   --value 'your-api-key'
 
 az keyvault secret set \
-  --vault-name kv-mtranscriber-prod \
+  --vault-name "$VAULT_NAME" \
   --name azure-openai-endpoint \
   --value 'https://your-resource.openai.azure.com/'
 ```
 
 ### Azure-Specific Environment Variables
 
-When using Azure Key Vault, set `AZURE_KEY_VAULT_URL`:
+If you want the app to fetch secrets directly from Key Vault at runtime, set `AZURE_KEY_VAULT_URL`:
 
 ```env
 AZURE_KEY_VAULT_URL=https://your-vault.vault.azure.net/
 ```
 
-The application will automatically fetch secrets from Key Vault using managed identity.
+Note: If you deploy with the Bicep templates in `infrastructure/`, Azure Container Apps will pull secrets from Key Vault and inject them as environment variables, so `AZURE_KEY_VAULT_URL` is optional.
 
 ## Environment Variables
 
@@ -310,9 +314,12 @@ GET /api/health
 Response:
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2025-01-01T00:00:00.000Z",
-  "uptime": 12345.67
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2025-01-01T00:00:00.000Z",
+    "uptime": 12345.67
+  }
 }
 ```
 
@@ -329,7 +336,7 @@ Check container health:
 
 ```bash
 docker ps  # Shows health status
-docker inspect --format='{{.State.Health.Status}}' meeting-transcriber
+docker inspect --format='{{.State.Health.Status}}' austin-rtass
 ```
 
 ### Azure Container Apps Health
@@ -351,7 +358,7 @@ Azure Container Apps automatically uses the `/api/health` endpoint for:
 ```bash
 docker compose logs -f app
 # or
-docker logs meeting-transcriber
+docker logs austin-rtass
 ```
 
 **Common causes**:
@@ -379,7 +386,7 @@ docker compose exec app ps aux
 
 **Solution**: Use buildx with explicit platform:
 ```bash
-docker buildx build --platform linux/amd64 -t meeting-transcriber:azure .
+docker buildx build --platform linux/amd64 -t austin-rtass:azure .
 ```
 
 #### Environment Variables Not Loading
@@ -414,7 +421,7 @@ VERSION="0.9.9-$(date +%Y%m%d%H%M%S)"
 az containerapp update \
   --name your-app \
   --resource-group your-rg \
-  --image youracr.azurecr.io/meeting-transcriber:v${VERSION}
+  --image youracr.azurecr.io/austin-rtass:v${VERSION}
 ```
 
 **Verify the new revision is running**:

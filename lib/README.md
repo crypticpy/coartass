@@ -1,6 +1,6 @@
 # Database Wrapper Documentation
 
-This directory contains the IndexedDB wrapper implementation using Dexie.js for the Meeting Transcriber application.
+This directory contains the IndexedDB wrapper implementation using Dexie.js for the Austin RTASS application.
 
 ## Overview
 

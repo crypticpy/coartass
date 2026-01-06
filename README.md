@@ -163,12 +163,12 @@ Build and run the containerized application:
 
 ```bash
 # Build the Docker image
-docker build -t meeting-transcriber .
+docker build -t austin-rtass .
 
 # Run with environment variables
 docker run -p 3000:3000 \
   -e OPENAI_API_KEY=your-key \
-  meeting-transcriber
+  austin-rtass
 ```
 
 Or use Docker Compose:
@@ -242,7 +242,7 @@ make deploy        # Build and deploy to Azure
 ## Project Structure
 
 ```
-meeting-transcriber/
+austin-rtass/
 ├── app/                    # Next.js pages and API routes
 │   ├── api/               # Backend API endpoints
 │   │   ├── transcribe/    # Audio transcription

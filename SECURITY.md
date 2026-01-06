@@ -11,7 +11,7 @@ We release patches for security vulnerabilities. Which versions are eligible for
 
 ## Reporting a Vulnerability
 
-We take the security of Meeting Transcriber seriously. If you believe you have found a security vulnerability, please report it to us responsibly.
+We take the security of Austin RTASS seriously. If you believe you have found a security vulnerability, please report it to us responsibly.
 
 ### How to Report
 
@@ -238,4 +238,4 @@ npm audit fix
 
 ---
 
-Thank you for helping keep Meeting Transcriber and its users safe!
+Thank you for helping keep Austin RTASS and its users safe!

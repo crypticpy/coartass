@@ -11,7 +11,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 // Content Security Policy configuration
-// This CSP is designed for the Meeting Transcriber app which uses:
+// This CSP is designed for the Austin RTASS app which uses:
 // - React/Next.js (requires 'unsafe-inline' for styles due to Mantine UI)
 // - FFmpeg WASM workers (requires worker-src blob:)
 // - Audio recording and playback (requires media-src blob:)

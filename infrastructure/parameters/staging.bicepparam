@@ -1,16 +1,16 @@
 // ============================================================================
-// Production Environment Parameters
+// Staging Environment Parameters
 // ============================================================================
-// Use this file for production deployments:
+// Use this file for staging deployments:
 //   az deployment group create \
 //     --resource-group rg-aph-cognitive-sandbox-dev-scus-01 \
 //     --template-file main.bicep \
-//     --parameters parameters/prod.bicepparam
+//     --parameters parameters/staging.bicepparam
 // ============================================================================
 
 using '../main.bicep'
 
-param environment = 'prod'
+param environment = 'staging'
 // Location defaults to resource group location (southcentralus)
 param baseName = 'austin-rtass'
 param imageTag = 'latest'
@@ -23,16 +23,16 @@ param azureOpenAIWhisperDeployment = 'gpt-4o-transcribe-diarize'
 param azureOpenAIGPTDeployment = 'gpt-5'
 param azureOpenAIExtendedGPTDeployment = ''
 
-// Production-specific tags
+// Staging-specific tags
 param tags = {
   project: 'austin-rtass'
-  environment: 'prod'
+  environment: 'staging'
   managedBy: 'bicep'
-  criticality: 'high'
+  criticality: 'medium'
 }
 
 // Note: After deployment, add secrets to Key Vault:
-//   az keyvault secret set --vault-name kv-austin-rtass-prd \
+//   az keyvault secret set --vault-name kv-austin-rtass-stg \
 //     --name azure-openai-api-key --value 'your-key'
-//   az keyvault secret set --vault-name kv-austin-rtass-prd \
+//   az keyvault secret set --vault-name kv-austin-rtass-stg \
 //     --name azure-openai-endpoint --value 'https://your-endpoint.openai.azure.com/'

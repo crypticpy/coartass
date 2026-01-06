@@ -1,5 +1,5 @@
 # ============================================================================
-# Meeting Transcriber - Development Docker Compose
+# Austin RTASS - Development Docker Compose
 # ============================================================================
 # Extends docker-compose.yml for development with hot-reload
 #

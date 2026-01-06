@@ -67,7 +67,7 @@
     },
     "azureOpenAIApiVersion": {
       "type": "string",
-      "defaultValue": "2024-08-01-preview",
+      "defaultValue": "2024-12-01-preview",
       "metadata": {
         "description": "Azure OpenAI API version"
       }
@@ -86,10 +86,17 @@
         "description": "Azure OpenAI GPT deployment name"
       }
     },
+    "azureOpenAIExtendedGPTDeployment": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure OpenAI extended-context GPT deployment name (optional, for long transcripts)"
+      }
+    },
     "tags": {
       "type": "object",
       "defaultValue": {
-        "project": "meeting-transcriber",
+        "project": "austin-rtass",
         "environment": "[parameters('environment')]",
         "managedBy": "bicep"
       },
@@ -647,6 +654,14 @@
               {
                 "name": "AZURE_OPENAI_GPT4_DEPLOYMENT",
                 "value": "[parameters('azureOpenAIGPTDeployment')]"
+              },
+              {
+                "name": "AZURE_OPENAI_GPT5_DEPLOYMENT",
+                "value": "[parameters('azureOpenAIGPTDeployment')]"
+              },
+              {
+                "name": "AZURE_OPENAI_EXTENDED_GPT_DEPLOYMENT",
+                "value": "[parameters('azureOpenAIExtendedGPTDeployment')]"
               }
             ]
           },
@@ -791,7 +806,7 @@
                 }
               }
             ],
-            "imageName": "[format('{0}/meeting-transcriber:{1}', parameters('containerRegistryLoginServer'), parameters('imageTag'))]",
+            "imageName": "[format('{0}/austin-rtass:{1}', parameters('containerRegistryLoginServer'), parameters('imageTag'))]",
             "useKeyVault": "[not(empty(parameters('keyVaultUri')))]",
             "allEnvVars": "[concat(parameters('environmentVariables'), variables('secretEnvVarsFormatted'))]"
           },
@@ -848,7 +863,7 @@
                 "template": {
                   "containers": [
                     {
-                      "name": "meeting-transcriber",
+                      "name": "austin-rtass",
                       "image": "[variables('imageName')]",
                       "resources": {
                         "cpu": "[json(parameters('cpu'))]",

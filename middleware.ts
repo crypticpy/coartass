@@ -1,7 +1,7 @@
 /**
  * Next.js Middleware
  *
- * Handles routing and internationalization for the Meeting Transcriber app.
+ * Handles routing and internationalization for the Austin RTASS app.
  * This is a minimal middleware since the app uses client-side locale management
  * via localStorage rather than URL-based routing.
  */

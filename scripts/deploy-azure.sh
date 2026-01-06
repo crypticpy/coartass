@@ -2,7 +2,7 @@
 # ============================================================================
 # Azure Container Apps Deployment Script
 # ============================================================================
-# This script automates the deployment of the Meeting Transcriber application
+# This script automates the deployment of the Austin RTASS application
 # to Azure Container Apps.
 #
 # Usage:
@@ -46,19 +46,19 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Azure resources
-ACR_NAME="meetingtranscriberacr"
-IMAGE_NAME="meeting-transcriber"
+ACR_NAME="austinrtassacr"
+IMAGE_NAME="austin-rtass"
 AZURE_REGION="eastus"
 
 # Environment-specific configuration
 if [[ "$ENVIRONMENT" == "production" ]]; then
-    RESOURCE_GROUP="meeting-transcriber-production-rg"
-    CONTAINER_APP_NAME="meeting-transcriber-production"
-    CONTAINER_APP_ENV="meeting-transcriber-env-production"
+    RESOURCE_GROUP="austin-rtass-production-rg"
+    CONTAINER_APP_NAME="austin-rtass-production"
+    CONTAINER_APP_ENV="austin-rtass-env-production"
 else
-    RESOURCE_GROUP="meeting-transcriber-staging-rg"
-    CONTAINER_APP_NAME="meeting-transcriber-staging"
-    CONTAINER_APP_ENV="meeting-transcriber-env-staging"
+    RESOURCE_GROUP="austin-rtass-staging-rg"
+    CONTAINER_APP_NAME="austin-rtass-staging"
+    CONTAINER_APP_ENV="austin-rtass-env-staging"
 fi
 
 # Image tag (use git SHA if in git repo, otherwise use timestamp)

@@ -1,6 +1,6 @@
-# Contributing to Meeting Transcriber
+# Contributing to Austin RTASS
 
-Thank you for your interest in contributing to Meeting Transcriber! This document provides guidelines and information about contributing to this project.
+Thank you for your interest in contributing to Austin RTASS! This document provides guidelines and information about contributing to this project.
 
 ## Table of Contents
 
@@ -36,14 +36,14 @@ This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participatin
 2. **Clone your fork**
 
    ```bash
-   git clone https://github.com/your-username/meeting-transcriber.git
-   cd meeting-transcriber
+   git clone https://github.com/your-username/austin-rtass.git
+   cd austin-rtass
    ```
 
 3. **Add upstream remote**
 
    ```bash
-   git remote add upstream https://github.com/your-org/meeting-transcriber.git
+   git remote add upstream https://github.com/your-org/austin-rtass.git
    ```
 
 4. **Install dependencies**
@@ -328,4 +328,4 @@ If you have questions about contributing:
 - **GitHub Discussions**: Ask questions and discuss ideas
 - **Issues**: For bugs and feature requests (use appropriate labels)
 
-Thank you for contributing to Meeting Transcriber!
+Thank you for contributing to Austin RTASS!

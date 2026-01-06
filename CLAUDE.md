@@ -47,7 +47,7 @@ make deploy        # Build, push, and deploy to Azure
 
 ```bash
 docker compose up                    # Start with docker-compose
-docker buildx build --platform linux/amd64 -t meeting-transcriber .  # Build for Azure
+docker buildx build --platform linux/amd64 -t austin-rtass .  # Build for Azure
 ```
 
 ### Azure Deployment
@@ -66,13 +66,13 @@ This file contains:
 VERSION=$(node -p "require('./package.json').version")
 
 az acr login --name acrmtranscriberprod && \
-docker buildx build --platform linux/amd64 -t meeting-transcriber:v${VERSION} . && \
-docker tag meeting-transcriber:v${VERSION} acrmtranscriberprod.azurecr.io/meeting-transcriber:v${VERSION} && \
-docker push acrmtranscriberprod.azurecr.io/meeting-transcriber:v${VERSION} && \
+docker buildx build --platform linux/amd64 -t austin-rtass:v${VERSION} . && \
+docker tag austin-rtass:v${VERSION} acrmtranscriberprod.azurecr.io/austin-rtass:v${VERSION} && \
+docker push acrmtranscriberprod.azurecr.io/austin-rtass:v${VERSION} && \
 az containerapp update \
   --name ca-mtranscriber-prod \
   --resource-group rg-aph-cognitive-sandbox-dev-scus-01 \
-  --image acrmtranscriberprod.azurecr.io/meeting-transcriber:v${VERSION}
+  --image acrmtranscriberprod.azurecr.io/austin-rtass:v${VERSION}
 ```
 
 **Important:** Always use versioned tags (`:v0.9.3`) instead of `:latest`. Azure Container Apps caches the `:latest` tag and may not pull the new image, causing deployments to silently use stale code. Using explicit version tags forces a new revision.

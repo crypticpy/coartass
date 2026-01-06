@@ -1,6 +1,6 @@
 # Branding Guide
 
-This guide explains how to customize the Meeting Transcriber application for your organization. You can change the logo, colors, application name, and more without modifying the core application code.
+This guide explains how to customize the Austin RTASS application for your organization. You can change the logo, colors, application name, and more without modifying the core application code.
 
 ## Table of Contents
 
@@ -146,9 +146,9 @@ Update the application name in `app/layout.tsx`:
 
 ```typescript
 export const metadata: Metadata = {
-  title: "Meeting Transcriber - Your Organization Name",
+  title: "Austin RTASS - Your Organization Name",
   description: "Your custom description here",
-  keywords: ["transcription", "meetings", "AI", "your keywords"],
+  keywords: ["transcription", "radio traffic", "AI", "your keywords"],
   // ...icons config
 };
 ```
@@ -159,7 +159,7 @@ Update `public/site.webmanifest` for Progressive Web App support:
 
 ```json
 {
-  "name": "Meeting Transcriber - Your Org",
+  "name": "Austin RTASS - Your Org",
   "short_name": "Transcriber",
   "description": "Your description",
   "theme_color": "#YOUR_PRIMARY_COLOR",

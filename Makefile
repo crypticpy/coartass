@@ -1,5 +1,5 @@
 # ============================================================================
-# Meeting Transcriber - Makefile
+# Austin RTASS - Makefile
 # ============================================================================
 # Common commands for development, testing, and deployment
 # Usage: make [target]
@@ -18,7 +18,7 @@ RED := \033[0;31m
 NC := \033[0m # No Color
 
 # Variables
-IMAGE_NAME ?= meeting-transcriber
+IMAGE_NAME ?= austin-rtass
 IMAGE_TAG ?= latest
 REGISTRY ?= your-registry.azurecr.io
 ENVIRONMENT ?= dev
@@ -28,7 +28,7 @@ ENVIRONMENT ?= dev
 # ============================================================================
 
 help: ## Show this help message
-	@echo "$(BLUE)Meeting Transcriber - Available Commands$(NC)"
+	@echo "$(BLUE)Austin RTASS - Available Commands$(NC)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
 

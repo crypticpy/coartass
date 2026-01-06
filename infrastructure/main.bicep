@@ -1,12 +1,12 @@
 // ============================================================================
-// Meeting Transcriber - Azure Infrastructure
+// Austin RTASS - Azure Infrastructure
 // ============================================================================
 // Main Bicep deployment template for Azure Container Apps
 //
 // Resources deployed:
 // - Azure Container Registry (ACR)
 // - Container Apps Environment
-// - Container App (Meeting Transcriber)
+// - Container App (Austin RTASS)
 // - Key Vault (optional, for secrets management)
 // - Log Analytics Workspace (for monitoring)
 //
@@ -33,7 +33,7 @@ param location string = resourceGroup().location
 @description('Base name for all resources')
 @minLength(3)
 @maxLength(20)
-param baseName string = 'mtranscriber'
+param baseName string = 'austin-rtass'
 
 @description('Container image tag to deploy')
 param imageTag string = 'latest'
@@ -50,7 +50,7 @@ param azureOpenAIEndpoint string = ''
 param azureOpenAIApiKey string = ''
 
 @description('Azure OpenAI API version')
-param azureOpenAIApiVersion string = '2024-08-01-preview'
+param azureOpenAIApiVersion string = '2024-12-01-preview'
 
 @description('Azure OpenAI Whisper deployment name')
 param azureOpenAIWhisperDeployment string = ''
@@ -58,15 +58,21 @@ param azureOpenAIWhisperDeployment string = ''
 @description('Azure OpenAI GPT deployment name')
 param azureOpenAIGPTDeployment string = ''
 
+@description('Azure OpenAI extended-context GPT deployment name (optional, for long transcripts)')
+param azureOpenAIExtendedGPTDeployment string = ''
+
 @description('Tags to apply to all resources')
 param tags object = {
-  project: 'meeting-transcriber'
+  project: 'austin-rtass'
   environment: environment
   managedBy: 'bicep'
 }
 
 @description('CORS allowed origins for the Container App. Empty array disables CORS (recommended for production if accessed via same-origin). Set to specific domain(s) if cross-origin access is required.')
 param corsAllowedOrigins array = []
+
+@description('Whether the Container App should be publicly accessible (external ingress)')
+param externalIngress bool = true
 
 // ============================================================================
 // Variables
@@ -151,6 +157,7 @@ module containerApp 'modules/container-app.bicep' = {
     containerRegistryLoginServer: acr.outputs.loginServer
     imageTag: imageTag
     keyVaultUri: enableKeyVault ? keyVault!.outputs.vaultUri : ''
+    externalIngress: externalIngress
 
     // Environment variables (non-secrets go here)
     environmentVariables: [
@@ -169,6 +176,14 @@ module containerApp 'modules/container-app.bicep' = {
       {
         name: 'AZURE_OPENAI_GPT4_DEPLOYMENT'
         value: azureOpenAIGPTDeployment
+      }
+      {
+        name: 'AZURE_OPENAI_GPT5_DEPLOYMENT'
+        value: azureOpenAIGPTDeployment
+      }
+      {
+        name: 'AZURE_OPENAI_EXTENDED_GPT_DEPLOYMENT'
+        value: azureOpenAIExtendedGPTDeployment
       }
     ]
 
@@ -219,7 +234,9 @@ module containerApp 'modules/container-app.bicep' = {
 // ============================================================================
 
 output resourceGroupName string = resourceGroup().name
+output containerRegistryName string = acr.outputs.registryName
 output containerRegistryLoginServer string = acr.outputs.loginServer
+output containerAppName string = containerAppName
 output containerAppFqdn string = containerApp.outputs.fqdn
 output containerAppUrl string = 'https://${containerApp.outputs.fqdn}'
 output keyVaultUri string = enableKeyVault ? keyVault!.outputs.vaultUri : ''

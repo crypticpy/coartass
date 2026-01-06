@@ -2,7 +2,7 @@
 # Azure Container Apps - Deployment Configuration
 # ============================================================================
 # This file defines the Azure Container Apps configuration for the
-# Meeting Transcriber application.
+# Austin RTASS application.
 #
 # Prerequisites:
 # - Azure subscription
@@ -77,9 +77,9 @@ properties:
   template:
     # Container definition
     containers:
-      - name: meeting-transcriber
+      - name: austin-rtass
         # Image from Azure Container Registry
-        image: {ACR_NAME}.azurecr.io/meeting-transcriber:latest
+        image: {ACR_NAME}.azurecr.io/austin-rtass:latest
 
         # Resource allocation
         resources:
@@ -216,19 +216,19 @@ properties:
 #
 # 4. Create resource group:
 #    az group create \
-#      --name meeting-transcriber-rg \
+#      --name austin-rtass-rg \
 #      --location eastus
 #
 # 5. Create Container Registry:
 #    az acr create \
-#      --resource-group meeting-transcriber-rg \
+#      --resource-group austin-rtass-rg \
 #      --name meetingtranscriberacr \
 #      --sku Basic
 #
 # 6. Create Container Apps Environment:
 #    az containerapp env create \
-#      --name meeting-transcriber-env \
-#      --resource-group meeting-transcriber-rg \
+#      --name austin-rtass-env \
+#      --resource-group austin-rtass-rg \
 #      --location eastus
 #
 # Build and Push Image:
@@ -238,16 +238,16 @@ properties:
 #
 # 2. Build and push image:
 #    docker buildx build --platform linux/amd64 \
-#      -t meetingtranscriberacr.azurecr.io/meeting-transcriber:latest \
+#      -t meetingtranscriberacr.azurecr.io/austin-rtass:latest \
 #      --push .
 #
 # Create Container App:
 # ---------------------
 # az containerapp create \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
-#   --environment meeting-transcriber-env \
-#   --image meetingtranscriberacr.azurecr.io/meeting-transcriber:latest \
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
+#   --environment austin-rtass-env \
+#   --image meetingtranscriberacr.azurecr.io/austin-rtass:latest \
 #   --target-port 3000 \
 #   --ingress external \
 #   --min-replicas 1 \
@@ -272,15 +272,15 @@ properties:
 # Update Container App:
 # ---------------------
 # az containerapp update \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
-#   --image meetingtranscriberacr.azurecr.io/meeting-transcriber:latest
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
+#   --image meetingtranscriberacr.azurecr.io/austin-rtass:latest
 #
 # Update Secrets:
 # ---------------
 # az containerapp secret set \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
 #   --secrets \
 #     azure-openai-api-key={NEW_API_KEY} \
 #     azure-openai-endpoint={NEW_ENDPOINT}
@@ -288,15 +288,15 @@ properties:
 # View Logs:
 # ----------
 # az containerapp logs show \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
 #   --follow
 #
 # Get Application URL:
 # -------------------
 # az containerapp show \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
 #   --query properties.configuration.ingress.fqdn \
 #   --output tsv
 #
@@ -306,25 +306,25 @@ properties:
 #
 # View Revisions:
 # az containerapp revision list \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
 #   --output table
 #
 # View Replicas:
 # az containerapp replica list \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
 #   --output table
 #
 # Restart Container App:
 # az containerapp revision restart \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg
 #
 # Delete Container App:
 # az containerapp delete \
-#   --name meeting-transcriber \
-#   --resource-group meeting-transcriber-rg \
+#   --name austin-rtass \
+#   --resource-group austin-rtass-rg \
 #   --yes
 #
 # ============================================================================

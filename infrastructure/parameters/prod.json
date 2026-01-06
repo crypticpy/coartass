@@ -9,7 +9,7 @@
       "value": "eastus"
     },
     "baseName": {
-      "value": "mtranscriber"
+      "value": "austin-rtass"
     },
     "imageTag": {
       "value": "latest"
@@ -17,18 +17,24 @@
     "enableKeyVault": {
       "value": true
     },
+    "externalIngress": {
+      "value": true
+    },
     "azureOpenAIApiVersion": {
-      "value": "2024-08-01-preview"
+      "value": "2024-12-01-preview"
     },
     "azureOpenAIWhisperDeployment": {
-      "value": "whisper-1"
+      "value": "gpt-4o-transcribe-diarize"
     },
     "azureOpenAIGPTDeployment": {
-      "value": "gpt-4o"
+      "value": "gpt-5"
+    },
+    "azureOpenAIExtendedGPTDeployment": {
+      "value": ""
     },
     "tags": {
       "value": {
-        "project": "meeting-transcriber",
+        "project": "austin-rtass",
         "environment": "prod",
         "managedBy": "bicep",
         "criticality": "high"

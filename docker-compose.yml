@@ -1,5 +1,5 @@
 # ============================================================================
-# Meeting Transcriber - Docker Compose Configuration
+# Austin RTASS - Docker Compose Configuration
 # ============================================================================
 # Purpose: Local development and testing with Docker
 # Usage: docker-compose up
@@ -20,10 +20,10 @@ services:
       # platform: linux/amd64
 
     # Container name
-    container_name: meeting-transcriber
+    container_name: austin-rtass
 
     # Image name and tag
-    image: meeting-transcriber:local
+    image: austin-rtass:local
 
     # Port mapping: host:container
     # Access application at http://localhost:3000
@@ -110,15 +110,15 @@ services:
 
     # Network configuration
     networks:
-      - meeting-transcriber-network
+      - austin-rtass-network
 
 # ==========================================================================
 # Networks
 # ==========================================================================
 networks:
-  meeting-transcriber-network:
+  austin-rtass-network:
     driver: bridge
-    name: meeting-transcriber-network
+    name: austin-rtass-network
 
 # ==========================================================================
 # Volumes (if needed for persistent data)
@@ -126,7 +126,7 @@ networks:
 # Uncomment if you need persistent storage
 # volumes:
 #   app-data:
-#     name: meeting-transcriber-data
+#     name: austin-rtass-data
 
 # ============================================================================
 # Usage Instructions

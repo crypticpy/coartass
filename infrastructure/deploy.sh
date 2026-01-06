@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Meeting Transcriber - Azure Deployment Script
+# Austin RTASS - Azure Deployment Script
 # ============================================================================
 # Deploys the infrastructure and application to Azure
 #
@@ -31,7 +31,7 @@ NC='\033[0m' # No Color
 ENVIRONMENT="${1:-dev}"
 BUILD_IMAGE=false
 PUSH_IMAGE=false
-BASE_NAME="mtranscriber"
+PARAM_FILE="parameters/${ENVIRONMENT}.bicepparam"
 
 # Target resource group (existing)
 RESOURCE_GROUP="rg-aph-cognitive-sandbox-dev-scus-01"
@@ -67,12 +67,13 @@ if [[ ! "$ENVIRONMENT" =~ ^(dev|staging|prod)$ ]]; then
 fi
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}Meeting Transcriber - Azure Deployment${NC}"
+echo -e "${BLUE}Austin RTASS - Azure Deployment${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo -e "Environment:    ${GREEN}$ENVIRONMENT${NC}"
 echo -e "Resource Group: ${GREEN}$RESOURCE_GROUP${NC}"
 echo -e "Build Image:    ${GREEN}$BUILD_IMAGE${NC}"
 echo -e "Push Image:     ${GREEN}$PUSH_IMAGE${NC}"
+echo -e "Parameters:     ${GREEN}$PARAM_FILE${NC}"
 echo ""
 
 # Check prerequisites
@@ -114,6 +115,17 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+if [[ ! -f "$PARAM_FILE" ]]; then
+    echo -e "${RED}Error: Parameters file not found: $PARAM_FILE${NC}"
+    echo -e "${YELLOW}Available parameter files:${NC}"
+    ls -1 parameters/*.bicepparam 2>/dev/null || true
+    exit 1
+fi
+
+# Best-effort extraction of baseName for display (do not depend on parsing for deploy logic)
+BASE_NAME=$(sed -n "s/^param baseName = '\\(.*\\)'/\\1/p" "$PARAM_FILE" | head -n 1)
+BASE_NAME="${BASE_NAME:-austin-rtass}"
+
 # ============================================================================
 # Deploy Infrastructure
 # ============================================================================
@@ -121,13 +133,13 @@ cd "$SCRIPT_DIR"
 echo ""
 echo -e "${YELLOW}Deploying infrastructure...${NC}"
 
-DEPLOYMENT_NAME="mtranscriber-${ENVIRONMENT}-$(date +%Y%m%d%H%M%S)"
+DEPLOYMENT_NAME="${BASE_NAME}-${ENVIRONMENT}-$(date +%Y%m%d%H%M%S)"
 
 az deployment group create \
     --name "$DEPLOYMENT_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --template-file main.bicep \
-    --parameters "parameters/${ENVIRONMENT}.bicepparam" \
+    --parameters "$PARAM_FILE" \
     --output table
 
 # Get deployment outputs
@@ -135,11 +147,13 @@ echo ""
 echo -e "${YELLOW}Getting deployment outputs...${NC}"
 
 ACR_NAME=$(az deployment group show --name "$DEPLOYMENT_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.outputs.containerRegistryLoginServer.value' -o tsv 2>/dev/null || echo "")
+CONTAINER_APP_NAME=$(az deployment group show --name "$DEPLOYMENT_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.outputs.containerAppName.value' -o tsv 2>/dev/null || echo "")
 APP_URL=$(az deployment group show --name "$DEPLOYMENT_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.outputs.containerAppUrl.value' -o tsv 2>/dev/null || echo "")
 KEY_VAULT_URI=$(az deployment group show --name "$DEPLOYMENT_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.outputs.keyVaultUri.value' -o tsv 2>/dev/null || echo "")
 
 echo -e "Resource Group: ${GREEN}$RESOURCE_GROUP${NC}"
 echo -e "ACR Server:     ${GREEN}$ACR_NAME${NC}"
+echo -e "Container App:  ${GREEN}${CONTAINER_APP_NAME:-"(not available)"}${NC}"
 echo -e "App URL:        ${GREEN}$APP_URL${NC}"
 echo -e "Key Vault:      ${GREEN}$KEY_VAULT_URI${NC}"
 
@@ -153,32 +167,49 @@ if [[ "$BUILD_IMAGE" == "true" ]]; then
 
     cd "$SCRIPT_DIR/.."
 
+    # Versioned tag to avoid Azure Container Apps image caching
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+        GIT_SHA=$(git rev-parse --short HEAD)
+        IMAGE_TAG="${ENVIRONMENT}-${GIT_SHA}"
+    else
+        IMAGE_TAG="${ENVIRONMENT}-$(date +%Y%m%d%H%M%S)"
+    fi
+
     # Build for AMD64 (Azure)
-    docker buildx build \
-        --platform linux/amd64 \
-        -t meeting-transcriber:latest \
-        -t meeting-transcriber:$(git rev-parse --short HEAD 2>/dev/null || echo "local") \
-        .
-
     if [[ "$PUSH_IMAGE" == "true" && -n "$ACR_NAME" ]]; then
-        echo ""
-        echo -e "${YELLOW}Pushing to Azure Container Registry...${NC}"
-
         # Login to ACR
         az acr login --name "${ACR_NAME%%.*}"
 
-        # Tag and push
-        docker tag meeting-transcriber:latest "$ACR_NAME/meeting-transcriber:latest"
-        docker push "$ACR_NAME/meeting-transcriber:latest"
+        # Build and push directly to ACR
+        docker buildx build \
+            --platform linux/amd64 \
+            -t "$ACR_NAME/austin-rtass:${IMAGE_TAG}" \
+            -t "$ACR_NAME/austin-rtass:latest" \
+            --push \
+            .
+
+        echo -e "${GREEN}Pushed:${NC} $ACR_NAME/austin-rtass:${IMAGE_TAG}"
 
         # Update Container App with new image
         echo ""
         echo -e "${YELLOW}Updating Container App...${NC}"
 
+        if [[ -z "$CONTAINER_APP_NAME" ]]; then
+            echo -e "${RED}Error: containerAppName output missing from deployment${NC}"
+            exit 1
+        fi
+
         az containerapp update \
-            --name "ca-${BASE_NAME}-${ENVIRONMENT}" \
+            --name "$CONTAINER_APP_NAME" \
             --resource-group "$RESOURCE_GROUP" \
-            --image "$ACR_NAME/meeting-transcriber:latest"
+            --image "$ACR_NAME/austin-rtass:${IMAGE_TAG}"
+    else
+        docker buildx build \
+            --platform linux/amd64 \
+            -t "austin-rtass:latest" \
+            -t "austin-rtass:${IMAGE_TAG}" \
+            --load \
+            .
     fi
 fi
 

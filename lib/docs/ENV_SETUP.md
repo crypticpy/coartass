@@ -1,6 +1,6 @@
 # Environment Setup Guide
 
-This guide explains how to configure the Meeting Transcriber application with OpenAI API credentials.
+This guide explains how to configure the Austin RTASS application with OpenAI API credentials.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This guide explains how to configure the Meeting Transcriber application with Op
 
 ## Overview
 
-The Meeting Transcriber requires access to OpenAI APIs for:
+Austin RTASS requires access to OpenAI APIs for:
 
 - **Transcription**: Converting audio to text (Whisper or GPT-4o Transcribe)
 - **Analysis**: Meeting summaries, action items, and key decisions (GPT models)
@@ -52,8 +52,10 @@ Then add these variables to `.env.local`:
 AZURE_OPENAI_API_KEY=your-azure-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_VERSION=2024-12-01-preview
-AZURE_OPENAI_WHISPER_DEPLOYMENT=your-whisper-deployment
-AZURE_OPENAI_GPT4_DEPLOYMENT=your-gpt4-deployment
+AZURE_OPENAI_WHISPER_DEPLOYMENT=your-transcription-deployment
+AZURE_OPENAI_GPT5_DEPLOYMENT=your-gpt5-deployment
+# Legacy fallback name (still supported):
+# AZURE_OPENAI_GPT4_DEPLOYMENT=your-gpt5-deployment
 # Optional: Use a small model for "View Supporting Evidence" (Advanced analyses)
 AZURE_OPENAI_CITATIONS_DEPLOYMENT=gpt-4.1-mini
 AZURE_OPENAI_CITATIONS_API_VERSION=2024-12-01-preview
@@ -76,7 +78,8 @@ In Azure OpenAI Studio, deploy these models:
 |-------|---------|----------------------------|
 | `whisper` | Audio transcription | `whisper-1` |
 | `gpt-4o-transcribe` | Advanced audio transcription | `gpt-4o-transcribe` |
-| `gpt-4o` | Analysis and chat | `gpt-4o` |
+| `gpt-4o-transcribe-diarize` | Speaker diarization (beta) | `gpt-4o-transcribe-diarize` |
+| `gpt-5` | Analysis and chat | `gpt-5` |
 | `gpt-4.1-mini` | Supporting evidence selection | `gpt-4.1-mini` |
 
 **Note**: You need at least one transcription model (Whisper or GPT-4o Transcribe) and one analysis model.
@@ -100,10 +103,10 @@ AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_VERSION=2024-12-01-preview
 
 # Transcription deployment
-AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper-1
+AZURE_OPENAI_WHISPER_DEPLOYMENT=gpt-4o-transcribe-diarize
 
 # Analysis deployment
-AZURE_OPENAI_GPT4_DEPLOYMENT=gpt-4o
+AZURE_OPENAI_GPT5_DEPLOYMENT=gpt-5
 
 # Optional: Supporting evidence selection (Advanced analyses)
 AZURE_OPENAI_CITATIONS_DEPLOYMENT=gpt-4.1-mini
@@ -263,10 +266,14 @@ Expected response for Azure OpenAI:
 
 ```json
 {
-  "configured": true,
-  "provider": "azure",
-  "whisperDeployment": "whisper-1",
-  "gpt4Deployment": "gpt-4o"
+  "success": true,
+  "data": {
+    "configured": true,
+    "provider": "azure",
+    "whisperDeployment": "whisper-1",
+    "analysisDeployment": "gpt-5",
+    "endpointHost": "your-resource.openai.azure.com"
+  }
 }
 ```
 
@@ -274,8 +281,13 @@ Expected response for standard OpenAI:
 
 ```json
 {
-  "configured": true,
-  "provider": "openai"
+  "success": true,
+  "data": {
+    "configured": true,
+    "provider": "openai",
+    "whisperDeployment": "whisper-1",
+    "analysisDeployment": "gpt-5"
+  }
 }
 ```
 

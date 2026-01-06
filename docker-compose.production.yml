@@ -1,5 +1,5 @@
 # ============================================================================
-# Meeting Transcriber - Production Docker Compose
+# Austin RTASS - Production Docker Compose
 # ============================================================================
 # Extends docker-compose.yml with production-optimized settings
 #
@@ -10,7 +10,7 @@
 services:
   app:
     # Production image from registry
-    image: ${REGISTRY:-your-registry.azurecr.io}/meeting-transcriber:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-your-registry.azurecr.io}/austin-rtass:${IMAGE_TAG:-latest}
 
     # Don't build locally in production
     build: !reset null

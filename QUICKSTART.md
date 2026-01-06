@@ -1,6 +1,6 @@
-# Meeting Transcriber - Quick Start Guide
+# Austin RTASS - Quick Start Guide
 
-Get the Meeting Transcriber running in 5 minutes.
+Get Austin RTASS running in 5 minutes.
 
 ## Prerequisites
 
@@ -15,8 +15,8 @@ Before you begin, ensure you have:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/meeting-transcriber.git
-cd meeting-transcriber
+git clone https://github.com/your-org/austin-rtass.git
+cd austin-rtass
 
 # Install dependencies
 npm install
@@ -127,7 +127,7 @@ The application is production-ready with:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Meeting Transcriber                 │
+│                        Austin RTASS                     │
 │                      (Next.js 15)                       │
 └────────────────────┬────────────────────────────────────┘
                      │
