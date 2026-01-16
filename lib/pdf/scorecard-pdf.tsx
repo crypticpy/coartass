@@ -185,43 +185,43 @@ const styles = StyleSheet.create({
     fontSize: 9,
   },
 
-  // Section summary cards
-  sectionSummaryContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 20,
+  // Section breakdown page styles
+  breakdownContainer: {
+    marginTop: 16,
   },
-  sectionCard: {
-    width: "48%",
-    padding: 12,
-    borderRadius: 4,
+  breakdownCard: {
+    padding: 16,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.white,
+    marginBottom: 12,
+  },
+  breakdownCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
-  sectionCardTitle: {
-    fontSize: 11,
+  breakdownCardTitle: {
+    fontSize: 13,
     fontWeight: "bold",
     color: colors.navy,
-    marginBottom: 6,
+    flex: 1,
+    paddingRight: 10,
   },
-  sectionCardScore: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 4,
+  breakdownCardDescription: {
+    fontSize: 9,
+    color: colors.textMuted,
+    lineHeight: 1.4,
+    marginBottom: 10,
   },
-  sectionCardScorePass: {
-    color: colors.pass,
+  breakdownCardStats: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  sectionCardScoreNeedsImprovement: {
-    color: colors.needsImprovement,
-  },
-  sectionCardScoreFail: {
-    color: colors.fail,
-  },
-  sectionCardWeight: {
+  breakdownCardStat: {
     fontSize: 8,
     color: colors.textLight,
   },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: colors.borderLight,
     borderRadius: 2,
-    marginTop: 8,
+    marginTop: 4,
     overflow: "hidden",
   },
   progressFill: {
@@ -495,7 +495,6 @@ function getStatusStyles(status: "pass" | "needs_improvement" | "fail") {
         badge: styles.scoreBadgePass,
         statusBadge: styles.statusBadgePass,
         statusText: styles.statusTextPass,
-        cardScore: styles.sectionCardScorePass,
         color: colors.pass,
       };
     case "needs_improvement":
@@ -503,7 +502,6 @@ function getStatusStyles(status: "pass" | "needs_improvement" | "fail") {
         badge: styles.scoreBadgeNeedsImprovement,
         statusBadge: styles.statusBadgeNeedsImprovement,
         statusText: styles.statusTextNeedsImprovement,
-        cardScore: styles.sectionCardScoreNeedsImprovement,
         color: colors.needsImprovement,
       };
     case "fail":
@@ -511,7 +509,6 @@ function getStatusStyles(status: "pass" | "needs_improvement" | "fail") {
         badge: styles.scoreBadgeFail,
         statusBadge: styles.statusBadgeFail,
         statusText: styles.statusTextFail,
-        cardScore: styles.sectionCardScoreFail,
         color: colors.fail,
       };
   }
@@ -582,7 +579,7 @@ const PDFFooter: React.FC = () => (
 );
 
 /**
- * Cover Page Component
+ * Cover Page Component - Overview with total score and warnings
  */
 const CoverPage: React.FC<{
   scorecard: RtassScorecard;
@@ -673,21 +670,86 @@ const CoverPage: React.FC<{
         </View>
       </View>
 
-      {/* Section Summary Cards */}
-      <View style={styles.sectionSummaryContainer}>
+      {/* Warnings */}
+      {scorecard.warnings && scorecard.warnings.length > 0 && (
+        <View style={styles.warningsSection} wrap={false}>
+          <Text style={styles.warningsTitle}>Warnings</Text>
+          {scorecard.warnings.slice(0, 8).map((warning, idx) => (
+            <Text key={idx} style={styles.warningItem}>
+              • {String(warning)}
+            </Text>
+          ))}
+          {scorecard.warnings.length > 8 && (
+            <Text style={styles.warningItem}>
+              + {scorecard.warnings.length - 8} more...
+            </Text>
+          )}
+        </View>
+      )}
+
+      <PDFFooter />
+    </Page>
+  );
+};
+
+/**
+ * Section Breakdown Page Component - KPI scores with descriptions
+ */
+const SectionBreakdownPage: React.FC<{
+  scorecard: RtassScorecard;
+  rubric?: RtassRubricTemplate;
+}> = ({ scorecard, rubric }) => {
+  // Helper to get section description from rubric
+  const getSectionDescription = (sectionId: string): string | undefined => {
+    return rubric?.sections.find(s => s.id === sectionId)?.description;
+  };
+
+  return (
+    <Page size="A4" style={styles.page} wrap>
+      {/* Page Header */}
+      <View style={styles.sectionHeader} wrap={false}>
+        <Text style={styles.sectionTitle}>Section Breakdown</Text>
+        <Text style={{ fontSize: 10, color: colors.textMuted }}>
+          Performance by evaluation area
+        </Text>
+      </View>
+
+      {/* Section Cards with Descriptions */}
+      <View style={styles.breakdownContainer}>
         {scorecard.sections.map((section) => {
           const sectionStatusStyles = getStatusStyles(section.status);
+          const description = getSectionDescription(section.sectionId);
+
           return (
-            <View key={section.sectionId} style={styles.sectionCard}>
-              <Text style={styles.sectionCardTitle}>{String(section.title || '')}</Text>
-              <Text
-                style={[styles.sectionCardScore, sectionStatusStyles.cardScore]}
-              >
-                {formatPercent(section.score)}
-              </Text>
-              <Text style={styles.sectionCardWeight}>
-                Weight: {Math.round(section.weight * 100)}%
-              </Text>
+            <View key={section.sectionId} style={styles.breakdownCard} wrap={false} minPresenceAhead={60}>
+              {/* Card Header: Title + Score */}
+              <View style={styles.breakdownCardHeader}>
+                <Text style={styles.breakdownCardTitle}>{String(section.title || '')}</Text>
+                <View style={[styles.sectionScoreBadge, sectionStatusStyles.statusBadge]}>
+                  <Text style={[styles.sectionScoreText, sectionStatusStyles.statusText]}>
+                    {formatPercent(section.score)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Description */}
+              {description && (
+                <Text style={styles.breakdownCardDescription}>
+                  {description}
+                </Text>
+              )}
+
+              {/* Stats Row: Weight + Criteria Count */}
+              <View style={styles.breakdownCardStats}>
+                <Text style={styles.breakdownCardStat}>
+                  Weight: {Math.round(section.weight * 100)}%
+                </Text>
+                <Text style={styles.breakdownCardStat}>
+                  {section.criteria.length} criteria evaluated
+                </Text>
+              </View>
+
+              {/* Progress Bar */}
               <View style={styles.progressBar}>
                 <View
                   style={[
@@ -703,23 +765,6 @@ const CoverPage: React.FC<{
           );
         })}
       </View>
-
-      {/* Warnings */}
-      {scorecard.warnings && scorecard.warnings.length > 0 && (
-        <View style={styles.warningsSection}>
-          <Text style={styles.warningsTitle}>Warnings</Text>
-          {scorecard.warnings.slice(0, 5).map((warning, idx) => (
-            <Text key={idx} style={styles.warningItem}>
-              • {String(warning)}
-            </Text>
-          ))}
-          {scorecard.warnings.length > 5 && (
-            <Text style={styles.warningItem}>
-              + {scorecard.warnings.length - 5} more...
-            </Text>
-          )}
-        </View>
-      )}
 
       <PDFFooter />
     </Page>
@@ -859,8 +904,9 @@ const SectionDetailPage: React.FC<{
  *
  * Main PDF document component for RTASS scorecards.
  * Generates a multi-page PDF with:
- * - Cover page with overall score and section summary
- * - Detail pages for each section with criteria breakdown
+ * - Page 1: Cover page with overall score and warnings
+ * - Page 2: Section breakdown with KPI scores and descriptions
+ * - Pages 3+: Detailed criteria tables for each section
  */
 export const ScorecardPDFDocument: React.FC<ScorecardPDFDocumentProps> = ({
   scorecard,
@@ -876,7 +922,7 @@ export const ScorecardPDFDocument: React.FC<ScorecardPDFDocumentProps> = ({
       keywords="rtass, scorecard, radio, traffic, analysis"
       creator="Austin RTASS"
     >
-      {/* Cover Page */}
+      {/* Page 1: Cover Page - Overall score and warnings */}
       <CoverPage
         scorecard={scorecard}
         rubric={rubric}
@@ -884,7 +930,10 @@ export const ScorecardPDFDocument: React.FC<ScorecardPDFDocumentProps> = ({
         incidentInfo={incidentInfo}
       />
 
-      {/* Section Detail Pages */}
+      {/* Page 2: Section Breakdown - KPI scores with descriptions */}
+      <SectionBreakdownPage scorecard={scorecard} rubric={rubric} />
+
+      {/* Pages 3+: Section Detail Pages - Criteria tables */}
       {scorecard.sections.map((section) => (
         <SectionDetailPage key={section.sectionId} section={section} />
       ))}
