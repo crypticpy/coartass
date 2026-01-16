@@ -9,8 +9,10 @@ import React from "react";
 import { pdf } from "@react-pdf/renderer";
 import { Transcript, Analysis } from "@/types";
 import type { Template } from "@/types";
+import type { RtassRubricTemplate, RtassScorecard } from "@/types/rtass";
 import { TranscriptPDFDocument } from "./transcript-pdf";
 import { AnalysisPDFDocument } from "./analysis-pdf";
+import { ScorecardPDFDocument } from "./scorecard-pdf";
 
 /**
  * Options for transcript PDF export
@@ -30,6 +32,22 @@ export interface AnalysisPDFOptions {
   template?: Template;
   /** Whether to include table of contents */
   includeTableOfContents?: boolean;
+}
+
+/**
+ * Options for scorecard PDF export
+ */
+export interface ScorecardPDFOptions {
+  /** Optional rubric template information */
+  rubric?: RtassRubricTemplate;
+  /** Original transcript filename for context */
+  transcriptFilename?: string;
+  /** Optional incident information */
+  incidentInfo?: {
+    incidentNumber?: string;
+    incidentDate?: Date;
+    location?: string;
+  };
 }
 
 /**
@@ -104,13 +122,60 @@ function validateAnalysis(analysis: Analysis, transcript: Transcript): boolean {
 }
 
 /**
+ * Validates a scorecard for PDF export
+ *
+ * @param scorecard - The scorecard to validate
+ * @returns True if valid, false otherwise
+ */
+function validateScorecard(scorecard: RtassScorecard): boolean {
+  if (!scorecard) {
+    return false;
+  }
+
+  if (!scorecard.id || scorecard.id.trim() === "") {
+    return false;
+  }
+
+  if (!scorecard.transcriptId || scorecard.transcriptId.trim() === "") {
+    return false;
+  }
+
+  if (!scorecard.rubricTemplateId || scorecard.rubricTemplateId.trim() === "") {
+    return false;
+  }
+
+  if (!scorecard.createdAt) {
+    return false;
+  }
+
+  if (!scorecard.modelInfo?.model || scorecard.modelInfo.model.trim() === "") {
+    return false;
+  }
+
+  if (!scorecard.overall || typeof scorecard.overall.score !== "number") {
+    return false;
+  }
+
+  if (!Array.isArray(scorecard.sections)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Generates a PDF blob from a React element
  *
  * @param document - React-PDF document element
  * @returns Promise resolving to PDF blob
  * @throws Error if PDF generation fails
  */
-async function generatePDF(document: ReturnType<typeof TranscriptPDFDocument> | ReturnType<typeof AnalysisPDFDocument>): Promise<Blob> {
+async function generatePDF(
+  document:
+    | ReturnType<typeof TranscriptPDFDocument>
+    | ReturnType<typeof AnalysisPDFDocument>
+    | ReturnType<typeof ScorecardPDFDocument>
+): Promise<Blob> {
   try {
     const pdfInstance = pdf(document as React.ReactElement);
     const blob = await pdfInstance.toBlob();
@@ -280,6 +345,98 @@ export async function exportAnalysisToPDF(
 }
 
 /**
+ * Exports a scorecard to PDF
+ *
+ * @param scorecard - The scorecard to export
+ * @param options - Export options
+ * @returns Promise resolving to export result
+ */
+export async function exportScorecardToPDF(
+  scorecard: RtassScorecard,
+  options: ScorecardPDFOptions = {}
+): Promise<PDFExportResult> {
+  try {
+    if (!validateScorecard(scorecard)) {
+      return {
+        success: false,
+        error: "Invalid scorecard data. Cannot generate PDF.",
+      };
+    }
+
+    const { rubric, transcriptFilename, incidentInfo } = options;
+
+    const scorecardData: RtassScorecard = {
+      ...scorecard,
+      createdAt:
+        scorecard.createdAt instanceof Date
+          ? scorecard.createdAt
+          : new Date(scorecard.createdAt),
+      humanReview: scorecard.humanReview
+        ? {
+            ...scorecard.humanReview,
+            reviewedAt:
+              scorecard.humanReview.reviewedAt instanceof Date
+                ? scorecard.humanReview.reviewedAt
+                : scorecard.humanReview.reviewedAt
+                  ? new Date(scorecard.humanReview.reviewedAt)
+                  : undefined,
+          }
+        : undefined,
+    };
+
+    const rubricData: RtassRubricTemplate | undefined = rubric
+      ? {
+          ...rubric,
+          createdAt:
+            rubric.createdAt instanceof Date
+              ? rubric.createdAt
+              : new Date(rubric.createdAt),
+          updatedAt:
+            rubric.updatedAt instanceof Date
+              ? rubric.updatedAt
+              : rubric.updatedAt
+                ? new Date(rubric.updatedAt)
+                : undefined,
+        }
+      : undefined;
+
+    const incidentData = incidentInfo
+      ? {
+          ...incidentInfo,
+          incidentDate:
+            incidentInfo.incidentDate instanceof Date
+              ? incidentInfo.incidentDate
+              : incidentInfo.incidentDate
+                ? new Date(incidentInfo.incidentDate)
+                : undefined,
+        }
+      : undefined;
+
+    const blob = await generatePDF(
+      React.createElement(ScorecardPDFDocument, {
+        scorecard: scorecardData,
+        rubric: rubricData,
+        transcriptFilename,
+        incidentInfo: incidentData,
+      })
+    );
+
+    return {
+      success: true,
+      blob,
+      size: blob.size,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    return {
+      success: false,
+      error: message,
+    };
+  }
+}
+
+/**
  * Generates a sanitized filename for PDF export
  *
  * @param baseFilename - Base filename (e.g., transcript filename)
@@ -348,6 +505,31 @@ export async function exportAndDownloadAnalysis(
 
   if (result.success && result.blob) {
     const filename = generatePDFFilename(transcript.filename, "analysis");
+    triggerPDFDownload(result.blob, filename);
+  }
+
+  return result;
+}
+
+/**
+ * Exports a scorecard to PDF and triggers download
+ *
+ * Convenience function that combines PDF generation and download trigger.
+ *
+ * @param scorecard - The scorecard to export
+ * @param options - Export options
+ * @returns Promise resolving to export result
+ */
+export async function exportAndDownloadScorecard(
+  scorecard: RtassScorecard,
+  options: ScorecardPDFOptions = {}
+): Promise<PDFExportResult> {
+  const result = await exportScorecardToPDF(scorecard, options);
+
+  if (result.success && result.blob) {
+    const base = options.transcriptFilename ?? `rtass-scorecard-${scorecard.id.slice(0, 8)}`;
+    const suffix = options.transcriptFilename ? "scorecard" : undefined;
+    const filename = generatePDFFilename(base, suffix);
     triggerPDFDownload(result.blob, filename);
   }
 

@@ -198,38 +198,21 @@ export function ScorecardViewer({
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      const response = await fetch("/api/pdf/scorecard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scorecard,
-          rubric,
-          transcriptFilename,
-          incidentInfo,
-        }),
-      });
+      const { exportAndDownloadScorecard, isPDFExportSupported } = await import("@/lib/pdf/pdf-exporter");
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        const message =
-          payload?.error ||
-          payload?.message ||
-          payload?.details?.message ||
-          "Failed to generate PDF";
-        throw new Error(message);
+      if (!isPDFExportSupported()) {
+        throw new Error("Your browser does not support PDF export. Please try a modern browser.");
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = transcriptFilename
-        ? `${transcriptFilename.replace(/\.[^/.]+$/, "")}-scorecard.pdf`
-        : `rtass-scorecard-${scorecard.id.slice(0, 8)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const result = await exportAndDownloadScorecard(scorecard, {
+        rubric,
+        transcriptFilename,
+        incidentInfo,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate PDF");
+      }
 
       notifications.show({
         title: "PDF Exported",

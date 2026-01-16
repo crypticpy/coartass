@@ -20,8 +20,10 @@ export type { ScorecardPDFDocumentProps } from "./scorecard-pdf";
 export {
   exportTranscriptToPDF,
   exportAnalysisToPDF,
+  exportScorecardToPDF,
   exportAndDownloadTranscript,
   exportAndDownloadAnalysis,
+  exportAndDownloadScorecard,
   triggerPDFDownload,
   generatePDFFilename,
   estimateTranscriptPDFSize,
@@ -32,5 +34,6 @@ export {
 export type {
   TranscriptPDFOptions,
   AnalysisPDFOptions,
+  ScorecardPDFOptions,
   PDFExportResult,
 } from "./pdf-exporter";
