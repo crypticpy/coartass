@@ -11,7 +11,7 @@ import { Container, Text, Box } from "@mantine/core";
  */
 export default function Footer() {
   const currentYear = new Date().getFullYear();
-  const appVersion = "0.1.0";
+  const appVersion = "0.9.3";
 
   return (
     <>
@@ -88,28 +88,28 @@ export default function Footer() {
             </Box>
           </Box>
         </Container>
-    </Box>
-    <style jsx>{`
-      :global(.footer-content) {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 1rem;
-      }
-      :global(.footer-links) {
-        display: flex;
-        gap: 1.5rem;
-      }
-      @media (min-width: 768px) {
+      </Box>
+      <style jsx>{`
         :global(.footer-content) {
-          flex-direction: row;
-          justify-content: space-between;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
         }
-      }
-      :global(.footer-link:hover) {
-        color: var(--mantine-color-text) !important;
-      }
-    `}</style>
-  </>
+        :global(.footer-links) {
+          display: flex;
+          gap: 1.5rem;
+        }
+        @media (min-width: 768px) {
+          :global(.footer-content) {
+            flex-direction: row;
+            justify-content: space-between;
+          }
+        }
+        :global(.footer-link:hover) {
+          color: var(--mantine-color-text) !important;
+        }
+      `}</style>
+    </>
   );
 }

@@ -5,6 +5,28 @@ All notable changes to Austin RTASS will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-01-20
+
+### Fixed
+
+- **Critical Deployment Fix**: Corrected all Azure deployment configurations that were incorrectly pointing to meeting transcriber resources (`ca-mtranscriber-prod`) instead of Austin RTASS resources (`ca-austin-rtass-prod`). This prevents accidental deployments to the wrong container app.
+
+- **PDF Export**: Fixed React error #31 with defensive string coercion in PDF generation. Removed invalid Font.register calls that were breaking server-side PDF generation.
+
+- **Scorecard PDF**: Migrated to client-side react-pdf for reliable PDF export.
+
+### Added
+
+- **Scorecard PDF Layout**: Restructured PDF layout with dedicated section breakdown page for better readability.
+
+- **User-Configurable Model Settings**: Added settings UI for configuring AI model and reasoning effort level.
+
+### Changed
+
+- **Infrastructure Security**: Instance-specific Azure documentation (`AZURE_CONTAINER_APPS_GUIDE.md`) is now gitignored to prevent exposing infrastructure details. Generic deployment templates remain in repo with placeholders.
+
+- **GitHub Actions**: All workflows updated to use correct `austin-rtass` naming conventions.
+
 ## [0.9.2] - 2025-12-10
 
 ### Fixed
@@ -67,8 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date | Highlights |
-|---------|------|------------|
-| 0.9.2 | 2025-12-10 | Timestamp NaN fix in evaluation pass, timestamp recovery |
-| 0.9.1 | 2025-12-10 | Timestamp fixes, upload progress improvements |
-| 0.9.0 | 2025-11-30 | Initial production release |
+| Version | Date       | Highlights                                               |
+| ------- | ---------- | -------------------------------------------------------- |
+| 0.9.3   | 2026-01-20 | Critical deployment fix, PDF export improvements         |
+| 0.9.2   | 2025-12-10 | Timestamp NaN fix in evaluation pass, timestamp recovery |
+| 0.9.1   | 2025-12-10 | Timestamp fixes, upload progress improvements            |
+| 0.9.0   | 2025-11-30 | Initial production release                               |

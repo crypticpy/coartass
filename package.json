@@ -1,6 +1,6 @@
 {
   "name": "austin-rtass",
-  "version": "0.1.1",
+  "version": "0.9.3",
   "private": true,
   "scripts": {
     "dev": "npm run build:templates && npm run copy:pdf-worker && next dev",
