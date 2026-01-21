@@ -32,15 +32,15 @@ Austin RTASS is a web application that transcribes audio recordings using Azure 
 
 ### 1.2 Key Security Highlights
 
-| Security Aspect       | Implementation                                            |
-|-----------------------|-----------------------------------------------------------|
-| Architecture          | Single-container monolithic (unified frontend/backend)    |
-| Data Storage          | Client-side only (IndexedDB) - no server-side database    |
-| Secrets Management    | Azure Key Vault with RBAC and Managed Identity            |
-| Container Runtime     | Non-root user (UID 1001), minimal Alpine Linux base       |
-| AI Services           | Azure OpenAI (GPT-4o Transcribe, GPT-4/5 for analysis)    |
-| Network Security      | HTTPS only (TLS 1.2+), security headers enforced          |
-| Monitoring            | Azure Log Analytics with centralized logging              |
+| Security Aspect    | Implementation                                         |
+| ------------------ | ------------------------------------------------------ |
+| Architecture       | Single-container monolithic (unified frontend/backend) |
+| Data Storage       | Client-side only (IndexedDB) - no server-side database |
+| Secrets Management | Azure Key Vault with RBAC and Managed Identity         |
+| Container Runtime  | Non-root user (UID 1001), minimal Alpine Linux base    |
+| AI Services        | Azure OpenAI (GPT-4o Transcribe, GPT-4/5 for analysis) |
+| Network Security   | HTTPS only (TLS 1.2+), security headers enforced       |
+| Monitoring         | Azure Log Analytics with centralized logging           |
 
 ### 1.3 Attack Surface Summary
 
@@ -75,22 +75,22 @@ This application uses a **unified single-container architecture** rather than se
 
 #### Security Rationale
 
-| Benefit                      | Description                                              |
-|------------------------------|----------------------------------------------------------|
-| Reduced Attack Surface       | Single entry point, no inter-service APIs to exploit     |
-| Simplified Secrets           | One identity, one Key Vault access point                 |
-| No Service Mesh Required     | No mTLS configuration or service discovery vulnerabilities|
-| Single Audit Target          | One container image to scan and verify                   |
-| Atomic Security Updates      | Update once, deploy once, no version mismatches          |
+| Benefit                  | Description                                                |
+| ------------------------ | ---------------------------------------------------------- |
+| Reduced Attack Surface   | Single entry point, no inter-service APIs to exploit       |
+| Simplified Secrets       | One identity, one Key Vault access point                   |
+| No Service Mesh Required | No mTLS configuration or service discovery vulnerabilities |
+| Single Audit Target      | One container image to scan and verify                     |
+| Atomic Security Updates  | Update once, deploy once, no version mismatches            |
 
 #### Operational Rationale
 
-| Benefit                      | Description                                              |
-|------------------------------|----------------------------------------------------------|
-| Atomic Deployments           | Frontend and backend always in sync                      |
-| Simplified Debugging         | Single log stream, no distributed tracing needed         |
-| Lower Infrastructure Cost    | One container, one scaling policy                        |
-| Reduced Operational Overhead | Single health check, single monitoring target            |
+| Benefit                      | Description                                      |
+| ---------------------------- | ------------------------------------------------ |
+| Atomic Deployments           | Frontend and backend always in sync              |
+| Simplified Debugging         | Single log stream, no distributed tracing needed |
+| Lower Infrastructure Cost    | One container, one scaling policy                |
+| Reduced Operational Overhead | Single health check, single monitoring target    |
 
 #### Why This Works for Our Use Case
 
@@ -127,6 +127,7 @@ This application uses a **unified single-container architecture** rather than se
 #### When We Would Consider Separation
 
 Microservices would be reconsidered if:
+
 - Server-side database is added
 - Multiple external API integrations are required
 - Different scaling requirements for frontend vs backend
@@ -209,24 +210,24 @@ Microservices would be reconsidered if:
 
 ### 3.2 Architecture Characteristics
 
-| Characteristic     | Description                                     |
-|--------------------|-------------------------------------------------|
-| Pattern            | Monolithic (unified frontend + backend)         |
-| Framework          | Next.js 14 with App Router                      |
-| Runtime            | Node.js 20 LTS on Alpine Linux                  |
-| Containerization   | Single Docker container (~300MB)                |
-| Orchestration      | Azure Container Apps (serverless)               |
-| Scaling            | Horizontal (1-3 replicas, HTTP-based autoscale) |
-| Data Persistence   | Client-side IndexedDB only                      |
+| Characteristic   | Description                                     |
+| ---------------- | ----------------------------------------------- |
+| Pattern          | Monolithic (unified frontend + backend)         |
+| Framework        | Next.js 14 with App Router                      |
+| Runtime          | Node.js 20 LTS on Alpine Linux                  |
+| Containerization | Single Docker container (~300MB)                |
+| Orchestration    | Azure Container Apps (serverless)               |
+| Scaling          | Horizontal (1-3 replicas, HTTP-based autoscale) |
+| Data Persistence | Client-side IndexedDB only                      |
 
 ### 3.3 AI Model Configuration
 
-| Function          | Model                           | Format            |
-|-------------------|---------------------------------|-------------------|
-| Transcription     | GPT-4o Transcribe Diarize       | diarized_json     |
-| Transcription     | Whisper (fallback)              | verbose_json      |
-| Analysis          | GPT-4 / GPT-5                   | chat completions  |
-| Summary           | GPT-4 / GPT-5                   | chat completions  |
+| Function      | Model                     | Format           |
+| ------------- | ------------------------- | ---------------- |
+| Transcription | GPT-4o Transcribe Diarize | diarized_json    |
+| Transcription | Whisper (fallback)        | verbose_json     |
+| Analysis      | GPT-4 / GPT-5             | chat completions |
+| Summary       | GPT-4 / GPT-5             | chat completions |
 
 ---
 
@@ -271,16 +272,16 @@ Microservices would be reconsidered if:
 
 ### 4.2 Container Security Controls
 
-| Control                  | Implementation                 | CIS Benchmark    |
-|--------------------------|--------------------------------|------------------|
-| Non-root User            | User: nextjs (UID 1001)        | CIS Docker 4.1   |
-| Minimal Base Image       | Alpine Linux (~5MB base)       | CIS Docker 4.2   |
-| No Unnecessary Packages  | Only dumb-init + libc6-compat  | CIS Docker 4.4   |
-| Security Patches         | apk upgrade in build           | CIS Docker 4.4   |
-| Dropped Capabilities     | cap_drop: ALL                  | CIS Docker 5.3   |
-| No Privilege Escalation  | no-new-privileges: true        | CIS Docker 5.25  |
-| Signal Handling          | dumb-init for graceful shutdown| Best Practice    |
-| Health Checks            | HTTP /api/health endpoint      | Best Practice    |
+| Control                 | Implementation                  | CIS Benchmark   |
+| ----------------------- | ------------------------------- | --------------- |
+| Non-root User           | User: nextjs (UID 1001)         | CIS Docker 4.1  |
+| Minimal Base Image      | Alpine Linux (~5MB base)        | CIS Docker 4.2  |
+| No Unnecessary Packages | Only dumb-init + libc6-compat   | CIS Docker 4.4  |
+| Security Patches        | apk upgrade in build            | CIS Docker 4.4  |
+| Dropped Capabilities    | cap_drop: ALL                   | CIS Docker 5.3  |
+| No Privilege Escalation | no-new-privileges: true         | CIS Docker 5.25 |
+| Signal Handling         | dumb-init for graceful shutdown | Best Practice   |
+| Health Checks           | HTTP /api/health endpoint       | Best Practice   |
 
 ### 4.3 Final Image Contents
 
@@ -344,10 +345,10 @@ Microservices would be reconsidered if:
 |  COMPUTE LAYER                                                          |
 |  +-------------------------------------------------------------------+  |
 |  |                                                                   |  |
-|  |  Container Apps Environment: cae-mtranscriber-{env}               |  |
+|  |  Container Apps Environment: cae-austin-rtass-{env}               |  |
 |  |  +-------------------------------------------------------------+  |  |
 |  |  |                                                             |  |  |
-|  |  |  Container App: ca-mtranscriber-{env}                       |  |  |
+|  |  |  Container App: ca-austin-rtass-{env}                       |  |  |
 |  |  |                                                             |  |  |
 |  |  |  +-----------+   +-----------+   +-----------+              |  |  |
 |  |  |  | Replica 1 |   | Replica 2 |   | Replica 3 |              |  |  |
@@ -432,13 +433,13 @@ Microservices would be reconsidered if:
 
 ### 5.3 Azure Resource Security Settings
 
-| Resource            | Security Configuration                              |
-|---------------------|-----------------------------------------------------|
-| Container App       | System-assigned managed identity, HTTPS only        |
-| Key Vault           | RBAC authorization, soft delete, purge protection   |
-| Container Registry  | Private (no anon pull), managed identity auth       |
-| Log Analytics       | 30-day retention, data encryption at rest           |
-| Container Env       | Consumption workload profile, Log Analytics linked  |
+| Resource           | Security Configuration                             |
+| ------------------ | -------------------------------------------------- |
+| Container App      | System-assigned managed identity, HTTPS only       |
+| Key Vault          | RBAC authorization, soft delete, purge protection  |
+| Container Registry | Private (no anon pull), managed identity auth      |
+| Log Analytics      | 30-day retention, data encryption at rest          |
+| Container Env      | Consumption workload profile, Log Analytics linked |
 
 ---
 
@@ -498,13 +499,14 @@ Microservices would be reconsidered if:
 
 ### 6.2 Secrets Management
 
-| Secret                 | Storage Location | Access Method              |
-|------------------------|------------------|----------------------------|
-| Azure OpenAI API Key   | Azure Key Vault  | Managed Identity + secretRef |
-| Azure OpenAI Endpoint  | Azure Key Vault  | Managed Identity + secretRef |
-| Container Registry     | Azure (Managed)  | System-assigned identity    |
+| Secret                | Storage Location | Access Method                |
+| --------------------- | ---------------- | ---------------------------- |
+| Azure OpenAI API Key  | Azure Key Vault  | Managed Identity + secretRef |
+| Azure OpenAI Endpoint | Azure Key Vault  | Managed Identity + secretRef |
+| Container Registry    | Azure (Managed)  | System-assigned identity     |
 
 **Security Properties:**
+
 - No secrets in source code
 - No secrets in container image
 - No secrets in environment files (committed)
@@ -513,26 +515,26 @@ Microservices would be reconsidered if:
 
 ### 6.3 Application Security
 
-| Control              | Implementation                                |
-|----------------------|-----------------------------------------------|
-| Input Validation     | Zod schemas for all API inputs                |
-| Error Handling       | Sanitized responses (no stack traces in prod) |
-| Logging              | Structured logs to Log Analytics (no PII)     |
-| File Upload          | Type validation, size limits, filename hashing |
-| Health Checks        | Liveness and readiness probes configured      |
-| Dependency Security  | npm audit in CI/CD pipeline                   |
+| Control             | Implementation                                 |
+| ------------------- | ---------------------------------------------- |
+| Input Validation    | Zod schemas for all API inputs                 |
+| Error Handling      | Sanitized responses (no stack traces in prod)  |
+| Logging             | Structured logs to Log Analytics (no PII)      |
+| File Upload         | Type validation, size limits, filename hashing |
+| Health Checks       | Liveness and readiness probes configured       |
+| Dependency Security | npm audit in CI/CD pipeline                    |
 
 ### 6.4 Container Runtime Security
 
 ```yaml
 # Security configuration applied
 security_opt:
-  - no-new-privileges:true    # Prevent privilege escalation
+  - no-new-privileges:true # Prevent privilege escalation
 
 cap_drop:
-  - ALL                        # Drop all Linux capabilities
+  - ALL # Drop all Linux capabilities
 
-user: nextjs (1001:1001)      # Non-root user
+user: nextjs (1001:1001) # Non-root user
 
 healthcheck:
   test: ["CMD", "node", "-e", "..."]
@@ -611,7 +613,7 @@ healthcheck:
 ### 7.2 Data Classification
 
 | Data Type          | Classification | Storage Location    | Retention        |
-|--------------------|----------------|---------------------|------------------|
+| ------------------ | -------------- | ------------------- | ---------------- |
 | Audio Recordings   | Sensitive      | Client IndexedDB    | User-controlled  |
 | Transcripts        | Sensitive      | Client IndexedDB    | User-controlled  |
 | Analysis Results   | Internal       | Client IndexedDB    | User-controlled  |
@@ -632,12 +634,12 @@ healthcheck:
 
 When using Azure OpenAI (recommended configuration):
 
-| Aspect           | Policy                                              |
-|------------------|-----------------------------------------------------|
-| Training Data    | NOT used to train or improve models                 |
-| Data Retention   | NOT retained after processing                       |
-| Compliance       | SOC 2, ISO 27001, HIPAA eligible                    |
-| Data Residency   | Processed in configured Azure region                |
+| Aspect         | Policy                               |
+| -------------- | ------------------------------------ |
+| Training Data  | NOT used to train or improve models  |
+| Data Retention | NOT retained after processing        |
+| Compliance     | SOC 2, ISO 27001, HIPAA eligible     |
+| Data Residency | Processed in configured Azure region |
 
 ### 7.5 Transcription Pipeline Security
 
@@ -711,15 +713,15 @@ The transcription pipeline implements multiple security controls to protect audi
 +=====================================================================+
 ```
 
-| Security Control             | Implementation                                    |
-|------------------------------|---------------------------------------------------|
-| Audio Segmentation           | ~5 min chunks at silence boundaries (client-side) |
-| Filename Obfuscation         | UUID replacement, original never transmitted       |
-| Hash Non-Reconstruction      | Chunks cannot be used to recreate original hash   |
-| Transmission Encryption      | HTTPS/TLS 1.2+ for all chunk transfers            |
-| Server-Side Storage          | None - in-memory processing only                  |
-| Azure Retention              | Audio NOT retained after transcription            |
-| Reassembly Location          | Client browser only (IndexedDB)                   |
+| Security Control        | Implementation                                    |
+| ----------------------- | ------------------------------------------------- |
+| Audio Segmentation      | ~5 min chunks at silence boundaries (client-side) |
+| Filename Obfuscation    | UUID replacement, original never transmitted      |
+| Hash Non-Reconstruction | Chunks cannot be used to recreate original hash   |
+| Transmission Encryption | HTTPS/TLS 1.2+ for all chunk transfers            |
+| Server-Side Storage     | None - in-memory processing only                  |
+| Azure Retention         | Audio NOT retained after transcription            |
+| Reassembly Location     | Client browser only (IndexedDB)                   |
 
 ### 7.6 Analysis Pipeline Security
 
@@ -803,14 +805,14 @@ The analysis pipeline processes transcript text (not audio) through Azure OpenAI
 +=====================================================================+
 ```
 
-| Security Control             | Implementation                                    |
-|------------------------------|---------------------------------------------------|
-| Input Scope                  | Transcript text only (no audio, no filenames)     |
-| PII Handling                 | Azure OpenAI processes transiently, no retention  |
-| Server-Side Storage          | None - all processing is transient                |
-| Result Storage               | Client IndexedDB only (user-controlled)           |
-| Logging Protection           | No transcript content logged, filenames hashed    |
-| Access Controls              | Azure RBAC, Managed Identity, Key Vault secrets   |
+| Security Control    | Implementation                                   |
+| ------------------- | ------------------------------------------------ |
+| Input Scope         | Transcript text only (no audio, no filenames)    |
+| PII Handling        | Azure OpenAI processes transiently, no retention |
+| Server-Side Storage | None - all processing is transient               |
+| Result Storage      | Client IndexedDB only (user-controlled)          |
+| Logging Protection  | No transcript content logged, filenames hashed   |
+| Access Controls     | Azure RBAC, Managed Identity, Key Vault secrets  |
 
 ### 7.7 Infrastructure Control
 
@@ -877,14 +879,14 @@ Both transcription and analysis pipelines use internally-managed Azure infrastru
 +=====================================================================+
 ```
 
-| Infrastructure Control       | Implementation                                    |
-|------------------------------|---------------------------------------------------|
-| Endpoint Management          | Internal Azure OpenAI under ATS/ISO controls      |
-| Secret Storage               | Azure Key Vault with RBAC                         |
-| Authentication               | Managed Identity (no credentials in code)         |
-| Network Transit              | Azure backbone, HTTPS/TLS 1.2+                    |
-| Configuration Governance     | ATS/ISO change management processes               |
-| Azure Compliance             | SOC 2, ISO 27001, HIPAA eligible                  |
+| Infrastructure Control   | Implementation                               |
+| ------------------------ | -------------------------------------------- |
+| Endpoint Management      | Internal Azure OpenAI under ATS/ISO controls |
+| Secret Storage           | Azure Key Vault with RBAC                    |
+| Authentication           | Managed Identity (no credentials in code)    |
+| Network Transit          | Azure backbone, HTTPS/TLS 1.2+               |
+| Configuration Governance | ATS/ISO change management processes          |
+| Azure Compliance         | SOC 2, ISO 27001, HIPAA eligible             |
 
 ---
 
@@ -892,43 +894,43 @@ Both transcription and analysis pipelines use internally-managed Azure infrastru
 
 ### 8.1 OWASP Top 10 (2021) Mapping
 
-| OWASP Risk                    | Mitigation                           | Status       |
-|-------------------------------|--------------------------------------|--------------|
-| A01: Broken Access Control    | No user accounts, client-side data   | N/A          |
-| A02: Cryptographic Failures   | TLS 1.2+, Key Vault for secrets      | Mitigated    |
-| A03: Injection                | Zod validation, no SQL database, React auto-escaping, CSP | Mitigated |
-| A04: Insecure Design          | CSP headers, security headers, minimal attack surface | Mitigated |
-| A05: Security Misconfiguration| IaC (Bicep), no default credentials, configurable CORS | Mitigated |
-| A06: Vulnerable Components    | npm audit, Alpine, regular updates   | Mitigated    |
-| A07: Auth Failures            | API key via Key Vault, managed ID    | Mitigated    |
-| A08: Data Integrity           | HTTPS only, input validation         | Mitigated    |
-| A09: Logging Failures         | Azure Log Analytics, structured logs | Mitigated    |
-| A10: SSRF                     | No user-controllable URL fetching    | Mitigated    |
+| OWASP Risk                     | Mitigation                                                | Status    |
+| ------------------------------ | --------------------------------------------------------- | --------- |
+| A01: Broken Access Control     | No user accounts, client-side data                        | N/A       |
+| A02: Cryptographic Failures    | TLS 1.2+, Key Vault for secrets                           | Mitigated |
+| A03: Injection                 | Zod validation, no SQL database, React auto-escaping, CSP | Mitigated |
+| A04: Insecure Design           | CSP headers, security headers, minimal attack surface     | Mitigated |
+| A05: Security Misconfiguration | IaC (Bicep), no default credentials, configurable CORS    | Mitigated |
+| A06: Vulnerable Components     | npm audit, Alpine, regular updates                        | Mitigated |
+| A07: Auth Failures             | API key via Key Vault, managed ID                         | Mitigated |
+| A08: Data Integrity            | HTTPS only, input validation                              | Mitigated |
+| A09: Logging Failures          | Azure Log Analytics, structured logs                      | Mitigated |
+| A10: SSRF                      | No user-controllable URL fetching                         | Mitigated |
 
 ### 8.2 CIS Docker Benchmark Mapping
 
-| CIS Control                         | Implementation              | Status |
-|-------------------------------------|-----------------------------|--------|
-| 4.1 Create user for container       | User: nextjs (UID 1001)     | Pass   |
-| 4.2 Use trusted base images         | node:20-alpine (Official)   | Pass   |
-| 4.3 Install necessary packages only | Minimal Alpine + dumb-init  | Pass   |
-| 4.4 Scan and rebuild for patches    | apk upgrade in Dockerfile   | Pass   |
-| 4.5 Enable Content Trust            | Configurable in registry    | Note   |
-| 5.3 Restrict Linux capabilities     | cap_drop: ALL               | Pass   |
-| 5.12 Mount filesystem read-only     | Supported via orchestrator  | Note   |
-| 5.25 Restrict privilege escalation  | no-new-privileges: true     | Pass   |
-| 5.28 Use PIDs cgroup limit          | Container Apps managed      | Pass   |
+| CIS Control                         | Implementation             | Status |
+| ----------------------------------- | -------------------------- | ------ |
+| 4.1 Create user for container       | User: nextjs (UID 1001)    | Pass   |
+| 4.2 Use trusted base images         | node:20-alpine (Official)  | Pass   |
+| 4.3 Install necessary packages only | Minimal Alpine + dumb-init | Pass   |
+| 4.4 Scan and rebuild for patches    | apk upgrade in Dockerfile  | Pass   |
+| 4.5 Enable Content Trust            | Configurable in registry   | Note   |
+| 5.3 Restrict Linux capabilities     | cap_drop: ALL              | Pass   |
+| 5.12 Mount filesystem read-only     | Supported via orchestrator | Note   |
+| 5.25 Restrict privilege escalation  | no-new-privileges: true    | Pass   |
+| 5.28 Use PIDs cgroup limit          | Container Apps managed     | Pass   |
 
 ### 8.3 NIST Cybersecurity Framework
 
-| Function     | Category              | Implementation                        |
-|--------------|-----------------------|---------------------------------------|
-| Identify     | Asset Management      | IaC defines all resources             |
-| Protect      | Access Control        | Managed Identity, RBAC, Key Vault     |
-| Protect      | Data Security         | TLS, client-side storage, no server DB|
-| Detect       | Continuous Monitoring | Log Analytics, health checks          |
-| Respond      | Response Planning     | Centralized logging for investigation |
-| Recover      | Recovery Planning     | IaC enables rapid redeployment        |
+| Function | Category              | Implementation                         |
+| -------- | --------------------- | -------------------------------------- |
+| Identify | Asset Management      | IaC defines all resources              |
+| Protect  | Access Control        | Managed Identity, RBAC, Key Vault      |
+| Protect  | Data Security         | TLS, client-side storage, no server DB |
+| Detect   | Continuous Monitoring | Log Analytics, health checks           |
+| Respond  | Response Planning     | Centralized logging for investigation  |
+| Recover  | Recovery Planning     | IaC enables rapid redeployment         |
 
 ---
 
@@ -936,14 +938,14 @@ Both transcription and analysis pipelines use internally-managed Azure infrastru
 
 ### 9.1 STRIDE Analysis
 
-| Threat                    | Risk   | Mitigation                              |
-|---------------------------|--------|----------------------------------------|
-| Spoofing                  | Low    | HTTPS only, no user auth required       |
-| Tampering                 | Low    | TLS encryption, input validation        |
-| Repudiation               | Low    | Structured logging to Log Analytics     |
-| Information Disclosure    | Medium | Key Vault, no PII logging, client data  |
-| Denial of Service         | Medium | Azure DDoS protection, autoscaling      |
-| Elevation of Privilege    | Low    | Non-root, no-new-privileges, no caps    |
+| Threat                 | Risk   | Mitigation                             |
+| ---------------------- | ------ | -------------------------------------- |
+| Spoofing               | Low    | HTTPS only, no user auth required      |
+| Tampering              | Low    | TLS encryption, input validation       |
+| Repudiation            | Low    | Structured logging to Log Analytics    |
+| Information Disclosure | Medium | Key Vault, no PII logging, client data |
+| Denial of Service      | Medium | Azure DDoS protection, autoscaling     |
+| Elevation of Privilege | Low    | Non-root, no-new-privileges, no caps   |
 
 ### 9.2 Attack Vectors and Mitigations
 
@@ -1018,17 +1020,17 @@ Both transcription and analysis pipelines use internally-managed Azure infrastru
 
 ### 10.1 Pre-Deployment Checklist
 
-| Item                                              | Required | Status |
-|---------------------------------------------------|----------|--------|
-| npm audit shows no high/critical vulnerabilities  | Yes      | [ ]    |
-| All secrets stored in Key Vault                   | Yes      | [ ]    |
-| CORS policy configured (disabled or restricted)   | Yes      | [x]    |
-| Content-Security-Policy header configured         | Yes      | [x]    |
-| Container runs as non-root user                   | Yes      | [x]    |
-| Health check endpoints configured                 | Yes      | [x]    |
-| TLS certificate valid and auto-renewed            | Yes      | [ ]    |
-| Log Analytics workspace configured                | Yes      | [ ]    |
-| Resource tags applied for governance              | Yes      | [x]    |
+| Item                                             | Required | Status |
+| ------------------------------------------------ | -------- | ------ |
+| npm audit shows no high/critical vulnerabilities | Yes      | [ ]    |
+| All secrets stored in Key Vault                  | Yes      | [ ]    |
+| CORS policy configured (disabled or restricted)  | Yes      | [x]    |
+| Content-Security-Policy header configured        | Yes      | [x]    |
+| Container runs as non-root user                  | Yes      | [x]    |
+| Health check endpoints configured                | Yes      | [x]    |
+| TLS certificate valid and auto-renewed           | Yes      | [ ]    |
+| Log Analytics workspace configured               | Yes      | [ ]    |
+| Resource tags applied for governance             | Yes      | [x]    |
 
 ### 10.2 Production Configuration Recommendations
 
@@ -1050,14 +1052,14 @@ retentionInDays: 90
 
 ### 10.3 Optional Security Enhancements
 
-| Enhancement            | Description                       | Priority |
-|------------------------|-----------------------------------|----------|
-| Azure Front Door + WAF | Edge protection, DDoS mitigation  | High     |
-| Private Endpoints      | Remove public network access      | Medium   |
-| Azure Defender         | Threat detection for containers   | Medium   |
-| VNet Integration       | Network isolation                 | Medium   |
-| Egress Firewall Rules  | Enforce network-level egress restrictions to Azure OpenAI only | Medium |
-| Image Signing          | Container image verification      | Low      |
+| Enhancement            | Description                                                    | Priority |
+| ---------------------- | -------------------------------------------------------------- | -------- |
+| Azure Front Door + WAF | Edge protection, DDoS mitigation                               | High     |
+| Private Endpoints      | Remove public network access                                   | Medium   |
+| Azure Defender         | Threat detection for containers                                | Medium   |
+| VNet Integration       | Network isolation                                              | Medium   |
+| Egress Firewall Rules  | Enforce network-level egress restrictions to Azure OpenAI only | Medium   |
+| Image Signing          | Container image verification                                   | Low      |
 
 **Implemented Security Controls (v1.2):**
 
@@ -1078,47 +1080,47 @@ The following security controls have been implemented:
 
 ### 11.1 Glossary
 
-| Term              | Definition                                           |
-|-------------------|------------------------------------------------------|
-| Container App     | Azure's serverless container hosting service         |
-| Managed Identity  | Azure AD identity for resources (no credentials)     |
-| IndexedDB         | Browser-based NoSQL database for client storage      |
-| Alpine Linux      | Minimal Linux distribution (~5MB) for containers     |
-| dumb-init         | Minimal init system for proper signal handling       |
-| Bicep             | Azure's infrastructure-as-code language              |
-| GPT-4o Transcribe | Azure OpenAI speech-to-text model with diarization   |
+| Term              | Definition                                         |
+| ----------------- | -------------------------------------------------- |
+| Container App     | Azure's serverless container hosting service       |
+| Managed Identity  | Azure AD identity for resources (no credentials)   |
+| IndexedDB         | Browser-based NoSQL database for client storage    |
+| Alpine Linux      | Minimal Linux distribution (~5MB) for containers   |
+| dumb-init         | Minimal init system for proper signal handling     |
+| Bicep             | Azure's infrastructure-as-code language            |
+| GPT-4o Transcribe | Azure OpenAI speech-to-text model with diarization |
 
 ### 11.2 File References
 
-| File                            | Purpose                             |
-|---------------------------------|-------------------------------------|
-| /Dockerfile                     | Container build definition          |
-| /docker-compose.yml             | Local development orchestration     |
-| /infrastructure/main.bicep      | Azure infrastructure definition     |
-| /infrastructure/modules/*.bicep | Modular Azure resources             |
-| /next.config.mjs                | Security headers configuration      |
-| /app/api/health/route.ts        | Health check endpoint               |
-| /app/api/transcribe/route.ts    | Transcription API endpoint          |
-| /lib/openai.ts                  | Azure OpenAI client configuration   |
+| File                             | Purpose                           |
+| -------------------------------- | --------------------------------- |
+| /Dockerfile                      | Container build definition        |
+| /docker-compose.yml              | Local development orchestration   |
+| /infrastructure/main.bicep       | Azure infrastructure definition   |
+| /infrastructure/modules/\*.bicep | Modular Azure resources           |
+| /next.config.mjs                 | Security headers configuration    |
+| /app/api/health/route.ts         | Health check endpoint             |
+| /app/api/transcribe/route.ts     | Transcription API endpoint        |
+| /lib/openai.ts                   | Azure OpenAI client configuration |
 
 ### 11.3 Contact Information
 
-| Role                 | Contact        |
-|----------------------|----------------|
-| Application Owner    | [To be filled] |
-| Security Contact     | [To be filled] |
-| Infrastructure Team  | [To be filled] |
+| Role                | Contact        |
+| ------------------- | -------------- |
+| Application Owner   | [To be filled] |
+| Security Contact    | [To be filled] |
+| Infrastructure Team | [To be filled] |
 
 ---
 
 ## Document Approval
 
-| Role                 | Name | Date | Signature |
-|----------------------|------|------|-----------|
-| Application Owner    |      |      |           |
-| Security Reviewer    |      |      |           |
-| Infrastructure Lead  |      |      |           |
+| Role                | Name | Date | Signature |
+| ------------------- | ---- | ---- | --------- |
+| Application Owner   |      |      |           |
+| Security Reviewer   |      |      |           |
+| Infrastructure Lead |      |      |           |
 
 ---
 
-*This document should be reviewed and updated with each major release or infrastructure change.*
+_This document should be reviewed and updated with each major release or infrastructure change._

@@ -79,6 +79,9 @@ public/workers/pdf.worker*.mjs.map
 # Local deployment docs (not for repo)
 *.local.md
 
+# Instance-specific Azure documentation (contains resource names)
+docs/AZURE_CONTAINER_APPS_GUIDE.md
+
 # OS generated files
 Thumbs.db
 ehthumbs.db

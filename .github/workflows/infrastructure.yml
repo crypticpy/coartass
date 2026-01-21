@@ -100,7 +100,7 @@ jobs:
         id: deploy
         run: |
           ENVIRONMENT="${{ github.event.inputs.environment || 'dev' }}"
-          DEPLOYMENT_NAME="mtranscriber-${ENVIRONMENT}-$(date +%Y%m%d%H%M%S)"
+          DEPLOYMENT_NAME="austin-rtass-${ENVIRONMENT}-$(date +%Y%m%d%H%M%S)"
 
           cd infrastructure
 

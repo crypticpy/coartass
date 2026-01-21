@@ -2,7 +2,7 @@
 # Azure Container Apps - CI/CD Pipeline
 # ============================================================================
 # This GitHub Actions workflow automates building, testing, and deploying
-# the Meeting Transcriber application to Azure Container Apps.
+# the Austin RTASS application to Azure Container Apps.
 #
 # Features:
 # - Multi-stage Docker build for production
@@ -48,10 +48,10 @@ on:
 # Environment variables used across jobs
 env:
   # Azure Container Registry name (without .azurecr.io)
-  ACR_NAME: meetingtranscriberacr
+  ACR_NAME: austinrtassacr
 
   # Image name
-  IMAGE_NAME: meeting-transcriber
+  IMAGE_NAME: austin-rtass
 
   # Azure region
   AZURE_REGION: eastus
@@ -194,8 +194,8 @@ jobs:
         uses: azure/container-apps-deploy-action@v1
         with:
           resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP_STAGING }}
-          containerAppName: meeting-transcriber-staging
-          containerAppEnvironment: meeting-transcriber-env-staging
+          containerAppName: austin-rtass-staging
+          containerAppEnvironment: austin-rtass-env-staging
           imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
           targetPort: 3000
           ingress: external
@@ -268,8 +268,8 @@ jobs:
         uses: azure/container-apps-deploy-action@v1
         with:
           resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }}
-          containerAppName: meeting-transcriber-production
-          containerAppEnvironment: meeting-transcriber-env-production
+          containerAppName: austin-rtass-production
+          containerAppEnvironment: austin-rtass-env-production
           imageToDeploy: ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}
           targetPort: 3000
           ingress: external
@@ -325,7 +325,7 @@ jobs:
 
           # Get previous revision
           PREV_REVISION=$(az containerapp revision list \
-            --name meeting-transcriber-production \
+            --name austin-rtass-production \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
             --query "[?properties.active==true && properties.name != '${{ steps.deploy.outputs.revision-name }}'] | [0].name" \
             -o tsv)
@@ -333,7 +333,7 @@ jobs:
           if [ -n "$PREV_REVISION" ]; then
             echo "Rolling back to revision: $PREV_REVISION"
             az containerapp revision set-mode \
-              --name meeting-transcriber-production \
+              --name austin-rtass-production \
               --resource-group ${{ secrets.AZURE_RESOURCE_GROUP_PRODUCTION }} \
               --mode single \
               --revision $PREV_REVISION
@@ -354,11 +354,11 @@ jobs:
 #
 # 2. AZURE_RESOURCE_GROUP_STAGING
 #    Resource group name for staging environment
-#    Example: meeting-transcriber-staging-rg
+#    Example: austin-rtass-staging-rg
 #
 # 3. AZURE_RESOURCE_GROUP_PRODUCTION
 #    Resource group name for production environment
-#    Example: meeting-transcriber-production-rg
+#    Example: austin-rtass-production-rg
 #
 # 4. AZURE_OPENAI_API_KEY (set in Container App secrets)
 #    Azure OpenAI API key
@@ -371,7 +371,7 @@ jobs:
 # ============================================================================
 #
 # 1. Create Azure Service Principal:
-#    az ad sp create-for-rbac --name "github-actions-meeting-transcriber" \
+#    az ad sp create-for-rbac --name "github-actions-austin-rtass" \
 #      --role contributor \
 #      --scopes /subscriptions/{SUBSCRIPTION_ID} \
 #      --sdk-auth
@@ -381,20 +381,20 @@ jobs:
 # 2. Create Container App Environments:
 #    # Staging
 #    az containerapp env create \
-#      --name meeting-transcriber-env-staging \
-#      --resource-group meeting-transcriber-staging-rg \
+#      --name austin-rtass-env-staging \
+#      --resource-group austin-rtass-staging-rg \
 #      --location eastus
 #
 #    # Production
 #    az containerapp env create \
-#      --name meeting-transcriber-env-production \
-#      --resource-group meeting-transcriber-production-rg \
+#      --name austin-rtass-env-production \
+#      --resource-group austin-rtass-production-rg \
 #      --location eastus
 #
 # 3. Set secrets in Container Apps:
 #    az containerapp secret set \
-#      --name meeting-transcriber-production \
-#      --resource-group meeting-transcriber-production-rg \
+#      --name austin-rtass-production \
+#      --resource-group austin-rtass-production-rg \
 #      --secrets \
 #        azure-openai-api-key={YOUR_API_KEY} \
 #        azure-openai-endpoint={YOUR_ENDPOINT}

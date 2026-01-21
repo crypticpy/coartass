@@ -22,6 +22,7 @@ ANALYZE=true npm run build  # Build with bundle analyzer
 ### Testing
 
 Tests use Vitest with separate environments:
+
 - `lib/**/__tests__/*.test.ts` - Node environment
 - `hooks/**`, `components/**`, `app/**` - jsdom environment
 
@@ -52,46 +53,31 @@ docker buildx build --platform linux/amd64 -t austin-rtass .  # Build for Azure
 
 ### Azure Deployment
 
-**Local deployment guide available:** `DEPLOY-AZURE.local.md` (gitignored)
+**See `DEPLOY-AZURE.local.md` (gitignored) for instance-specific deployment commands.**
 
-This file contains:
-- Quick one-liner deploy command
-- Step-by-step Azure Container App deployment
-- Resource names, URLs, and troubleshooting
-- Log viewing, scaling, and rollback commands
+For general deployment guidance, see `DEPLOYMENT.md` and `docs/AZURE_CONTAINER_APPS_GUIDE.md`.
 
-**Quick deploy (use version tag to force new revision):**
+**Deployment pattern** (use version tags to force new revisions):
+
 ```bash
-# Get version from package.json
 VERSION=$(node -p "require('./package.json').version")
 
-az acr login --name acrmtranscriberprod && \
+az acr login --name <your-acr> && \
 docker buildx build --platform linux/amd64 -t austin-rtass:v${VERSION} . && \
-docker tag austin-rtass:v${VERSION} acrmtranscriberprod.azurecr.io/austin-rtass:v${VERSION} && \
-docker push acrmtranscriberprod.azurecr.io/austin-rtass:v${VERSION} && \
+docker tag austin-rtass:v${VERSION} <your-acr>.azurecr.io/austin-rtass:v${VERSION} && \
+docker push <your-acr>.azurecr.io/austin-rtass:v${VERSION} && \
 az containerapp update \
-  --name ca-mtranscriber-prod \
-  --resource-group rg-aph-cognitive-sandbox-dev-scus-01 \
-  --image acrmtranscriberprod.azurecr.io/austin-rtass:v${VERSION}
+  --name <your-container-app> \
+  --resource-group <your-resource-group> \
+  --image <your-acr>.azurecr.io/austin-rtass:v${VERSION}
 ```
 
-**Important:** Always use versioned tags (`:v0.9.3`) instead of `:latest`. Azure Container Apps caches the `:latest` tag and may not pull the new image, causing deployments to silently use stale code. Using explicit version tags forces a new revision.
-
-**Verify deployment:**
-```bash
-# Check revision is running with correct image
-az containerapp revision list \
-  --name ca-mtranscriber-prod \
-  --resource-group rg-aph-cognitive-sandbox-dev-scus-01 \
-  --query "[0].{revision:name,image:properties.template.containers[0].image,running:properties.runningState}" \
-  -o table
-```
-
-**Production URL:** https://ca-mtranscriber-prod.ashyground-53059b7a.southcentralus.azurecontainerapps.io
+**Important:** Always use versioned tags (`:v0.9.3`) instead of `:latest`. Azure Container Apps caches the `:latest` tag and may not pull the new image, causing deployments to silently use stale code.
 
 ## Architecture
 
 ### Tech Stack
+
 - **Framework**: Next.js 15 with App Router
 - **UI**: Mantine v8 + Tailwind CSS
 - **Database**: Dexie.js (IndexedDB wrapper) - client-side only
@@ -130,6 +116,7 @@ az containerapp revision list \
 ### Database Schema (lib/db.ts)
 
 The `AustinRTASSDB` class manages these IndexedDB tables:
+
 - `transcripts` - Transcribed audio with segments and metadata
 - `templates` - Analysis templates (built-in and custom)
 - `analyses` - AI-generated analyses linked to transcripts
@@ -140,12 +127,14 @@ The `AustinRTASSDB` class manages these IndexedDB tables:
 ### OpenAI Configuration
 
 The app supports both Azure OpenAI and standard OpenAI API. Configuration in `lib/openai.ts`:
+
 - Uses Azure OpenAI if `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT` are set
 - Falls back to standard OpenAI with `OPENAI_API_KEY`
 - Separate transcription client with API version `2025-03-01-preview` for Azure
 - Automatic model selection based on transcript length (uses extended context model for >256k tokens)
 
 Key functions:
+
 - `getOpenAIClient()` - Returns singleton client for chat completions
 - `getTranscriptionClient()` - Returns client configured for audio transcription
 - `getWhisperDeployment()` - Returns deployment name for transcription
@@ -155,9 +144,10 @@ Key functions:
 ### Path Aliases
 
 Use `@/*` for imports (configured in `tsconfig.json`):
+
 ```typescript
-import { db } from '@/lib/db';
-import { Transcript } from '@/types';
+import { db } from "@/lib/db";
+import { Transcript } from "@/types";
 ```
 
 ## Environment Setup
@@ -165,6 +155,7 @@ import { Transcript } from '@/types';
 Copy `.env.local.example` to `.env.local` and configure:
 
 ### Azure OpenAI (Recommended)
+
 ```env
 AZURE_OPENAI_API_KEY=your-key
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
@@ -174,6 +165,7 @@ AZURE_OPENAI_EXTENDED_GPT_DEPLOYMENT=gpt-41  # Optional: for long transcripts (>
 ```
 
 ### Standard OpenAI
+
 ```env
 OPENAI_API_KEY=sk-your-key
 ```
@@ -183,14 +175,18 @@ Note: `AZURE_OPENAI_GPT4_DEPLOYMENT` is supported as a legacy fallback.
 ## Code Patterns
 
 ### API Route Handlers
+
 API routes use helper functions from `lib/api-utils.ts`:
+
 ```typescript
 return successResponse(data);
-return errorResponse('message', statusCode, details);
+return errorResponse("message", statusCode, details);
 ```
 
 ### Database Operations
+
 Database operations in `lib/db.ts` follow consistent patterns:
+
 - Functions throw `DatabaseError` with codes like `SAVE_FAILED`, `GET_FAILED`
 - Use transactions for multi-table operations
 - Paginated queries available for large datasets
@@ -199,13 +195,14 @@ Database operations in `lib/db.ts` follow consistent patterns:
 
 Pluggable analysis strategies in `lib/analysis-strategies/` with automatic fallback:
 
-| Strategy | Use Case | API Calls | Duration |
-|----------|----------|-----------|----------|
-| `basic` | Short transcripts (<50k tokens) | 1 | 30-60s |
-| `hybrid` | Medium transcripts (50k-150k tokens) | 2-4 | 60-90s |
-| `advanced` | Long/complex transcripts (>150k tokens) | 5-8 | 90-180s |
+| Strategy   | Use Case                                | API Calls | Duration |
+| ---------- | --------------------------------------- | --------- | -------- |
+| `basic`    | Short transcripts (<50k tokens)         | 1         | 30-60s   |
+| `hybrid`   | Medium transcripts (50k-150k tokens)    | 2-4       | 60-90s   |
+| `advanced` | Long/complex transcripts (>150k tokens) | 5-8       | 90-180s  |
 
 Key features:
+
 - **Auto-selection**: Strategy chosen based on transcript token count via `recommendStrategy()`
 - **Fallback chain**: On failure, degrades gracefully (advanced → hybrid → basic)
 - **Circuit breaker**: Prevents repeated failures by tracking strategy health
@@ -217,5 +214,6 @@ Entry point: `executeAnalysis()` in `lib/analysis-strategies/index.ts`
 ### Build Scripts
 
 The build process runs preparatory scripts before Next.js build:
+
 - `scripts/build-templates.mjs` - Compiles analysis templates
 - `scripts/copy-pdf-worker.mjs` - Copies pdfjs-dist worker for PDF export

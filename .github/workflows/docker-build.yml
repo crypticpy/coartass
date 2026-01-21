@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: meeting-transcriber
+  IMAGE_NAME: austin-rtass
   TEST_TAG: test
 
 permissions:

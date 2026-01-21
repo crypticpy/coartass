@@ -222,7 +222,7 @@ properties:
 # 5. Create Container Registry:
 #    az acr create \
 #      --resource-group austin-rtass-rg \
-#      --name meetingtranscriberacr \
+#      --name austinrtassacr \
 #      --sku Basic
 #
 # 6. Create Container Apps Environment:
@@ -234,11 +234,11 @@ properties:
 # Build and Push Image:
 # ----------------------
 # 1. Login to ACR:
-#    az acr login --name meetingtranscriberacr
+#    az acr login --name austinrtassacr
 #
 # 2. Build and push image:
 #    docker buildx build --platform linux/amd64 \
-#      -t meetingtranscriberacr.azurecr.io/austin-rtass:latest \
+#      -t austinrtassacr.azurecr.io/austin-rtass:latest \
 #      --push .
 #
 # Create Container App:
@@ -247,7 +247,7 @@ properties:
 #   --name austin-rtass \
 #   --resource-group austin-rtass-rg \
 #   --environment austin-rtass-env \
-#   --image meetingtranscriberacr.azurecr.io/austin-rtass:latest \
+#   --image austinrtassacr.azurecr.io/austin-rtass:latest \
 #   --target-port 3000 \
 #   --ingress external \
 #   --min-replicas 1 \
@@ -267,14 +267,14 @@ properties:
 #     AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper-1 \
 #     AZURE_OPENAI_GPT4_DEPLOYMENT=gpt-4 \
 #     NEXT_TELEMETRY_DISABLED=1 \
-#   --registry-server meetingtranscriberacr.azurecr.io
+#   --registry-server austinrtassacr.azurecr.io
 #
 # Update Container App:
 # ---------------------
 # az containerapp update \
 #   --name austin-rtass \
 #   --resource-group austin-rtass-rg \
-#   --image meetingtranscriberacr.azurecr.io/austin-rtass:latest
+#   --image austinrtassacr.azurecr.io/austin-rtass:latest
 #
 # Update Secrets:
 # ---------------
