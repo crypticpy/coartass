@@ -5,11 +5,13 @@ All notable changes to Austin RTASS will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.3] - 2026-01-20
+## [0.14.1] - 2026-01-20
 
 ### Fixed
 
 - **Critical Deployment Fix**: Corrected all Azure deployment configurations that were incorrectly pointing to meeting transcriber resources (`ca-mtranscriber-prod`) instead of Austin RTASS resources (`ca-austin-rtass-prod`). This prevents accidental deployments to the wrong container app.
+
+- **Skip Link Visibility**: Fixed "Skip to main content" link always visible in top-left corner. Now uses sr-only/not-sr-only pattern for proper accessibility - link only appears when focused via keyboard navigation.
 
 - **PDF Export**: Fixed React error #31 with defensive string coercion in PDF generation. Removed invalid Font.register calls that were breaking server-side PDF generation.
 
@@ -26,6 +28,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Infrastructure Security**: Instance-specific Azure documentation (`AZURE_CONTAINER_APPS_GUIDE.md`) is now gitignored to prevent exposing infrastructure details. Generic deployment templates remain in repo with placeholders.
 
 - **GitHub Actions**: All workflows updated to use correct `austin-rtass` naming conventions.
+
+## [0.14.0] - 2026-01-02
+
+### Added
+
+- **Interactive Review Mode**: Full-screen transcript review with synchronized audio playback.
+- **Scorecard Overlay System**: Scorecard selector and overlay panel for reviewing criteria verdicts.
+- **Audio Enhancements**: Waveform peaks caching, audio controls modal, improved sync.
+- **Branding Updates**: AFD logo, simplified RTASS branding.
+
+## [0.13.0] - 2026-01-01
+
+### Added
+
+- **Scorecard PDF Export**: Professional PDF export of RTASS scorecards with rubric visualization.
+- **Rubric Builder UI**: Interactive rubric template editor with sections and criteria.
+- **Scoring Enhancements**: Improved evidence linking and benchmark display.
+
+## [0.12.6] - 2026-01-01
+
+### Added
+
+- **RTASS Foundation**: Initial Austin RTASS conversion from meeting transcriber.
+- **AFD Templates**: Post-Incident Review and Radio Quick Review templates.
 
 ## [0.9.2] - 2025-12-10
 
@@ -91,7 +117,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | Highlights                                               |
 | ------- | ---------- | -------------------------------------------------------- |
-| 0.9.3   | 2026-01-20 | Critical deployment fix, PDF export improvements         |
-| 0.9.2   | 2025-12-10 | Timestamp NaN fix in evaluation pass, timestamp recovery |
+| 0.14.1  | 2026-01-20 | Deployment security fix, skip link fix, PDF improvements |
+| 0.14.0  | 2026-01-02 | Interactive review mode, scorecard overlay               |
+| 0.13.0  | 2026-01-01 | Scorecard PDF export, rubric builder UI                  |
+| 0.12.6  | 2026-01-01 | Initial Austin RTASS conversion                          |
+| 0.9.2   | 2025-12-10 | Timestamp NaN fix in evaluation pass                     |
 | 0.9.1   | 2025-12-10 | Timestamp fixes, upload progress improvements            |
 | 0.9.0   | 2025-11-30 | Initial production release                               |

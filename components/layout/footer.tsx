@@ -11,7 +11,7 @@ import { Container, Text, Box } from "@mantine/core";
  */
 export default function Footer() {
   const currentYear = new Date().getFullYear();
-  const appVersion = "0.9.3";
+  const appVersion = "0.14.1";
 
   return (
     <>
