@@ -9,12 +9,17 @@
 /**
  * Supported document types for supplemental materials.
  */
-export type SupplementalDocumentType = 'docx' | 'pdf' | 'pptx' | 'txt' | 'pasted';
+export type SupplementalDocumentType =
+  | "docx"
+  | "pdf"
+  | "pptx"
+  | "txt"
+  | "pasted";
 
 /**
  * Processing status for a supplemental document.
  */
-export type SupplementalDocumentStatus = 'parsing' | 'ready' | 'error';
+export type SupplementalDocumentStatus = "parsing" | "ready" | "error";
 
 /**
  * Represents a parsed supplemental document with extracted text.
@@ -49,6 +54,18 @@ export interface SupplementalDocument {
 
   /** Timestamp when document was added */
   addedAt: Date;
+}
+
+/**
+ * Represents a supplemental document persisted to IndexedDB.
+ * Extends SupplementalDocument with a link to the parent transcript.
+ *
+ * Used for managing supplemental documents attached to incidents,
+ * which are automatically included in subsequent analyses.
+ */
+export interface PersistedSupplementalDocument extends SupplementalDocument {
+  /** ID of the parent transcript this document is attached to */
+  transcriptId: string;
 }
 
 /**
@@ -102,14 +119,14 @@ export const SUPPLEMENTAL_LIMITS = {
   WARNING_THRESHOLD_PERCENT: 80,
 
   /** Supported file extensions */
-  SUPPORTED_EXTENSIONS: ['.docx', '.pdf', '.pptx', '.txt'] as const,
+  SUPPORTED_EXTENSIONS: [".docx", ".pdf", ".pptx", ".txt"] as const,
 
   /** MIME types for supported formats */
   SUPPORTED_MIME_TYPES: [
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-    'application/pdf', // .pdf
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
-    'text/plain', // .txt
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+    "application/pdf", // .pdf
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+    "text/plain", // .txt
   ] as const,
 } as const;
 
@@ -117,10 +134,10 @@ export const SUPPLEMENTAL_LIMITS = {
  * Type guard to check if a file extension is supported.
  */
 export function isSupportedExtension(
-  ext: string
+  ext: string,
 ): ext is (typeof SUPPLEMENTAL_LIMITS.SUPPORTED_EXTENSIONS)[number] {
   return SUPPLEMENTAL_LIMITS.SUPPORTED_EXTENSIONS.includes(
-    ext.toLowerCase() as (typeof SUPPLEMENTAL_LIMITS.SUPPORTED_EXTENSIONS)[number]
+    ext.toLowerCase() as (typeof SUPPLEMENTAL_LIMITS.SUPPORTED_EXTENSIONS)[number],
   );
 }
 
@@ -128,18 +145,18 @@ export function isSupportedExtension(
  * Get document type from file extension.
  */
 export function getDocumentTypeFromExtension(
-  filename: string
+  filename: string,
 ): SupplementalDocumentType | null {
-  const ext = filename.toLowerCase().split('.').pop();
+  const ext = filename.toLowerCase().split(".").pop();
   switch (ext) {
-    case 'docx':
-      return 'docx';
-    case 'pdf':
-      return 'pdf';
-    case 'pptx':
-      return 'pptx';
-    case 'txt':
-      return 'txt';
+    case "docx":
+      return "docx";
+    case "pdf":
+      return "pdf";
+    case "pptx":
+      return "pptx";
+    case "txt":
+      return "txt";
     default:
       return null;
   }
@@ -150,18 +167,18 @@ export function getDocumentTypeFromExtension(
  */
 export function getDocumentTypeLabel(type: SupplementalDocumentType): string {
   switch (type) {
-    case 'docx':
-      return 'Word Document';
-    case 'pdf':
-      return 'PDF';
-    case 'pptx':
-      return 'PowerPoint';
-    case 'txt':
-      return 'Text File';
-    case 'pasted':
-      return 'Pasted Text';
+    case "docx":
+      return "Word Document";
+    case "pdf":
+      return "PDF";
+    case "pptx":
+      return "PowerPoint";
+    case "txt":
+      return "Text File";
+    case "pasted":
+      return "Pasted Text";
     default:
-      return 'Document';
+      return "Document";
   }
 }
 
@@ -170,7 +187,7 @@ export function getDocumentTypeLabel(type: SupplementalDocumentType): string {
  */
 export const EMPTY_SUPPLEMENTAL_STATE: SupplementalState = {
   documents: [],
-  pastedText: '',
+  pastedText: "",
   pastedTextTokens: 0,
   totalTokens: 0,
   isProcessing: false,

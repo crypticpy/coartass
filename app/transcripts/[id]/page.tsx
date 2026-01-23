@@ -7,7 +7,13 @@
 
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -64,21 +70,28 @@ import type { Analysis } from "@/types/analysis";
 import type { AudioPlayerControls } from "@/types/audio";
 import type { Template } from "@/types/template";
 import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
+import { useAnnotations } from "@/hooks/use-annotations";
+import { SupplementalDocsManager } from "@/components/analysis/supplemental-docs-manager";
+import { AnnotationEditor } from "@/components/transcript/annotation-editor";
+import { AnnotationPanel } from "@/components/transcript/annotation-panel";
 
 // Dynamic import for RadioPlaybackInterface (contains heavy WaveSurfer dependency)
 const RadioPlaybackInterface = dynamic(
-  () => import("@/components/audio/radio-playback-interface").then((mod) => mod.RadioPlaybackInterface),
+  () =>
+    import("@/components/audio/radio-playback-interface").then(
+      (mod) => mod.RadioPlaybackInterface,
+    ),
   {
     ssr: false,
     loading: () => (
       <Box
         h={300}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--mantine-color-default)',
-          borderRadius: 'var(--mantine-radius-md)'
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "var(--mantine-color-default)",
+          borderRadius: "var(--mantine-radius-md)",
         }}
       >
         <Group gap="xs" c="dimmed">
@@ -86,17 +99,20 @@ const RadioPlaybackInterface = dynamic(
           <Text size="sm">Loading audio player...</Text>
         </Group>
       </Box>
-    )
-  }
+    ),
+  },
 );
 
 // Dynamic import for InteractiveReviewMode (full-screen overlay)
 const InteractiveReviewMode = dynamic(
-  () => import("@/components/audio/interactive-review-mode").then((mod) => mod.InteractiveReviewMode),
+  () =>
+    import("@/components/audio/interactive-review-mode").then(
+      (mod) => mod.InteractiveReviewMode,
+    ),
   {
     ssr: false,
-    loading: () => null
-  }
+    loading: () => null,
+  },
 );
 
 const EMPTY_ANALYSES: Analysis[] = [];
@@ -107,9 +123,9 @@ const EMPTY_ANALYSES: Analysis[] = [];
  */
 function formatAnalysisTabLabel(analysis: Analysis): string {
   const date = new Date(analysis.createdAt);
-  const shortDate = date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric'
+  const shortDate = date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
   });
 
   return `Analysis (${shortDate})`;
@@ -131,14 +147,22 @@ export default function TranscriptDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deletingAnalysisId, setDeletingAnalysisId] = useState<string | null>(null);
+  const [deletingAnalysisId, setDeletingAnalysisId] = useState<string | null>(
+    null,
+  );
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number>(-1);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>("transcript");
-  const [generatingEvidenceFor, setGeneratingEvidenceFor] = useState<string | null>(null);
-  const [evaluationViewMode, setEvaluationViewMode] = useState<Record<string, "draft" | "final">>({});
+  const [generatingEvidenceFor, setGeneratingEvidenceFor] = useState<
+    string | null
+  >(null);
+  const [evaluationViewMode, setEvaluationViewMode] = useState<
+    Record<string, "draft" | "final">
+  >({});
   const [showReviewMode, setShowReviewMode] = useState(false);
+  const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
+  const [annotationEditorTimestamp, setAnnotationEditorTimestamp] = useState(0);
   const hasSetInitialTab = useRef(false);
 
   const audioControlsRef = useRef<AudioPlayerControls | null>(null);
@@ -201,10 +225,25 @@ export default function TranscriptDetailPage() {
     return scorecards[0];
   }, [scorecards]);
 
-  function normalizeRubricDates(rubric: RtassRubricTemplate): RtassRubricTemplate {
+  // Annotations management
+  const {
+    annotations,
+    annotationsBySegment: _annotationsBySegment, // TODO: Pass to TranscriptViewer for segment display
+    addAnnotation,
+    updateAnnotation,
+    deleteAnnotation,
+    isProcessing: annotationsProcessing,
+  } = useAnnotations(transcriptId, transcript?.segments ?? []);
+
+  function normalizeRubricDates(
+    rubric: RtassRubricTemplate,
+  ): RtassRubricTemplate {
     return {
       ...rubric,
-      createdAt: rubric.createdAt instanceof Date ? rubric.createdAt : new Date(rubric.createdAt),
+      createdAt:
+        rubric.createdAt instanceof Date
+          ? rubric.createdAt
+          : new Date(rubric.createdAt),
       updatedAt:
         rubric.updatedAt instanceof Date
           ? rubric.updatedAt
@@ -215,7 +254,9 @@ export default function TranscriptDetailPage() {
   }
 
   // Load the rubric template for the latest scorecard (for Review Mode benchmarks)
-  const [latestRubric, setLatestRubric] = useState<RtassRubricTemplate | undefined>(undefined);
+  const [latestRubric, setLatestRubric] = useState<
+    RtassRubricTemplate | undefined
+  >(undefined);
 
   useEffect(() => {
     if (!latestScorecard?.rubricTemplateId) {
@@ -240,16 +281,21 @@ export default function TranscriptDetailPage() {
       }
 
       try {
-        const res = await fetch(`/api/rtass/rubrics?id=${encodeURIComponent(rubricId)}`, {
-          signal: controller.signal,
-        });
+        const res = await fetch(
+          `/api/rtass/rubrics?id=${encodeURIComponent(rubricId)}`,
+          {
+            signal: controller.signal,
+          },
+        );
         const payload = await res.json();
         if (cancelled) return;
         if (!res.ok) {
           setLatestRubric(undefined);
           return;
         }
-        setLatestRubric(normalizeRubricDates(payload.data as RtassRubricTemplate));
+        setLatestRubric(
+          normalizeRubricDates(payload.data as RtassRubricTemplate),
+        );
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         console.error("Error loading built-in rubric:", error);
@@ -263,7 +309,8 @@ export default function TranscriptDetailPage() {
     };
   }, [latestScorecard?.rubricTemplateId]);
 
-  const citationsEnabled = process.env.NEXT_PUBLIC_CITATIONS_ENABLED !== "false";
+  const citationsEnabled =
+    process.env.NEXT_PUBLIC_CITATIONS_ENABLED !== "false";
 
   const handleGenerateEvidence = useCallback(
     async (analysis: Analysis) => {
@@ -281,7 +328,8 @@ export default function TranscriptDetailPage() {
       if (!template) {
         notifications.show({
           title: "Template Not Found",
-          message: "Cannot generate supporting evidence because the template is missing.",
+          message:
+            "Cannot generate supporting evidence because the template is missing.",
           color: "red",
         });
         return;
@@ -332,10 +380,9 @@ export default function TranscriptDetailPage() {
         }
 
         const evidenceByName = new Map<string, unknown>(
-          (payload?.data?.sections || []).map((s: { name: string; evidence: unknown }) => [
-            s.name,
-            s.evidence,
-          ])
+          (payload?.data?.sections || []).map(
+            (s: { name: string; evidence: unknown }) => [s.name, s.evidence],
+          ),
         );
 
         const mergedSections = analysis.results.sections.map((section) => {
@@ -360,13 +407,15 @@ export default function TranscriptDetailPage() {
         });
       } catch (error) {
         // Don't show notification for aborted requests
-        if (error instanceof Error && error.name === 'AbortError') {
+        if (error instanceof Error && error.name === "AbortError") {
           return;
         }
         notifications.show({
           title: "Supporting Evidence Failed",
           message:
-            error instanceof Error ? error.message : "Failed to generate citations",
+            error instanceof Error
+              ? error.message
+              : "Failed to generate citations",
           color: "red",
         });
       } finally {
@@ -374,7 +423,7 @@ export default function TranscriptDetailPage() {
         citationsAbortRef.current = null;
       }
     },
-    [citationsEnabled, templateById, transcript]
+    [citationsEnabled, templateById, transcript],
   );
 
   // Cleanup: abort in-flight citations request on unmount
@@ -458,7 +507,7 @@ export default function TranscriptDetailPage() {
         });
       }
     },
-    [transcript]
+    [transcript],
   );
 
   // Handle delete functionality
@@ -502,42 +551,45 @@ export default function TranscriptDetailPage() {
 
   // Handle delete individual analysis
   // Note: Tab switching is handled by the useEffect below to avoid stale closure issues
-  const handleDeleteAnalysis = useCallback(async (analysisId: string) => {
-    // Guard: prevent concurrent deletions
-    if (deletingAnalysisId) return;
+  const handleDeleteAnalysis = useCallback(
+    async (analysisId: string) => {
+      // Guard: prevent concurrent deletions
+      if (deletingAnalysisId) return;
 
-    setDeletingAnalysisId(analysisId);
+      setDeletingAnalysisId(analysisId);
 
-    try {
-      await deleteAnalysis(analysisId);
+      try {
+        await deleteAnalysis(analysisId);
 
-      notifications.show({
-        title: "Analysis Deleted",
-        message: "The analysis has been deleted successfully.",
-        color: "green",
-      });
-      // Tab switching handled by useEffect reacting to analyses changes
-    } catch (error) {
-      console.error("Delete analysis error:", error);
-      notifications.show({
-        title: "Delete Failed",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to delete analysis",
-        color: "red",
-      });
-    } finally {
-      setDeletingAnalysisId(null);
-    }
-  }, [deletingAnalysisId]);
+        notifications.show({
+          title: "Analysis Deleted",
+          message: "The analysis has been deleted successfully.",
+          color: "green",
+        });
+        // Tab switching handled by useEffect reacting to analyses changes
+      } catch (error) {
+        console.error("Delete analysis error:", error);
+        notifications.show({
+          title: "Delete Failed",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to delete analysis",
+          color: "red",
+        });
+      } finally {
+        setDeletingAnalysisId(null);
+      }
+    },
+    [deletingAnalysisId],
+  );
 
   // Handle tab switching when current analysis is deleted
   // Separated from delete handler to avoid stale closure issues with useLiveQuery
   useEffect(() => {
-    if (activeTab?.startsWith('analysis-')) {
-      const analysisId = activeTab.replace('analysis-', '');
-      const analysisExists = analyses.some(a => a.id === analysisId);
+    if (activeTab?.startsWith("analysis-")) {
+      const analysisId = activeTab.replace("analysis-", "");
+      const analysisExists = analyses.some((a) => a.id === analysisId);
 
       if (!analysisExists && analyses.length >= 0) {
         // Analysis was deleted, switch to another tab
@@ -595,7 +647,7 @@ export default function TranscriptDetailPage() {
     (segment: TranscriptSegment | null, index: number) => {
       setActiveSegmentIndex(index);
     },
-    []
+    [],
   );
 
   // Handle controls ready from audio player
@@ -612,7 +664,7 @@ export default function TranscriptDetailPage() {
       // Switch to transcript tab to show the highlighted segment
       setActiveTab("transcript");
     },
-    [transcript]
+    [transcript],
   );
 
   // Handle timestamp click from analysis (converts seconds to segment index)
@@ -644,7 +696,34 @@ export default function TranscriptDetailPage() {
         });
       }
     },
-    [transcript]
+    [transcript],
+  );
+
+  // Handle adding annotation from segment list
+  // TODO: Pass to TranscriptViewer once it supports annotation props
+  const _handleAddAnnotation = useCallback(
+    (_segmentIndex: number, timestamp: number) => {
+      setAnnotationEditorTimestamp(timestamp);
+      setAnnotationEditorOpen(true);
+    },
+    [],
+  );
+
+  // Handle saving new annotation
+  const handleSaveAnnotation = useCallback(
+    async (text: string) => {
+      await addAnnotation(annotationEditorTimestamp, text);
+      setAnnotationEditorOpen(false);
+    },
+    [addAnnotation, annotationEditorTimestamp],
+  );
+
+  // Handle annotation click (seek to timestamp)
+  const handleAnnotationClick = useCallback(
+    (annotation: { timestamp: number }) => {
+      handleTimestampClick(annotation.timestamp);
+    },
+    [handleTimestampClick],
   );
 
   // Handle scroll for sticky tabs shadow (throttled for performance)
@@ -717,8 +796,8 @@ export default function TranscriptDetailPage() {
             title="Incident Not Found"
             icon={<AlertCircle size={16} />}
           >
-            The incident you&apos;re looking for doesn&apos;t exist or may
-            have been deleted.
+            The incident you&apos;re looking for doesn&apos;t exist or may have
+            been deleted.
           </Alert>
 
           {/* Actions */}
@@ -740,237 +819,297 @@ export default function TranscriptDetailPage() {
   return (
     <div className="content-max-width">
       <Container size="xl" py="xl">
-          <Stack gap="xl">
-            {/* Back Button */}
-            <Button
-              component={Link}
-              href="/transcripts"
-              variant="subtle"
-              leftSection={<ArrowLeft size={16} />}
-              styles={{ root: { minHeight: 44, width: "fit-content" } }}
+        <Stack gap="xl">
+          {/* Back Button */}
+          <Button
+            component={Link}
+            href="/transcripts"
+            variant="subtle"
+            leftSection={<ArrowLeft size={16} />}
+            styles={{ root: { minHeight: 44, width: "fit-content" } }}
+          >
+            Back to Incidents
+          </Button>
+
+          {/* Transcript Header Components */}
+          <TranscriptHeader
+            transcript={transcript}
+            analyses={analyses}
+            onExport={handleExport}
+            onDelete={handleDelete}
+            onAnalyze={handleAnalyze}
+            isDeleting={isDeleting}
+            hasExistingAnalyses={analyses.length > 0}
+          />
+
+          {/* Radio Playback Interface (if audio is available) */}
+          {audioUrl && transcript.segments.length > 0 && (
+            <Paper
+              p="md"
+              radius="md"
+              style={{
+                backgroundColor: "var(--mantine-color-default)",
+                border: "1px solid var(--mantine-color-default-border)",
+              }}
             >
-              Back to Incidents
-            </Button>
+              <RadioPlaybackInterface
+                audioUrl={audioUrl}
+                cacheKey={transcript.id}
+                segments={transcript.segments}
+                duration={transcript.metadata.duration}
+                wordCount={transcript.text.split(/\s+/).filter(Boolean).length}
+                fileSize={transcript.metadata.fileSize}
+                onSegmentChange={handleSegmentChange}
+                onControlsReady={handleControlsReady}
+                onReviewModeClick={() => setShowReviewMode(true)}
+              />
+            </Paper>
+          )}
 
-            {/* Transcript Header Components */}
-            <TranscriptHeader
-              transcript={transcript}
-              analyses={analyses}
-              onExport={handleExport}
-              onDelete={handleDelete}
-              onAnalyze={handleAnalyze}
-              isDeleting={isDeleting}
-              hasExistingAnalyses={analyses.length > 0}
-            />
+          {/* Supplemental Documents & Annotations Sidebar */}
+          <Group align="flex-start" gap="md">
+            {/* Supplemental Documents Manager */}
+            <Box style={{ flex: "1 1 300px", maxWidth: 400 }}>
+              <SupplementalDocsManager
+                transcriptId={transcriptId}
+                collapsible
+                defaultCollapsed
+              />
+            </Box>
 
-            {/* Radio Playback Interface (if audio is available) */}
-            {audioUrl && transcript.segments.length > 0 && (
-              <Paper
-                p="md"
-                radius="md"
-                style={{ backgroundColor: "var(--mantine-color-default)", border: "1px solid var(--mantine-color-default-border)" }}
-              >
-                <RadioPlaybackInterface
-                  audioUrl={audioUrl}
-                  cacheKey={transcript.id}
-                  segments={transcript.segments}
-                  duration={transcript.metadata.duration}
-                  wordCount={transcript.text.split(/\s+/).filter(Boolean).length}
-                  fileSize={transcript.metadata.fileSize}
-                  onSegmentChange={handleSegmentChange}
-                  onControlsReady={handleControlsReady}
-                  onReviewModeClick={() => setShowReviewMode(true)}
+            {/* Annotations Panel */}
+            <Box style={{ flex: "1 1 300px", maxWidth: 400 }}>
+              <Paper withBorder p="sm" radius="sm">
+                <AnnotationPanel
+                  annotations={annotations}
+                  onAnnotationClick={handleAnnotationClick}
+                  onUpdate={updateAnnotation}
+                  onDelete={deleteAnnotation}
+                  onAddNew={() => {
+                    setAnnotationEditorTimestamp(0);
+                    setAnnotationEditorOpen(true);
+                  }}
+                  isLoading={annotationsProcessing}
+                  maxHeight={300}
                 />
               </Paper>
-            )}
+            </Box>
+          </Group>
 
-            {/* Sticky Tabs Section */}
-            <div
-              ref={tabsRef}
-              className={`sticky-tabs ${isScrolled ? "scrolled" : ""}`}
+          {/* Sticky Tabs Section */}
+          <div
+            ref={tabsRef}
+            className={`sticky-tabs ${isScrolled ? "scrolled" : ""}`}
+          >
+            <Tabs
+              value={activeTab}
+              onChange={setActiveTab}
+              variant="default"
+              keepMounted={false}
             >
-              <Tabs value={activeTab} onChange={setActiveTab} variant="default" keepMounted={false}>
-                <Tabs.List
-                  mb="md"
-                  style={{
-                    overflowX: 'auto',
-                    flexWrap: 'nowrap',
-                    WebkitOverflowScrolling: 'touch'
-                  }}
+              <Tabs.List
+                mb="md"
+                style={{
+                  overflowX: "auto",
+                  flexWrap: "nowrap",
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
+                {/* Transcript Tab */}
+                <Tabs.Tab
+                  value="transcript"
+                  leftSection={<FileTextIcon size={14} />}
                 >
-                  {/* Transcript Tab */}
-                  <Tabs.Tab
-                    value="transcript"
-                    leftSection={<FileTextIcon size={14} />}
-                  >
-                    <Text size="sm" fw={600}>
-                      Radio Transcript
-                    </Text>
-                  </Tabs.Tab>
+                  <Text size="sm" fw={600}>
+                    Radio Transcript
+                  </Text>
+                </Tabs.Tab>
 
-                  {/* Dynamic Analysis Tabs */}
-                  {analyses.map((analysis) => (
-                    <Tabs.Tab
-                      key={analysis.id}
-                      value={`analysis-${analysis.id}`}
-                      leftSection={<Sparkles size={14} />}
-                    >
-                      <Text size="sm" fw={600}>
-                        {formatAnalysisTabLabel(analysis)}
-                      </Text>
-                    </Tabs.Tab>
-                  ))}
-
-                  {/* RTASS Scorecard Tab */}
-                  <Tabs.Tab value="scorecard" leftSection={<ClipboardCheck size={14} />}>
-                    <Text size="sm" fw={600}>
-                      Scorecard
-                    </Text>
-                  </Tabs.Tab>
-
-                  {/* Chat Tab */}
-                  <Tabs.Tab
-                    value="chat"
-                    leftSection={<MessageCircle size={14} />}
-                  >
-                    <Text size="sm" fw={600}>
-                      Chat
-                    </Text>
-                  </Tabs.Tab>
-                </Tabs.List>
-
-                {/* Transcript Panel */}
-                <Tabs.Panel value="transcript">
-                  <Paper
-                    p={0}
-                    radius="md"
-                    withBorder
-                    style={{
-                      boxShadow: "var(--mantine-shadow-sm)",
-                      overflow: "visible",
-                    }}
-                  >
-                    <TranscriptViewer
-                      transcript={transcript}
-                      defaultView="segments"
-                      activeSegmentIndex={activeSegmentIndex}
-                      onSegmentClick={
-                        audioUrl ? handleTranscriptSegmentClick : undefined
-                      }
-                    />
-                  </Paper>
-                </Tabs.Panel>
-
-                {/* Dynamic Analysis Panels */}
+                {/* Dynamic Analysis Tabs */}
                 {analyses.map((analysis) => (
-                  <Tabs.Panel
+                  <Tabs.Tab
                     key={analysis.id}
                     value={`analysis-${analysis.id}`}
+                    leftSection={<Sparkles size={14} />}
                   >
-                    {(() => {
-                      const template = templateById.get(analysis.templateId);
-                      const hasEvaluation = !!(analysis.evaluation && analysis.draftResults);
-                      const currentViewMode = evaluationViewMode[analysis.id] || "final";
-                      return (
-                        <Stack gap="md">
-                          {/* Export Header */}
-                          <Group justify="flex-end">
-                            {template && (
-                              <AnalysisExportMenu
-                                analysis={analysis}
-                                transcript={transcript}
-                                template={template}
-                                variant="light"
-                                size="sm"
-                              />
-                            )}
-                          </Group>
-
-                          <AnalysisViewer
-                            analysis={analysis}
-                            template={template}
-                            onGenerateEvidence={
-                              template ? () => handleGenerateEvidence(analysis) : undefined
-                            }
-                            isGeneratingEvidence={generatingEvidenceFor === analysis.id}
-                            onTimestampClick={
-                              audioUrl ? handleTimestampClick : undefined
-                            }
-                            onDelete={() => handleDeleteAnalysis(analysis.id)}
-                            isDeleting={deletingAnalysisId === analysis.id}
-                            showDraftResults={hasEvaluation && currentViewMode === "draft"}
-                          />
-
-                          {/* Evaluation Display (Quality Checker Panel) - at bottom */}
-                          {hasEvaluation && (
-                            <EvaluationDisplay
-                              evaluation={analysis.evaluation!}
-                              draftResults={analysis.draftResults!}
-                              finalResults={analysis.results}
-                              currentView={currentViewMode}
-                              onViewChange={(view) => setEvaluationViewMode((prev) => ({
-                                ...prev,
-                                [analysis.id]: view
-                              }))}
-                            />
-                          )}
-                        </Stack>
-                      );
-                    })()}
-                  </Tabs.Panel>
+                    <Text size="sm" fw={600}>
+                      {formatAnalysisTabLabel(analysis)}
+                    </Text>
+                  </Tabs.Tab>
                 ))}
 
-                {/* RTASS Scorecard Panel */}
-                <Tabs.Panel value="scorecard">
-                  <Paper
-                    p="lg"
-                    radius="md"
-                    withBorder
-                    style={{
-                      boxShadow: "var(--mantine-shadow-sm)",
-                    }}
-                  >
-                    <ScorecardRunner
-                      transcript={transcript}
-                      onTimestampClick={audioUrl ? handleTimestampClick : undefined}
-                    />
-                  </Paper>
-                </Tabs.Panel>
+                {/* RTASS Scorecard Tab */}
+                <Tabs.Tab
+                  value="scorecard"
+                  leftSection={<ClipboardCheck size={14} />}
+                >
+                  <Text size="sm" fw={600}>
+                    Scorecard
+                  </Text>
+                </Tabs.Tab>
 
-                {/* Chat Panel */}
-                <Tabs.Panel value="chat">
-                  <Paper
-                    p="lg"
-                    radius="md"
-                    withBorder
-                    style={{
-                      boxShadow: "var(--mantine-shadow-sm)",
-                    }}
-                  >
-                    <ChatInterface
-                      transcriptId={transcript.id}
-                      transcript={transcript}
-                    />
-                  </Paper>
-                </Tabs.Panel>
-              </Tabs>
-            </div>
-          </Stack>
-        </Container>
+                {/* Chat Tab */}
+                <Tabs.Tab
+                  value="chat"
+                  leftSection={<MessageCircle size={14} />}
+                >
+                  <Text size="sm" fw={600}>
+                    Chat
+                  </Text>
+                </Tabs.Tab>
+              </Tabs.List>
 
-        {/* Interactive Review Mode Overlay */}
-        {showReviewMode && audioUrl && (
-          <InteractiveReviewMode
-            audioUrl={audioUrl}
-            segments={transcript.segments}
-            scorecard={latestScorecard}
-            rubric={latestRubric}
-            scorecards={scorecards ?? []}
-            duration={transcript.metadata.duration}
-            cacheKey={transcript.id}
-            onClose={() => setShowReviewMode(false)}
-          />
-        )}
-      </div>
+              {/* Transcript Panel */}
+              <Tabs.Panel value="transcript">
+                <Paper
+                  p={0}
+                  radius="md"
+                  withBorder
+                  style={{
+                    boxShadow: "var(--mantine-shadow-sm)",
+                    overflow: "visible",
+                  }}
+                >
+                  <TranscriptViewer
+                    transcript={transcript}
+                    defaultView="segments"
+                    activeSegmentIndex={activeSegmentIndex}
+                    onSegmentClick={
+                      audioUrl ? handleTranscriptSegmentClick : undefined
+                    }
+                  />
+                </Paper>
+              </Tabs.Panel>
+
+              {/* Dynamic Analysis Panels */}
+              {analyses.map((analysis) => (
+                <Tabs.Panel key={analysis.id} value={`analysis-${analysis.id}`}>
+                  {(() => {
+                    const template = templateById.get(analysis.templateId);
+                    const hasEvaluation = !!(
+                      analysis.evaluation && analysis.draftResults
+                    );
+                    const currentViewMode =
+                      evaluationViewMode[analysis.id] || "final";
+                    return (
+                      <Stack gap="md">
+                        {/* Export Header */}
+                        <Group justify="flex-end">
+                          {template && (
+                            <AnalysisExportMenu
+                              analysis={analysis}
+                              transcript={transcript}
+                              template={template}
+                              variant="light"
+                              size="sm"
+                            />
+                          )}
+                        </Group>
+
+                        <AnalysisViewer
+                          analysis={analysis}
+                          template={template}
+                          onGenerateEvidence={
+                            template
+                              ? () => handleGenerateEvidence(analysis)
+                              : undefined
+                          }
+                          isGeneratingEvidence={
+                            generatingEvidenceFor === analysis.id
+                          }
+                          onTimestampClick={
+                            audioUrl ? handleTimestampClick : undefined
+                          }
+                          onDelete={() => handleDeleteAnalysis(analysis.id)}
+                          isDeleting={deletingAnalysisId === analysis.id}
+                          showDraftResults={
+                            hasEvaluation && currentViewMode === "draft"
+                          }
+                        />
+
+                        {/* Evaluation Display (Quality Checker Panel) - at bottom */}
+                        {hasEvaluation && (
+                          <EvaluationDisplay
+                            evaluation={analysis.evaluation!}
+                            draftResults={analysis.draftResults!}
+                            finalResults={analysis.results}
+                            currentView={currentViewMode}
+                            onViewChange={(view) =>
+                              setEvaluationViewMode((prev) => ({
+                                ...prev,
+                                [analysis.id]: view,
+                              }))
+                            }
+                          />
+                        )}
+                      </Stack>
+                    );
+                  })()}
+                </Tabs.Panel>
+              ))}
+
+              {/* RTASS Scorecard Panel */}
+              <Tabs.Panel value="scorecard">
+                <Paper
+                  p="lg"
+                  radius="md"
+                  withBorder
+                  style={{
+                    boxShadow: "var(--mantine-shadow-sm)",
+                  }}
+                >
+                  <ScorecardRunner
+                    transcript={transcript}
+                    onTimestampClick={
+                      audioUrl ? handleTimestampClick : undefined
+                    }
+                  />
+                </Paper>
+              </Tabs.Panel>
+
+              {/* Chat Panel */}
+              <Tabs.Panel value="chat">
+                <Paper
+                  p="lg"
+                  radius="md"
+                  withBorder
+                  style={{
+                    boxShadow: "var(--mantine-shadow-sm)",
+                  }}
+                >
+                  <ChatInterface
+                    transcriptId={transcript.id}
+                    transcript={transcript}
+                  />
+                </Paper>
+              </Tabs.Panel>
+            </Tabs>
+          </div>
+        </Stack>
+      </Container>
+
+      {/* Interactive Review Mode Overlay */}
+      {showReviewMode && audioUrl && (
+        <InteractiveReviewMode
+          audioUrl={audioUrl}
+          segments={transcript.segments}
+          scorecard={latestScorecard}
+          rubric={latestRubric}
+          scorecards={scorecards ?? []}
+          duration={transcript.metadata.duration}
+          cacheKey={transcript.id}
+          onClose={() => setShowReviewMode(false)}
+        />
+      )}
+
+      {/* Annotation Editor Modal */}
+      <AnnotationEditor
+        opened={annotationEditorOpen}
+        onClose={() => setAnnotationEditorOpen(false)}
+        timestamp={annotationEditorTimestamp}
+        onSave={handleSaveAnnotation}
+        isLoading={annotationsProcessing}
+      />
+    </div>
   );
 }

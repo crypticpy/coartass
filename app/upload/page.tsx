@@ -38,6 +38,7 @@ import {
   Center,
 } from "@mantine/core";
 import { useFileUpload } from "@/hooks/use-file-upload";
+import { useSupplementalUpload } from "@/hooks/use-supplemental-upload";
 import { notifications } from "@mantine/notifications";
 import {
   saveTranscript,
@@ -45,16 +46,19 @@ import {
   countTranscriptVersions,
   getRecording,
   updateRecordingStatus,
+  saveSupplementalDocumentsBatch,
 } from "@/lib/db";
 import { loadAndStoreAudioFile } from "@/lib/audio-storage";
 import { computeTranscriptFingerprint } from "@/lib/transcript-fingerprint";
 import type { Transcript } from "@/types/transcript";
+import type { PersistedSupplementalDocument } from "@/types/supplemental";
 
 // Code-split heavy upload components for better performance
 const FileUploadZone = dynamic(
-  () => import("@/components/upload/file-upload-zone").then((m) => ({
-    default: m.FileUploadZone,
-  })),
+  () =>
+    import("@/components/upload/file-upload-zone").then((m) => ({
+      default: m.FileUploadZone,
+    })),
   {
     loading: () => (
       <Card withBorder shadow="sm" radius="md" p="xl">
@@ -72,22 +76,24 @@ const FileUploadZone = dynamic(
       </Card>
     ),
     ssr: false,
-  }
+  },
 );
 
 const DepartmentSelector = dynamic(
-  () => import("@/components/upload/department-selector").then((m) => ({
-    default: m.DepartmentSelector,
-  })),
+  () =>
+    import("@/components/upload/department-selector").then((m) => ({
+      default: m.DepartmentSelector,
+    })),
   {
     loading: () => <Skeleton height={56} />,
-  }
+  },
 );
 
 const UploadProgress = dynamic(
-  () => import("@/components/upload/upload-progress").then((m) => ({
-    default: m.UploadProgress,
-  })),
+  () =>
+    import("@/components/upload/upload-progress").then((m) => ({
+      default: m.UploadProgress,
+    })),
   {
     loading: () => (
       <Stack gap="md">
@@ -95,7 +101,17 @@ const UploadProgress = dynamic(
         <Skeleton height={16} width="40%" />
       </Stack>
     ),
-  }
+  },
+);
+
+const SupplementalUpload = dynamic(
+  () =>
+    import("@/components/analysis/supplemental-upload").then((m) => ({
+      default: m.SupplementalUpload,
+    })),
+  {
+    loading: () => <Skeleton height={100} />,
+  },
 );
 
 /**
@@ -164,11 +180,28 @@ export default function UploadPage() {
   const enableSpeakerDetection = model === "gpt-4o-transcribe-diarize";
 
   // Source recording ID (when coming from recordings page)
-  const [sourceRecordingId, setSourceRecordingId] = React.useState<number | null>(null);
+  const [sourceRecordingId, setSourceRecordingId] = React.useState<
+    number | null
+  >(null);
 
   // Loading state for recording retrieval (when coming from recordings page)
   const [isLoadingRecording, setIsLoadingRecording] = React.useState(false);
-  const [loadingRecordingStatus, setLoadingRecordingStatus] = React.useState<string>("");
+  const [loadingRecordingStatus, setLoadingRecordingStatus] =
+    React.useState<string>("");
+
+  // Supplemental documents upload state
+  const {
+    isEnabled: supplementalEnabled,
+    setEnabled: setSupplementalEnabled,
+    documents: supplementalDocuments,
+    pastedText: supplementalPastedText,
+    pastedTextTokens: supplementalPastedTextTokens,
+    totalTokens: supplementalTotalTokens,
+    isProcessing: supplementalIsProcessing,
+    addFiles: addSupplementalFiles,
+    removeDocument: removeSupplementalDocument,
+    setPastedText: setSupplementalPastedText,
+  } = useSupplementalUpload();
 
   /**
    * Check if coming from recordings page with a recording to transcribe
@@ -191,7 +224,8 @@ export default function UploadPage() {
             const recording = await getRecording(Number(recordingId));
             if (recording) {
               // Normalize MIME type - strip codec suffix (e.g., "audio/webm;codecs=opus" -> "audio/webm")
-              const normalizedMimeType = recording.metadata.mimeType.split(";")[0];
+              const normalizedMimeType =
+                recording.metadata.mimeType.split(";")[0];
 
               // Determine file extension from MIME type
               const extMap: Record<string, string> = {
@@ -206,21 +240,24 @@ export default function UploadPage() {
 
               // Create filename with proper extension
               const filename = recording.name
-                ? (recording.name.includes(".") ? recording.name : `${recording.name}${ext}`)
+                ? recording.name.includes(".")
+                  ? recording.name
+                  : `${recording.name}${ext}`
                 : `recording-${recordingId}${ext}`;
 
               // Convert blob to File with normalized MIME type
-              const recordingFile = new File(
-                [recording.blob],
-                filename,
-                { type: normalizedMimeType }
-              );
+              const recordingFile = new File([recording.blob], filename, {
+                type: normalizedMimeType,
+              });
 
               // Update status to show we're now processing the file
               // This is especially important for WebM files that need conversion
-              const isWebM = normalizedMimeType === "audio/webm" || ext === ".webm";
+              const isWebM =
+                normalizedMimeType === "audio/webm" || ext === ".webm";
               if (isWebM) {
-                setLoadingRecordingStatus("Processing audio file for transcription...");
+                setLoadingRecordingStatus(
+                  "Processing audio file for transcription...",
+                );
               } else {
                 setLoadingRecordingStatus("Validating audio file...");
               }
@@ -243,7 +280,10 @@ export default function UploadPage() {
             console.error("Failed to load recording:", error);
             notifications.show({
               title: "Error",
-              message: error instanceof Error ? error.message : "Failed to load recording. Please try again.",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to load recording. Please try again.",
               color: "red",
             });
           } finally {
@@ -280,7 +320,7 @@ export default function UploadPage() {
         });
       }
     },
-    [selectFile]
+    [selectFile],
   );
 
   /**
@@ -348,14 +388,14 @@ export default function UploadPage() {
 
       try {
         const existingTranscript = await findTranscriptByFingerprint(
-          fingerprint.fileHash
+          fingerprint.fileHash,
         );
 
         let transcriptToSave = transcript;
 
         if (existingTranscript) {
           const versionCount = await countTranscriptVersions(
-            fingerprint.fileHash
+            fingerprint.fileHash,
           );
           const nextVersion = versionCount + 1;
 
@@ -373,6 +413,34 @@ export default function UploadPage() {
 
         await saveTranscript(transcriptToSave);
         transcriptIdToNavigate = transcriptToSave.id;
+
+        // Persist supplemental documents if any were added
+        if (supplementalEnabled && supplementalDocuments.length > 0) {
+          try {
+            const readyDocs = supplementalDocuments.filter(
+              (doc) => doc.status === "ready" && doc.text.trim(),
+            );
+            if (readyDocs.length > 0) {
+              const persistedDocs: PersistedSupplementalDocument[] =
+                readyDocs.map((doc) => ({
+                  ...doc,
+                  transcriptId: transcriptIdToNavigate,
+                }));
+              await saveSupplementalDocumentsBatch(persistedDocs);
+            }
+          } catch (supplementalError) {
+            console.error(
+              "Failed to save supplemental documents:",
+              supplementalError,
+            );
+            notifications.show({
+              title: "Warning",
+              message:
+                "Supplemental documents could not be saved. You can add them later on the incident page.",
+              color: "yellow",
+            });
+          }
+        }
       } catch (dbError) {
         console.error("Failed to save transcript to IndexedDB:", dbError);
         // Show warning but don't fail the upload
@@ -387,7 +455,11 @@ export default function UploadPage() {
       // Update source recording status if this came from recordings page
       if (sourceRecordingId) {
         try {
-          await updateRecordingStatus(sourceRecordingId, "transcribed", transcriptIdToNavigate);
+          await updateRecordingStatus(
+            sourceRecordingId,
+            "transcribed",
+            transcriptIdToNavigate,
+          );
           setSourceRecordingId(null);
         } catch (recordingError) {
           console.error("Failed to update recording status:", recordingError);
@@ -430,6 +502,8 @@ export default function UploadPage() {
     uploadFile,
     router,
     sourceRecordingId,
+    supplementalEnabled,
+    supplementalDocuments,
   ]);
 
   /**
@@ -474,7 +548,13 @@ export default function UploadPage() {
           zIndex={200}
         >
           <Center h="100vh">
-            <Card shadow="lg" padding="xl" radius="lg" withBorder style={{ minWidth: 320 }}>
+            <Card
+              shadow="lg"
+              padding="xl"
+              radius="lg"
+              withBorder
+              style={{ minWidth: 320 }}
+            >
               <Stack align="center" gap="lg">
                 <Box
                   style={{
@@ -547,8 +627,8 @@ export default function UploadPage() {
             </Title>
             <Text size="sm" c="dimmed" mt={4}>
               Upload an audio recording for transcription. Supported formats:
-              MP3, M4A, WAV, WebM, OGG, FLAC, AAC. Files larger than 25MB
-              are automatically converted and split before upload.
+              MP3, M4A, WAV, WebM, OGG, FLAC, AAC. Files larger than 25MB are
+              automatically converted and split before upload.
             </Text>
           </Card.Section>
           <Card.Section inheritPadding py="md">
@@ -566,7 +646,12 @@ export default function UploadPage() {
 
         {/* Upload Settings */}
         {file && (
-          <Card withBorder shadow="sm" radius="md" data-tour-id="upload-settings">
+          <Card
+            withBorder
+            shadow="sm"
+            radius="md"
+            data-tour-id="upload-settings"
+          >
             <Card.Section withBorder inheritPadding py="md">
               <Group gap="sm">
                 <Settings2
@@ -610,7 +695,7 @@ export default function UploadPage() {
                       setModel(
                         event.currentTarget.checked
                           ? "gpt-4o-transcribe-diarize"
-                          : "gpt-4o-transcribe"
+                          : "gpt-4o-transcribe",
                       )
                     }
                     disabled={isUploading}
@@ -628,7 +713,7 @@ export default function UploadPage() {
                       isUploading
                         ? `Using: ${
                             SUPPORTED_LANGUAGES.find(
-                              (lang) => lang.value === language
+                              (lang) => lang.value === language,
                             )?.label
                           }`
                         : 'Leave on "Auto-detect" to let AI determine the language'
@@ -665,6 +750,24 @@ export default function UploadPage() {
               </Stack>
             </Card.Section>
           </Card>
+        )}
+
+        {/* Supplemental Documents Section */}
+        {file && !isUploading && (
+          <SupplementalUpload
+            enabled={supplementalEnabled}
+            onEnabledChange={setSupplementalEnabled}
+            documents={supplementalDocuments}
+            pastedText={supplementalPastedText}
+            pastedTextTokens={supplementalPastedTextTokens}
+            totalTokens={supplementalTotalTokens}
+            isProcessing={supplementalIsProcessing}
+            onAddFiles={addSupplementalFiles}
+            onRemoveDocument={removeSupplementalDocument}
+            onPastedTextChange={setSupplementalPastedText}
+            transcriptTokens={0}
+            disabled={isUploading}
+          />
         )}
 
         {/* Upload Progress */}
@@ -738,15 +841,17 @@ export default function UploadPage() {
 
         {/* Info Alert */}
         {!file && !isUploading && (
-          <Alert
-            icon={<FileAudio size={16} />}
-            color="blue"
-            variant="light"
-          >
+          <Alert icon={<FileAudio size={16} />} color="blue" variant="light">
             Select an audio file to get started. The transcription process
             typically takes 1-3 minutes depending on the file length. Need to
             record audio? Use the dedicated{" "}
-            <Text component="a" href="/record" c="blue" fw={500} style={{ textDecoration: "underline" }}>
+            <Text
+              component="a"
+              href="/record"
+              c="blue"
+              fw={500}
+              style={{ textDecoration: "underline" }}
+            >
               Record page
             </Text>
             .

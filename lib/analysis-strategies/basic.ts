@@ -26,8 +26,9 @@ import type {
   EvaluationResults,
   TranscriptSegment,
   EnrichmentMetadata,
-} from '@/types';
-import type OpenAI from 'openai';
+} from "@/types";
+import type { TranscriptAnnotation } from "@/types/annotation";
+import type OpenAI from "openai";
 import {
   formatOutputType,
   postProcessResults,
@@ -38,9 +39,10 @@ import {
   buildAnalysisChatCompletionParams,
   retryWithBackoff,
   TIMESTAMP_INSTRUCTION,
-} from './shared';
-import { executeEvaluationPass } from './evaluator';
-import { getCitationsClient, getCitationsDeployment } from '../openai';
+  buildAnnotationsPromptSection,
+} from "./shared";
+import { executeEvaluationPass } from "./evaluator";
+import { getCitationsClient, getCitationsDeployment } from "../openai";
 import {
   createMiningEngine,
   isEnrichmentEnabled,
@@ -48,7 +50,7 @@ import {
   actionMiningPattern,
   decisionMiningPattern,
   quoteMiningPattern,
-} from './enrichment';
+} from "./enrichment";
 
 /**
  * Result from basic analysis (raw JSON response)
@@ -67,7 +69,7 @@ interface BasicAnalysisResponse {
   benchmarks?: Array<{
     id: string;
     benchmark: string;
-    status: 'met' | 'missed' | 'not_observed' | 'not_applicable';
+    status: "met" | "missed" | "not_observed" | "not_applicable";
     timestamp?: number;
     unitOrRole?: string;
     evidenceQuote?: string;
@@ -76,13 +78,13 @@ interface BasicAnalysisResponse {
   radioReports?: Array<{
     id: string;
     type:
-      | 'initial_radio_report'
-      | 'follow_up_360'
-      | 'entry_report'
-      | 'command_transfer_company_officer'
-      | 'command_transfer_chief'
-      | 'can_report'
-      | 'other';
+      | "initial_radio_report"
+      | "follow_up_360"
+      | "entry_report"
+      | "command_transfer_company_officer"
+      | "command_transfer_chief"
+      | "can_report"
+      | "other";
     timestamp: number;
     from?: string;
     fields?: Record<string, unknown>;
@@ -92,18 +94,18 @@ interface BasicAnalysisResponse {
   safetyEvents?: Array<{
     id: string;
     type:
-      | 'par'
-      | 'mayday'
-      | 'urgent_traffic'
-      | 'evacuation_order'
-      | 'strategy_change'
-      | 'ric_established'
-      | 'safety_officer_assigned'
-      | 'rehab'
-      | 'utilities_hazard'
-      | 'collapse_hazard'
-      | 'other';
-    severity: 'info' | 'warning' | 'critical';
+      | "par"
+      | "mayday"
+      | "urgent_traffic"
+      | "evacuation_order"
+      | "strategy_change"
+      | "ric_established"
+      | "safety_officer_assigned"
+      | "rehab"
+      | "utilities_hazard"
+      | "collapse_hazard"
+      | "other";
+    severity: "info" | "warning" | "critical";
     timestamp: number;
     unitOrRole?: string;
     details: string;
@@ -142,12 +144,14 @@ interface BasicAnalysisResponse {
  * @param template - Analysis template with sections
  * @param transcript - Full transcript text
  * @param supplementalMaterial - Optional supplemental source material text
+ * @param annotations - Optional trainer annotations
  * @returns Comprehensive prompt string
  */
 export function generateBasicAnalysisPrompt(
   template: Template,
   transcript: string,
-  supplementalMaterial?: string
+  supplementalMaterial?: string,
+  annotations?: TranscriptAnnotation[],
 ): string {
   const sectionInstructions = template.sections
     .map((section, idx) => {
@@ -166,16 +170,16 @@ export function generateBasicAnalysisPrompt(
 - Be specific and actionable
 `;
     })
-    .join('\n');
+    .join("\n");
 
   const hasAgenda = template.sections.some((s) =>
-    s.name.toLowerCase().includes('agenda')
+    s.name.toLowerCase().includes("agenda"),
   );
-  const hasBenchmarks = template.outputs.includes('benchmarks');
-  const hasRadioReports = template.outputs.includes('radio_reports');
-  const hasSafetyEvents = template.outputs.includes('safety_events');
-  const hasDecisions = template.outputs.includes('decisions');
-  const hasActionItems = template.outputs.includes('action_items');
+  const hasBenchmarks = template.outputs.includes("benchmarks");
+  const hasRadioReports = template.outputs.includes("radio_reports");
+  const hasSafetyEvents = template.outputs.includes("safety_events");
+  const hasDecisions = template.outputs.includes("decisions");
+  const hasActionItems = template.outputs.includes("action_items");
 
   const relationshipInstructions = hasAgenda
     ? `
@@ -196,7 +200,7 @@ Since this meeting has an agenda, you MUST establish relationships between items
 
 This relationship mapping is ESSENTIAL for coherent reporting when agenda-style sections are present.
 `
-    : '';
+    : "";
 
   return `You are an expert fireground radio traffic evaluator for Austin Fire Department (AFD) Training Division. Your task is to analyze this transcript and extract ALL requested information in a SINGLE structured JSON response.
 
@@ -217,7 +221,7 @@ ${relationshipInstructions}
 ## Structured Outputs
 
 ${
-  template.outputs.includes('summary')
+  template.outputs.includes("summary")
     ? `
 **Summary**: Provide a concise 3-5 sentence overview of the entire meeting. Capture:
 - Main topics discussed
@@ -225,7 +229,7 @@ ${
 - Overall tone/sentiment
 - Next steps (if any)
 `
-    : ''
+    : ""
 }
 
 ${
@@ -236,7 +240,7 @@ ${
 - Include: benchmark label, status ("met"|"missed"|"not_observed"|"not_applicable"), timestamp (if observed), unitOrRole (if stated)
 - Keep evidenceQuote short when provided
 `
-    : ''
+    : ""
 }
 
 ${
@@ -247,7 +251,7 @@ ${
 - TIMESTAMP IS REQUIRED
 - Include: type, from (unit/role), fields (concise key/values), missingRequired (if incomplete), evidenceQuote (optional)
 `
-    : ''
+    : ""
 }
 
 ${
@@ -258,7 +262,7 @@ ${
 - TIMESTAMP IS REQUIRED
 - Include: type, severity (info|warning|critical), unitOrRole (if stated), details (1 sentence), evidenceQuote (optional)
 `
-    : ''
+    : ""
 }
 
 ${
@@ -268,9 +272,9 @@ ${
 - Assign unique IDs (e.g., "action-1", "action-2")
 - Include: task description, owner (if mentioned), deadline (if mentioned)
 - TIMESTAMP IS REQUIRED: Use the [MM:SS] markers in the transcript to determine when the action was mentioned (convert to seconds)
-- Link to agenda items and decisions using IDs${hasAgenda ? ' (REQUIRED)' : ' (if applicable)'}
+- Link to agenda items and decisions using IDs${hasAgenda ? " (REQUIRED)" : " (if applicable)"}
 `
-    : ''
+    : ""
 }
 
 ${
@@ -279,19 +283,19 @@ ${
 **Decisions**: Extract ALL decisions, resolutions, and conclusions as structured objects:
 - Assign unique IDs (e.g., "decision-1", "decision-2")
 - Include: decision text, context/rationale, timestamp
-- Link to agenda items using IDs${hasAgenda ? ' (REQUIRED)' : ' (if applicable)'}
+- Link to agenda items using IDs${hasAgenda ? " (REQUIRED)" : " (if applicable)"}
 `
-    : ''
+    : ""
 }
 
 ${
-  template.outputs.includes('quotes')
+  template.outputs.includes("quotes")
     ? `
 **Quotes**: Extract 3-5 notable or impactful quotes:
 - Include: exact quote text, speaker (if identifiable), timestamp
 - Focus on memorable, insightful, or decision-driving statements
 `
-    : ''
+    : ""
 }
 
 ## Timestamp Extraction Example
@@ -345,7 +349,7 @@ You MUST respond with valid JSON in this EXACT structure:
       "context": "Optional context"
     }
   ],`
-      : ''
+      : ""
   }
   ${
     hasBenchmarks
@@ -360,7 +364,7 @@ You MUST respond with valid JSON in this EXACT structure:
       "notes": "Initial command"
     }
   ],`
-      : ''
+      : ""
   }
   ${
     hasRadioReports
@@ -375,7 +379,7 @@ You MUST respond with valid JSON in this EXACT structure:
       "evidenceQuote": "Engine 25 assuming command, offensive mode"
     }
   ],`
-      : ''
+      : ""
   }
   ${
     hasSafetyEvents
@@ -390,7 +394,7 @@ You MUST respond with valid JSON in this EXACT structure:
       "evidenceQuote": "All units stand by for PAR"
     }
   ],`
-      : ''
+      : ""
   }
   ${
     hasActionItems
@@ -405,7 +409,7 @@ You MUST respond with valid JSON in this EXACT structure:
       "decisionIds": ["decision-2"]
     }
   ],`
-      : ''
+      : ""
   }
   ${
     hasDecisions
@@ -418,10 +422,10 @@ You MUST respond with valid JSON in this EXACT structure:
       "agendaItemIds": ["agenda-1"]
     }
   ],`
-      : ''
+      : ""
   }
   ${
-    template.outputs.includes('quotes')
+    template.outputs.includes("quotes")
       ? `"quotes": [
     {
       "text": "Exact quote",
@@ -429,13 +433,15 @@ You MUST respond with valid JSON in this EXACT structure:
       "timestamp": 180
     }
   ],`
-      : ''
+      : ""
   }
-  ${template.outputs.includes('summary') ? `"summary": "Overall meeting summary"` : ''}
+  ${template.outputs.includes("summary") ? `"summary": "Overall meeting summary"` : ""}
 }
 \`\`\`
 
-${supplementalMaterial ? `## Supplemental Source Material
+${buildAnnotationsPromptSection(annotations)}${
+    supplementalMaterial
+      ? `## Supplemental Source Material
 
 The following supplemental documents and notes have been provided as additional context.
 Use this information to inform your analysis, but note that:
@@ -447,7 +453,9 @@ ${supplementalMaterial}
 
 ---
 
-` : ''}## Transcript
+`
+      : ""
+  }## Transcript
 
 ${transcript}
 
@@ -455,7 +463,6 @@ ${transcript}
 
 Provide your complete analysis as valid JSON following the structure above. Ensure all relationship IDs are correctly assigned and linked.`;
 }
-
 
 /**
  * Parse basic analysis response and convert to AnalysisResults
@@ -465,7 +472,7 @@ Provide your complete analysis as valid JSON following the structure above. Ensu
  * @returns Structured AnalysisResults object
  */
 export function parseBasicAnalysisResponse(
-  response: BasicAnalysisResponse
+  response: BasicAnalysisResponse,
 ): AnalysisResults {
   // Convert sections (no evidence in basic mode for speed)
   const sections: AnalysisSection[] = response.sections.map((s) => ({
@@ -475,27 +482,31 @@ export function parseBasicAnalysisResponse(
   }));
 
   // Convert agenda items
-  const agendaItems: AgendaItem[] | undefined = response.agendaItems?.map((item) => ({
-    id: item.id,
-    topic: item.topic,
-    timestamp: item.timestamp,
-    context: item.context,
-  }));
+  const agendaItems: AgendaItem[] | undefined = response.agendaItems?.map(
+    (item) => ({
+      id: item.id,
+      topic: item.topic,
+      timestamp: item.timestamp,
+      context: item.context,
+    }),
+  );
 
   const benchmarks = response.benchmarks;
   const radioReports = response.radioReports;
   const safetyEvents = response.safetyEvents;
 
   // Convert action items
-  const actionItems: ActionItem[] | undefined = response.actionItems?.map((item) => ({
-    id: item.id,
-    task: item.task,
-    owner: item.owner,
-    deadline: item.deadline,
-    timestamp: item.timestamp,
-    agendaItemIds: item.agendaItemIds,
-    decisionIds: item.decisionIds,
-  }));
+  const actionItems: ActionItem[] | undefined = response.actionItems?.map(
+    (item) => ({
+      id: item.id,
+      task: item.task,
+      owner: item.owner,
+      deadline: item.deadline,
+      timestamp: item.timestamp,
+      agendaItemIds: item.agendaItemIds,
+      decisionIds: item.decisionIds,
+    }),
+  );
 
   // Convert decisions
   const decisions: Decision[] | undefined = response.decisions?.map((item) => ({
@@ -528,8 +539,10 @@ export function parseBasicAnalysisResponse(
  * @param data - Parsed JSON data
  * @returns true if valid structure
  */
-export function isValidBasicAnalysisResponse(data: unknown): data is BasicAnalysisResponse {
-  if (!data || typeof data !== 'object') return false;
+export function isValidBasicAnalysisResponse(
+  data: unknown,
+): data is BasicAnalysisResponse {
+  if (!data || typeof data !== "object") return false;
 
   const obj = data as Record<string, unknown>;
 
@@ -540,25 +553,32 @@ export function isValidBasicAnalysisResponse(data: unknown): data is BasicAnalys
   for (const section of obj.sections) {
     if (
       !section ||
-      typeof section !== 'object' ||
-      typeof section.name !== 'string' ||
-      typeof section.content !== 'string'
+      typeof section !== "object" ||
+      typeof section.name !== "string" ||
+      typeof section.content !== "string"
     ) {
       return false;
     }
   }
 
   // Optional arrays must be valid if present
-  if (obj.agendaItems !== undefined && !Array.isArray(obj.agendaItems)) return false;
-  if (obj.benchmarks !== undefined && !Array.isArray(obj.benchmarks)) return false;
-  if (obj.radioReports !== undefined && !Array.isArray(obj.radioReports)) return false;
-  if (obj.safetyEvents !== undefined && !Array.isArray(obj.safetyEvents)) return false;
-  if (obj.actionItems !== undefined && !Array.isArray(obj.actionItems)) return false;
-  if (obj.decisions !== undefined && !Array.isArray(obj.decisions)) return false;
+  if (obj.agendaItems !== undefined && !Array.isArray(obj.agendaItems))
+    return false;
+  if (obj.benchmarks !== undefined && !Array.isArray(obj.benchmarks))
+    return false;
+  if (obj.radioReports !== undefined && !Array.isArray(obj.radioReports))
+    return false;
+  if (obj.safetyEvents !== undefined && !Array.isArray(obj.safetyEvents))
+    return false;
+  if (obj.actionItems !== undefined && !Array.isArray(obj.actionItems))
+    return false;
+  if (obj.decisions !== undefined && !Array.isArray(obj.decisions))
+    return false;
   if (obj.quotes !== undefined && !Array.isArray(obj.quotes)) return false;
 
   // Summary must be string if present
-  if (obj.summary !== undefined && typeof obj.summary !== 'string') return false;
+  if (obj.summary !== undefined && typeof obj.summary !== "string")
+    return false;
 
   return true;
 }
@@ -578,6 +598,12 @@ export interface BasicAnalysisConfig {
    * the transcript to preserve timestamp citation logic.
    */
   supplementalMaterial?: string;
+  /**
+   * Trainer annotations - timestamped notes from training officers.
+   * These are observations of face-to-face interactions or events not captured
+   * in the audio. Included in prompts to provide additional context.
+   */
+  annotations?: TranscriptAnnotation[];
 }
 
 /**
@@ -616,25 +642,32 @@ export async function executeBasicAnalysis(
   openaiClient: OpenAI,
   deployment: string,
   config?: BasicAnalysisConfig,
-  segments?: TranscriptSegment[]
+  segments?: TranscriptSegment[],
 ): Promise<BasicAnalysisResult> {
   const supplementalMaterial = config?.supplementalMaterial;
-  console.log('[Basic Analysis] Generating monolithic prompt', {
+  const annotations = config?.annotations;
+  console.log("[Basic Analysis] Generating monolithic prompt", {
     hasSupplementalMaterial: !!supplementalMaterial,
     supplementalLength: supplementalMaterial?.length || 0,
+    annotationCount: annotations?.length || 0,
   });
-  const prompt = generateBasicAnalysisPrompt(template, transcript, supplementalMaterial);
+  const prompt = generateBasicAnalysisPrompt(
+    template,
+    transcript,
+    supplementalMaterial,
+    annotations,
+  );
 
   // Validate token limits before API call
-  const validation = validateTokenLimits(transcript, prompt, 'Basic Analysis');
+  const validation = validateTokenLimits(transcript, prompt, "Basic Analysis");
   if (validation.warnings.length > 0) {
-    validation.warnings.forEach(w => console.warn(w));
+    validation.warnings.forEach((w) => console.warn(w));
   }
   if (!validation.valid) {
-    throw new Error(validation.errors.join('; '));
+    throw new Error(validation.errors.join("; "));
   }
 
-  console.log('[Basic Analysis] Making single API call', {
+  console.log("[Basic Analysis] Making single API call", {
     deployment,
     templateSections: template.sections.length,
     outputs: template.outputs,
@@ -646,66 +679,69 @@ export async function executeBasicAnalysis(
         model: deployment,
         messages: [
           {
-            role: 'system',
+            role: "system",
             content:
-              'You are an expert fireground radio traffic evaluator for Austin Fire Department (AFD) Training Division. ' +
-              'You provide structured, accurate analysis of radio traffic transcripts. ' +
-              'Do not speculate. If information is not in the transcript, state that it is not stated. ' +
-              'Always respond with valid JSON only.',
+              "You are an expert fireground radio traffic evaluator for Austin Fire Department (AFD) Training Division. " +
+              "You provide structured, accurate analysis of radio traffic transcripts. " +
+              "Do not speculate. If information is not in the transcript, state that it is not stated. " +
+              "Always respond with valid JSON only.",
           },
           {
-            role: 'user',
+            role: "user",
             content: prompt,
           },
         ],
-        ...buildAnalysisChatCompletionParams(deployment, ANALYSIS_CONSTANTS.BASIC_TEMPERATURE),
-        response_format: { type: 'json_object' }, // Enforce JSON response
+        ...buildAnalysisChatCompletionParams(
+          deployment,
+          ANALYSIS_CONSTANTS.BASIC_TEMPERATURE,
+        ),
+        response_format: { type: "json_object" }, // Enforce JSON response
       });
 
       // Validate response before returning
       const finishReason = res.choices[0].finish_reason;
       const content = res.choices[0].message.content;
 
-      console.log('[Basic Analysis] Received response', {
+      console.log("[Basic Analysis] Received response", {
         tokensUsed: res.usage?.total_tokens,
         finishReason: finishReason,
         contentLength: content?.length ?? 0,
       });
 
       // Handle content filter - retry as it's likely a false positive
-      if (finishReason === 'content_filter') {
-        console.warn('[Basic Analysis] Content filter triggered - retrying');
-        throw new Error('RETRY'); // Will be caught by retry logic
+      if (finishReason === "content_filter") {
+        console.warn("[Basic Analysis] Content filter triggered - retrying");
+        throw new Error("RETRY"); // Will be caught by retry logic
       }
 
       // Handle token limit exceeded - fail fast with actionable error
-      if (finishReason === 'length') {
+      if (finishReason === "length") {
         throw new Error(
-          'Response truncated due to token limit. ' +
-          'The transcript may be too long for Basic strategy. Consider using shorter content.'
+          "Response truncated due to token limit. " +
+            "The transcript may be too long for Basic strategy. Consider using shorter content.",
         );
       }
 
       // Handle empty response
-      if (!content || content.trim() === '') {
-        console.error('[Basic Analysis] Empty response received', {
+      if (!content || content.trim() === "") {
+        console.error("[Basic Analysis] Empty response received", {
           finishReason,
           hasContent: !!content,
           contentLength: content?.length ?? 0,
         });
-        throw new Error('RETRY'); // Retry for empty responses
+        throw new Error("RETRY"); // Retry for empty responses
       }
 
       return res;
     },
     3, // Max 3 retry attempts
-    2000 // 2 second initial delay
+    2000, // 2 second initial delay
   );
 
   const content = response.choices[0].message.content;
   if (!content) {
     throw new Error(
-      `Empty response from OpenAI (finish_reason: ${response.choices[0].finish_reason})`
+      `Empty response from OpenAI (finish_reason: ${response.choices[0].finish_reason})`,
     );
   }
 
@@ -715,15 +751,18 @@ export async function executeBasicAnalysis(
     parsedResponse = JSON.parse(content);
     parsedResponse = normalizeAnalysisJsonKeys(parsedResponse);
   } catch (error) {
-    console.error('[Basic Analysis] Failed to parse JSON response:', error);
-    console.error('[Basic Analysis] Response content:', content.substring(0, 500));
-    throw new Error('Invalid JSON response from OpenAI');
+    console.error("[Basic Analysis] Failed to parse JSON response:", error);
+    console.error(
+      "[Basic Analysis] Response content:",
+      content.substring(0, 500),
+    );
+    throw new Error("Invalid JSON response from OpenAI");
   }
 
   // Validate structure
   if (!isValidBasicAnalysisResponse(parsedResponse)) {
-    console.error('[Basic Analysis] Invalid response structure');
-    throw new Error('Response does not match expected structure');
+    console.error("[Basic Analysis] Invalid response structure");
+    throw new Error("Response does not match expected structure");
   }
 
   // Convert to AnalysisResults
@@ -731,11 +770,11 @@ export async function executeBasicAnalysis(
 
   // Post-process: ensure unique IDs and validate relationships
   let draftResults = pruneResultsForTemplate(
-    postProcessResults(rawResults, 'Basic Analysis'),
-    template
+    postProcessResults(rawResults, "Basic Analysis"),
+    template,
   );
 
-  console.log('[Basic Analysis] Analysis complete', {
+  console.log("[Basic Analysis] Analysis complete", {
     sectionCount: draftResults.sections.length,
     agendaItemCount: draftResults.agendaItems?.length || 0,
     actionItemCount: draftResults.actionItems?.length || 0,
@@ -748,15 +787,17 @@ export async function executeBasicAnalysis(
   let enrichmentMetadata: EnrichmentMetadata | undefined;
   const shouldRunEnrichment =
     config?.runEnrichment !== false && // Default to true unless explicitly disabled
-    !template.outputs.every((o) => !['action_items', 'decisions', 'quotes'].includes(o)) &&
-    template.contentType !== 'radio-traffic' &&
+    !template.outputs.every(
+      (o) => !["action_items", "decisions", "quotes"].includes(o),
+    ) &&
+    template.contentType !== "radio-traffic" &&
     isEnrichmentEnabled() &&
     segments &&
     segments.length > 0 &&
     shouldEnrich(draftResults);
 
   if (shouldRunEnrichment) {
-    console.log('[Basic Analysis] Running enrichment pass');
+    console.log("[Basic Analysis] Running enrichment pass");
     try {
       const miniClient = getCitationsClient();
       const miniDeployment = getCitationsDeployment();
@@ -772,7 +813,13 @@ export async function executeBasicAnalysis(
         transcript,
         segments,
         draftResults,
-        { mode: 'combined', maxQuotes: 5, minConfidence: 0.6, enabled: true, maxEvidencePerItem: 3 }
+        {
+          mode: "combined",
+          maxQuotes: 5,
+          minConfidence: 0.6,
+          enabled: true,
+          maxEvidencePerItem: 3,
+        },
       );
 
       // Merge enriched results back into draft
@@ -789,34 +836,37 @@ export async function executeBasicAnalysis(
             ? enrichmentResult.results.quotes
             : draftResults.quotes,
         },
-        template
+        template,
       );
 
       enrichmentMetadata = enrichmentResult.metadata;
 
-      console.log('[Basic Analysis] Enrichment complete', {
+      console.log("[Basic Analysis] Enrichment complete", {
         enrichmentRun: enrichmentMetadata.enrichmentRun,
         totalDurationMs: enrichmentMetadata.totalDurationMs,
         patternResults: Object.keys(enrichmentMetadata.patternResults || {}),
       });
     } catch (error) {
       // Enrichment failure is non-fatal - log and continue
-      console.warn('[Basic Analysis] Enrichment failed, continuing without enrichment:', error);
+      console.warn(
+        "[Basic Analysis] Enrichment failed, continuing without enrichment:",
+        error,
+      );
     }
   }
 
   // Evaluation disabled for basic mode to reduce latency
   // Basic strategy prioritizes speed over quality refinement
   if (false && config?.runEvaluation) {
-    console.log('[Basic Analysis] Running self-evaluation pass');
+    console.log("[Basic Analysis] Running self-evaluation pass");
     const { evaluation, finalResults } = await executeEvaluationPass(
       template,
       transcript,
       draftResults,
-      'basic',
+      "basic",
       openaiClient,
       deployment,
-      [prompt]
+      [prompt],
     );
 
     return {

@@ -14,11 +14,9 @@ export type {
   TranscriptionProgress,
   TranscriptInput,
   TranscriptUpdate,
-} from './transcript';
+} from "./transcript";
 
-export {
-  isTranscriptionStatus,
-} from './transcript';
+export { isTranscriptionStatus } from "./transcript";
 
 // Template types
 export type {
@@ -31,13 +29,9 @@ export type {
   TemplateUpdate,
   TemplateSectionInput,
   DefaultTemplateConfig,
-} from './template';
+} from "./template";
 
-export {
-  isOutputFormat,
-  isTemplateCategory,
-  isOutputType,
-} from './template';
+export { isOutputFormat, isTemplateCategory, isOutputType } from "./template";
 
 // Analysis types
 export type {
@@ -67,13 +61,13 @@ export type {
   AnalysisProgress,
   AnalysisConfig,
   AnalysisStats,
-} from './analysis';
+} from "./analysis";
 
 export {
   isValidRelevanceScore,
   calculateAnalysisStats,
   DEFAULT_ANALYSIS_CONFIG,
-} from './analysis';
+} from "./analysis";
 
 // Enrichment types
 export type {
@@ -92,7 +86,7 @@ export type {
   EnrichedQuote,
   EnrichedResults,
   EnrichmentMetadata,
-} from './enrichment';
+} from "./enrichment";
 
 export {
   DEFAULT_ENRICHMENT_CONFIG,
@@ -100,7 +94,7 @@ export {
   isEnrichedDecision,
   isEnrichedQuote,
   hasEnrichmentData,
-} from './enrichment';
+} from "./enrichment";
 
 // Audio types
 export type {
@@ -114,11 +108,9 @@ export type {
   AudioMetadata,
   AudioStorageResult,
   AudioKeyboardShortcut,
-} from './audio';
+} from "./audio";
 
-export {
-  DEFAULT_AUDIO_CONFIG,
-} from './audio';
+export { DEFAULT_AUDIO_CONFIG } from "./audio";
 
 // Recording types
 export type {
@@ -135,7 +127,7 @@ export type {
   MicCheckState,
   MicCheckError,
   MicCheckPreference,
-} from './recording';
+} from "./recording";
 
 // Package types (export/import)
 export type {
@@ -145,22 +137,23 @@ export type {
   PackageMetadata,
   MeetingTranscriberPackage,
   ValidationResult,
-} from './package';
+} from "./package";
 
 export {
   MAX_PACKAGE_SIZE,
   PACKAGE_FORMAT_VERSION,
   isImportConflictAction,
-} from './package';
+} from "./package";
 
 // Supplemental material types
 export type {
   SupplementalDocumentType,
   SupplementalDocumentStatus,
   SupplementalDocument,
+  PersistedSupplementalDocument,
   ParseResult,
   SupplementalState,
-} from './supplemental';
+} from "./supplemental";
 
 export {
   SUPPLEMENTAL_LIMITS,
@@ -168,7 +161,17 @@ export {
   getDocumentTypeFromExtension,
   getDocumentTypeLabel,
   EMPTY_SUPPLEMENTAL_STATE,
-} from './supplemental';
+} from "./supplemental";
+
+// Annotation types
+export type {
+  TranscriptAnnotation,
+  CreateAnnotationInput,
+  UpdateAnnotationInput,
+  ResolvedAnnotation,
+} from "./annotation";
+
+export { formatAnnotationTimestamp } from "./annotation";
 
 // RTASS types
 export type {
@@ -184,7 +187,7 @@ export type {
   RtassScorecardCriterion,
   RtassScorecardSection,
   RtassScorecard,
-} from './rtass';
+} from "./rtass";
 
 /**
  * Common utility types used across the application.
@@ -217,7 +220,7 @@ export interface PaginationParams {
   page: number;
   limit: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 /**
@@ -245,13 +248,13 @@ export interface UploadResult {
  * Error types that can occur in the application.
  */
 export type ErrorType =
-  | 'validation_error'
-  | 'upload_error'
-  | 'transcription_error'
-  | 'analysis_error'
-  | 'api_error'
-  | 'network_error'
-  | 'unknown_error';
+  | "validation_error"
+  | "upload_error"
+  | "transcription_error"
+  | "analysis_error"
+  | "api_error"
+  | "network_error"
+  | "unknown_error";
 
 /**
  * Structured error information.
@@ -278,13 +281,13 @@ export interface AudioFileConstraints {
 export const DEFAULT_AUDIO_CONSTRAINTS: AudioFileConstraints = {
   maxSize: 25 * 1024 * 1024, // 25 MB (OpenAI Whisper limit)
   allowedFormats: [
-    'audio/mpeg', // Standard MP3 MIME type
-    'audio/mp4',
-    'audio/m4a',
-    'audio/wav',
-    'audio/webm',
-    'audio/flac',
-    'audio/ogg',
+    "audio/mpeg", // Standard MP3 MIME type
+    "audio/mp4",
+    "audio/m4a",
+    "audio/wav",
+    "audio/webm",
+    "audio/flac",
+    "audio/ogg",
   ],
   maxDuration: 3600, // 1 hour
 };

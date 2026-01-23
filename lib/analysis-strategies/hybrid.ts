@@ -25,8 +25,9 @@ import type {
   Decision,
   Quote,
   EvaluationResults,
-} from '@/types';
-import type OpenAI from 'openai';
+} from "@/types";
+import type { TranscriptAnnotation } from "@/types/annotation";
+import type OpenAI from "openai";
 import {
   formatOutputType,
   postProcessResults,
@@ -38,13 +39,14 @@ import {
   logger,
   retryWithBackoff,
   TIMESTAMP_INSTRUCTION,
-} from './shared';
-import { executeEvaluationPass } from './evaluator';
+  buildAnnotationsPromptSection,
+} from "./shared";
+import { executeEvaluationPass } from "./evaluator";
 
 /**
  * Defines the three batches used in hybrid analysis
  */
-export type BatchName = 'foundation' | 'discussion' | 'action';
+export type BatchName = "foundation" | "discussion" | "action";
 
 /**
  * Result from a single batch analysis (raw JSON response)
@@ -63,7 +65,7 @@ export interface HybridBatchResponse {
   benchmarks?: Array<{
     id: string;
     benchmark: string;
-    status: 'met' | 'missed' | 'not_observed' | 'not_applicable';
+    status: "met" | "missed" | "not_observed" | "not_applicable";
     timestamp?: number;
     unitOrRole?: string;
     evidenceQuote?: string;
@@ -72,13 +74,13 @@ export interface HybridBatchResponse {
   radioReports?: Array<{
     id: string;
     type:
-      | 'initial_radio_report'
-      | 'follow_up_360'
-      | 'entry_report'
-      | 'command_transfer_company_officer'
-      | 'command_transfer_chief'
-      | 'can_report'
-      | 'other';
+      | "initial_radio_report"
+      | "follow_up_360"
+      | "entry_report"
+      | "command_transfer_company_officer"
+      | "command_transfer_chief"
+      | "can_report"
+      | "other";
     timestamp: number;
     from?: string;
     fields?: Record<string, unknown>;
@@ -88,18 +90,18 @@ export interface HybridBatchResponse {
   safetyEvents?: Array<{
     id: string;
     type:
-      | 'par'
-      | 'mayday'
-      | 'urgent_traffic'
-      | 'evacuation_order'
-      | 'strategy_change'
-      | 'ric_established'
-      | 'safety_officer_assigned'
-      | 'rehab'
-      | 'utilities_hazard'
-      | 'collapse_hazard'
-      | 'other';
-    severity: 'info' | 'warning' | 'critical';
+      | "par"
+      | "mayday"
+      | "urgent_traffic"
+      | "evacuation_order"
+      | "strategy_change"
+      | "ric_established"
+      | "safety_officer_assigned"
+      | "rehab"
+      | "utilities_hazard"
+      | "collapse_hazard"
+      | "other";
+    severity: "info" | "warning" | "critical";
     timestamp: number;
     unitOrRole?: string;
     details: string;
@@ -151,6 +153,12 @@ export interface HybridAnalysisConfig {
    * the transcript to preserve timestamp citation logic.
    */
   supplementalMaterial?: string;
+  /**
+   * Trainer annotations - timestamped notes from training officers.
+   * These are observations of face-to-face interactions or events not captured
+   * in the audio. Included in prompts to provide additional context.
+   */
+  annotations?: TranscriptAnnotation[];
 }
 
 /**
@@ -167,7 +175,6 @@ export interface HybridAnalysisResult {
   promptsUsed: string[];
 }
 
-
 /**
  * Keywords organized by batch for section name matching.
  * Each array contains synonyms and variations that indicate a section belongs to that batch.
@@ -176,43 +183,147 @@ export interface HybridAnalysisResult {
 export const BATCH_KEYWORDS: Record<BatchName, string[]> = {
   foundation: [
     // Participants
-    'attendee', 'attendees', 'participant', 'participants', 'roster', 'present',
-    'member', 'members', 'team', 'invitee', 'invitees', 'attendance',
+    "attendee",
+    "attendees",
+    "participant",
+    "participants",
+    "roster",
+    "present",
+    "member",
+    "members",
+    "team",
+    "invitee",
+    "invitees",
+    "attendance",
     // Agenda/Topics
-    'agenda', 'overview', 'introduction', 'context', 'background', 'purpose',
-    'objective', 'objectives', 'goal', 'goals', 'scope',
+    "agenda",
+    "overview",
+    "introduction",
+    "context",
+    "background",
+    "purpose",
+    "objective",
+    "objectives",
+    "goal",
+    "goals",
+    "scope",
     // Summary/Overview
-    'summary', 'synopsis', 'recap', 'abstract', 'tldr', 'tl;dr', 'executive summary',
-    'meeting overview', 'brief', 'briefing', 'highlights', 'key takeaways',
+    "summary",
+    "synopsis",
+    "recap",
+    "abstract",
+    "tldr",
+    "tl;dr",
+    "executive summary",
+    "meeting overview",
+    "brief",
+    "briefing",
+    "highlights",
+    "key takeaways",
   ],
   discussion: [
     // Discussion content
-    'discussion', 'discussions', 'debate', 'deliberation', 'conversation',
-    'dialogue', 'exchange', 'talk', 'talking point', 'talking points',
+    "discussion",
+    "discussions",
+    "debate",
+    "deliberation",
+    "conversation",
+    "dialogue",
+    "exchange",
+    "talk",
+    "talking point",
+    "talking points",
     // Key points
-    'key point', 'key points', 'main point', 'main points', 'topic', 'topics',
-    'issue', 'issues', 'concern', 'concerns', 'matter', 'matters',
+    "key point",
+    "key points",
+    "main point",
+    "main points",
+    "topic",
+    "topics",
+    "issue",
+    "issues",
+    "concern",
+    "concerns",
+    "matter",
+    "matters",
     // Decisions
-    'decision', 'decisions', 'resolution', 'resolutions', 'conclusion', 'conclusions',
-    'outcome', 'outcomes', 'result', 'results', 'determination', 'ruling',
-    'agreement', 'consensus', 'vote', 'approval',
+    "decision",
+    "decisions",
+    "resolution",
+    "resolutions",
+    "conclusion",
+    "conclusions",
+    "outcome",
+    "outcomes",
+    "result",
+    "results",
+    "determination",
+    "ruling",
+    "agreement",
+    "consensus",
+    "vote",
+    "approval",
     // Analysis
-    'analysis', 'insight', 'insights', 'observation', 'observations',
-    'finding', 'findings', 'note', 'notes', 'remark', 'remarks',
+    "analysis",
+    "insight",
+    "insights",
+    "observation",
+    "observations",
+    "finding",
+    "findings",
+    "note",
+    "notes",
+    "remark",
+    "remarks",
     // Quotes
-    'quote', 'quotes', 'notable', 'highlight', 'memorable', 'key statement',
+    "quote",
+    "quotes",
+    "notable",
+    "highlight",
+    "memorable",
+    "key statement",
   ],
   action: [
     // Action items
-    'action', 'action item', 'action items', 'task', 'tasks', 'todo', 'to-do',
-    'to do', 'assignment', 'assignments', 'deliverable', 'deliverables',
-    'responsibility', 'responsibilities', 'owner', 'ownership',
+    "action",
+    "action item",
+    "action items",
+    "task",
+    "tasks",
+    "todo",
+    "to-do",
+    "to do",
+    "assignment",
+    "assignments",
+    "deliverable",
+    "deliverables",
+    "responsibility",
+    "responsibilities",
+    "owner",
+    "ownership",
     // Next steps
-    'next step', 'next steps', 'follow-up', 'follow up', 'followup',
-    'future', 'upcoming', 'pending', 'timeline', 'schedule', 'deadline',
-    'due date', 'milestone', 'milestones', 'plan', 'planning',
+    "next step",
+    "next steps",
+    "follow-up",
+    "follow up",
+    "followup",
+    "future",
+    "upcoming",
+    "pending",
+    "timeline",
+    "schedule",
+    "deadline",
+    "due date",
+    "milestone",
+    "milestones",
+    "plan",
+    "planning",
     // Commitments
-    'commitment', 'commitments', 'pledge', 'promise', 'accountability',
+    "commitment",
+    "commitments",
+    "pledge",
+    "promise",
+    "accountability",
   ],
 };
 
@@ -221,9 +332,9 @@ export const BATCH_KEYWORDS: Record<BatchName, string[]> = {
  * Maps output format types to their most likely batch.
  */
 const OUTPUT_FORMAT_SIGNALS: Record<string, BatchName> = {
-  action_items: 'action',
-  decisions: 'discussion',
-  quotes: 'discussion',
+  action_items: "action",
+  decisions: "discussion",
+  quotes: "discussion",
   // Other formats don't strongly indicate a batch
 };
 
@@ -234,8 +345,13 @@ const OUTPUT_FORMAT_SIGNALS: Record<string, BatchName> = {
 export interface BatchDeterminationResult {
   batch: BatchName;
   matchedKeyword: string | null;
-  matchSource: 'keyword' | 'output_format' | 'prompt_content' | 'position' | 'default';
-  confidence: 'high' | 'medium' | 'low';
+  matchSource:
+    | "keyword"
+    | "output_format"
+    | "prompt_content"
+    | "position"
+    | "default";
+  confidence: "high" | "medium" | "low";
 }
 
 /**
@@ -250,34 +366,41 @@ export interface BatchDeterminationResult {
 function determineBatchWithMetadata(
   section: TemplateSection,
   sectionIndex: number,
-  totalSections: number
+  totalSections: number,
 ): BatchDeterminationResult {
   // Handle edge cases
-  if (!section.name || section.name.trim() === '') {
-    logger.warn('Hybrid Analysis', 'Empty section name detected, using position-based assignment', {
-      sectionIndex,
-      outputFormat: section.outputFormat,
-    });
+  if (!section.name || section.name.trim() === "") {
+    logger.warn(
+      "Hybrid Analysis",
+      "Empty section name detected, using position-based assignment",
+      {
+        sectionIndex,
+        outputFormat: section.outputFormat,
+      },
+    );
     return {
       batch: getPositionBasedBatch(sectionIndex, totalSections),
       matchedKeyword: null,
-      matchSource: 'position',
-      confidence: 'low',
+      matchSource: "position",
+      confidence: "low",
     };
   }
 
   const nameLower = section.name.toLowerCase().trim();
-  const promptLower = section.prompt?.toLowerCase() || '';
+  const promptLower = section.prompt?.toLowerCase() || "";
 
   // Priority 1: Check section name against keyword lists
-  for (const [batchName, keywords] of Object.entries(BATCH_KEYWORDS) as [BatchName, string[]][]) {
+  for (const [batchName, keywords] of Object.entries(BATCH_KEYWORDS) as [
+    BatchName,
+    string[],
+  ][]) {
     for (const keyword of keywords) {
       if (nameLower.includes(keyword)) {
         return {
           batch: batchName,
           matchedKeyword: keyword,
-          matchSource: 'keyword',
-          confidence: 'high',
+          matchSource: "keyword",
+          confidence: "high",
         };
       }
     }
@@ -286,47 +409,59 @@ function determineBatchWithMetadata(
   // Priority 2: Check output format for strong signals
   const outputFormat = section.outputFormat;
   if (outputFormat && OUTPUT_FORMAT_SIGNALS[outputFormat]) {
-    logger.debug('Hybrid Analysis', `Section "${section.name}" matched via output format`, {
-      outputFormat,
-      assignedBatch: OUTPUT_FORMAT_SIGNALS[outputFormat],
-    });
+    logger.debug(
+      "Hybrid Analysis",
+      `Section "${section.name}" matched via output format`,
+      {
+        outputFormat,
+        assignedBatch: OUTPUT_FORMAT_SIGNALS[outputFormat],
+      },
+    );
     return {
       batch: OUTPUT_FORMAT_SIGNALS[outputFormat],
       matchedKeyword: null,
-      matchSource: 'output_format',
-      confidence: 'medium',
+      matchSource: "output_format",
+      confidence: "medium",
     };
   }
 
   // Priority 3: Analyze prompt content for batch signals
   const promptBatch = analyzePromptContent(promptLower);
   if (promptBatch) {
-    logger.debug('Hybrid Analysis', `Section "${section.name}" matched via prompt content analysis`, {
-      assignedBatch: promptBatch,
-    });
+    logger.debug(
+      "Hybrid Analysis",
+      `Section "${section.name}" matched via prompt content analysis`,
+      {
+        assignedBatch: promptBatch,
+      },
+    );
     return {
       batch: promptBatch,
       matchedKeyword: null,
-      matchSource: 'prompt_content',
-      confidence: 'medium',
+      matchSource: "prompt_content",
+      confidence: "medium",
     };
   }
 
   // Priority 4: Position-based fallback with intelligent distribution
   const positionBatch = getPositionBasedBatch(sectionIndex, totalSections);
-  logger.info('Hybrid Analysis', `Section "${section.name}" did not match any keywords - using position-based assignment`, {
-    sectionIndex,
-    totalSections,
-    assignedBatch: positionBatch,
-    sectionName: section.name,
-    promptPreview: section.prompt?.substring(0, 100),
-  });
+  logger.info(
+    "Hybrid Analysis",
+    `Section "${section.name}" did not match any keywords - using position-based assignment`,
+    {
+      sectionIndex,
+      totalSections,
+      assignedBatch: positionBatch,
+      sectionName: section.name,
+      promptPreview: section.prompt?.substring(0, 100),
+    },
+  );
 
   return {
     batch: positionBatch,
     matchedKeyword: null,
-    matchSource: 'position',
-    confidence: 'low',
+    matchSource: "position",
+    confidence: "low",
   };
 }
 
@@ -336,37 +471,59 @@ function determineBatchWithMetadata(
 function analyzePromptContent(promptLower: string): BatchName | null {
   // Action batch signals in prompt
   const actionPhrases = [
-    'list all tasks', 'extract action', 'identify assignments', 'who is responsible',
-    'what needs to be done', 'follow-up required', 'next steps', 'deliverables',
-    'deadlines', 'due dates', 'assign', 'owner',
+    "list all tasks",
+    "extract action",
+    "identify assignments",
+    "who is responsible",
+    "what needs to be done",
+    "follow-up required",
+    "next steps",
+    "deliverables",
+    "deadlines",
+    "due dates",
+    "assign",
+    "owner",
   ];
   for (const phrase of actionPhrases) {
     if (promptLower.includes(phrase)) {
-      return 'action';
+      return "action";
     }
   }
 
   // Discussion batch signals in prompt
   const discussionPhrases = [
-    'what was decided', 'key decisions', 'main points', 'important discussion',
-    'notable quotes', 'significant statements', 'conclusions reached',
-    'issues raised', 'concerns discussed', 'outcomes of',
+    "what was decided",
+    "key decisions",
+    "main points",
+    "important discussion",
+    "notable quotes",
+    "significant statements",
+    "conclusions reached",
+    "issues raised",
+    "concerns discussed",
+    "outcomes of",
   ];
   for (const phrase of discussionPhrases) {
     if (promptLower.includes(phrase)) {
-      return 'discussion';
+      return "discussion";
     }
   }
 
   // Foundation batch signals in prompt
   const foundationPhrases = [
-    'who attended', 'list participants', 'meeting purpose', 'agenda items',
-    'topics covered', 'provide an overview', 'summarize the meeting',
-    'main objectives', 'meeting goals',
+    "who attended",
+    "list participants",
+    "meeting purpose",
+    "agenda items",
+    "topics covered",
+    "provide an overview",
+    "summarize the meeting",
+    "main objectives",
+    "meeting goals",
   ];
   for (const phrase of foundationPhrases) {
     if (promptLower.includes(phrase)) {
-      return 'foundation';
+      return "foundation";
     }
   }
 
@@ -378,17 +535,17 @@ function analyzePromptContent(promptLower: string): BatchName | null {
  */
 function getPositionBasedBatch(index: number, total: number): BatchName {
   if (total <= 1) {
-    return 'foundation'; // Single section goes to foundation
+    return "foundation"; // Single section goes to foundation
   }
 
   const position = index / (total - 1); // 0.0 to 1.0
 
   if (position < 0.33) {
-    return 'foundation';
+    return "foundation";
   } else if (position < 0.67) {
-    return 'discussion';
+    return "discussion";
   } else {
-    return 'action';
+    return "action";
   }
 }
 
@@ -447,28 +604,33 @@ function groupSectionsIntoBatches(template: Template): BatchConfig[] {
 
     // Update statistics
     stats.byBatch[result.batch]++;
-    stats.byMatchSource[result.matchSource] = (stats.byMatchSource[result.matchSource] || 0) + 1;
+    stats.byMatchSource[result.matchSource] =
+      (stats.byMatchSource[result.matchSource] || 0) + 1;
     stats.byConfidence[result.confidence]++;
 
-    if (result.confidence === 'low') {
+    if (result.confidence === "low") {
       stats.lowConfidenceSections.push(section.name);
     }
 
     // Log individual section assignments for debugging
-    logger.debug('Hybrid Analysis', `Section "${section.name}" assigned to ${result.batch}`, {
-      matchSource: result.matchSource,
-      matchedKeyword: result.matchedKeyword,
-      confidence: result.confidence,
-    });
+    logger.debug(
+      "Hybrid Analysis",
+      `Section "${section.name}" assigned to ${result.batch}`,
+      {
+        matchSource: result.matchSource,
+        matchedKeyword: result.matchedKeyword,
+        confidence: result.confidence,
+      },
+    );
 
     switch (result.batch) {
-      case 'foundation':
+      case "foundation":
         foundationSections.push(section);
         break;
-      case 'discussion':
+      case "discussion":
         discussionSections.push(section);
         break;
-      case 'action':
+      case "action":
         actionSections.push(section);
         break;
     }
@@ -484,7 +646,7 @@ function groupSectionsIntoBatches(template: Template): BatchConfig[] {
   stats.allInOneBatch = nonEmptyBatches === 1 && totalSections > 1;
 
   // Log batch assignment summary
-  logger.info('Hybrid Analysis', 'Batch assignment complete', {
+  logger.info("Hybrid Analysis", "Batch assignment complete", {
     templateName: template.name,
     totalSections,
     distribution: stats.byBatch,
@@ -494,31 +656,39 @@ function groupSectionsIntoBatches(template: Template): BatchConfig[] {
 
   // Warn if all sections ended up in one batch (indicates poor template compatibility)
   if (stats.allInOneBatch) {
-    const dominantBatch = Object.entries(stats.byBatch)
-      .find(([, count]) => count === totalSections)?.[0] || 'unknown';
+    const dominantBatch =
+      Object.entries(stats.byBatch).find(
+        ([, count]) => count === totalSections,
+      )?.[0] || "unknown";
 
-    logger.warn('Hybrid Analysis',
+    logger.warn(
+      "Hybrid Analysis",
       `All ${totalSections} sections assigned to "${dominantBatch}" batch - ` +
-      `template may not be optimized for hybrid strategy`, {
+        `template may not be optimized for hybrid strategy`,
+      {
         templateName: template.name,
-        recommendation: 'Consider using Basic strategy for this template, ' +
-          'or rename sections to include batch-indicating keywords',
-        sectionNames: template.sections.map(s => s.name),
-      }
+        recommendation:
+          "Consider using Basic strategy for this template, " +
+          "or rename sections to include batch-indicating keywords",
+        sectionNames: template.sections.map((s) => s.name),
+      },
     );
   }
 
   // Warn if many sections had low-confidence assignments
   const lowConfidenceRatio = stats.byConfidence.low / totalSections;
   if (lowConfidenceRatio > 0.5 && totalSections > 2) {
-    logger.warn('Hybrid Analysis',
+    logger.warn(
+      "Hybrid Analysis",
       `${stats.byConfidence.low} of ${totalSections} sections (${Math.round(lowConfidenceRatio * 100)}%) ` +
-      `had low-confidence batch assignments`, {
+        `had low-confidence batch assignments`,
+      {
         templateName: template.name,
         lowConfidenceSections: stats.lowConfidenceSections,
-        recommendation: 'Consider renaming sections or updating section prompts ' +
-          'to include clearer batch-indicating keywords',
-      }
+        recommendation:
+          "Consider renaming sections or updating section prompts " +
+          "to include clearer batch-indicating keywords",
+      },
     );
   }
 
@@ -527,34 +697,43 @@ function groupSectionsIntoBatches(template: Template): BatchConfig[] {
 
   if (foundationSections.length > 0) {
     batches.push({
-      name: 'foundation',
+      name: "foundation",
       sections: foundationSections,
-      description: 'Establishes meeting foundation: who attended and what topics were discussed',
+      description:
+        "Establishes meeting foundation: who attended and what topics were discussed",
     });
   }
 
   if (discussionSections.length > 0) {
     batches.push({
-      name: 'discussion',
+      name: "discussion",
       sections: discussionSections,
-      description: 'Analyzes key discussions and decisions made during the meeting',
+      description:
+        "Analyzes key discussions and decisions made during the meeting",
     });
   }
 
   if (actionSections.length > 0) {
     batches.push({
-      name: 'action',
+      name: "action",
       sections: actionSections,
-      description: 'Extracts action items and next steps with full meeting context',
+      description:
+        "Extracts action items and next steps with full meeting context",
     });
   }
 
   // Final validation: ensure we have at least one batch
   if (batches.length === 0) {
-    logger.error('Hybrid Analysis', 'No batches created - template has no sections', {
-      templateName: template.name,
-    });
-    throw new Error(`Template "${template.name}" has no valid sections for hybrid analysis`);
+    logger.error(
+      "Hybrid Analysis",
+      "No batches created - template has no sections",
+      {
+        templateName: template.name,
+      },
+    );
+    throw new Error(
+      `Template "${template.name}" has no valid sections for hybrid analysis`,
+    );
   }
 
   return batches;
@@ -567,6 +746,7 @@ function groupSectionsIntoBatches(template: Template): BatchConfig[] {
  * @param transcript - Full transcript text
  * @param template - Analysis template
  * @param previousResults - Results from previous batches (for context)
+ * @param annotations - Optional trainer annotations
  * @returns Prompt string for this batch
  */
 export function generateBatchPrompt(
@@ -574,7 +754,8 @@ export function generateBatchPrompt(
   transcript: string,
   template: Template,
   previousResults?: Partial<AnalysisResults>,
-  supplementalMaterial?: string
+  supplementalMaterial?: string,
+  annotations?: TranscriptAnnotation[],
 ): string {
   const sectionInstructions = batch.sections
     .map((section, idx) => {
@@ -593,61 +774,63 @@ export function generateBatchPrompt(
 - Be specific and actionable
 `;
     })
-    .join('\n');
+    .join("\n");
 
   // Build context section from previous batch results
-  let contextSection = '';
+  let contextSection = "";
   if (previousResults) {
-    contextSection = '\n## Context from Previous Analysis\n\n';
+    contextSection = "\n## Context from Previous Analysis\n\n";
 
     if (previousResults.summary) {
       contextSection += `**Meeting Summary**: ${previousResults.summary}\n\n`;
     }
 
     if (previousResults.agendaItems && previousResults.agendaItems.length > 0) {
-      contextSection += '**Agenda Items**:\n';
+      contextSection += "**Agenda Items**:\n";
       previousResults.agendaItems.forEach((item) => {
         contextSection += `- [${item.id}] ${item.topic}`;
         if (item.context) {
           contextSection += ` - ${item.context}`;
         }
-        contextSection += '\n';
+        contextSection += "\n";
       });
-      contextSection += '\n';
+      contextSection += "\n";
     }
 
     if (previousResults.sections && previousResults.sections.length > 0) {
-      contextSection += '**Previously Analyzed Sections**:\n';
+      contextSection += "**Previously Analyzed Sections**:\n";
       previousResults.sections.forEach((section) => {
         contextSection += `\n**${section.name}**:\n${section.content}\n`;
       });
-      contextSection += '\n';
+      contextSection += "\n";
     }
 
     if (previousResults.decisions && previousResults.decisions.length > 0) {
-      contextSection += '**Decisions Made**:\n';
+      contextSection += "**Decisions Made**:\n";
       previousResults.decisions.forEach((dec) => {
         contextSection += `- [${dec.id}] ${dec.decision}`;
         if (dec.agendaItemIds && dec.agendaItemIds.length > 0) {
-          contextSection += ` (relates to: ${dec.agendaItemIds.join(', ')})`;
+          contextSection += ` (relates to: ${dec.agendaItemIds.join(", ")})`;
         }
-        contextSection += '\n';
+        contextSection += "\n";
       });
-      contextSection += '\n';
+      contextSection += "\n";
     }
   }
 
   // Build relationship instructions based on batch and available context
-  let relationshipInstructions = '';
+  let relationshipInstructions = "";
 
-  const hasAgenda = template.sections.some((s) => s.name.toLowerCase().includes('agenda'));
-  const hasBenchmarks = template.outputs.includes('benchmarks');
-  const hasRadioReports = template.outputs.includes('radio_reports');
-  const hasSafetyEvents = template.outputs.includes('safety_events');
-  const hasDecisions = template.outputs.includes('decisions');
-  const hasActionItems = template.outputs.includes('action_items');
+  const hasAgenda = template.sections.some((s) =>
+    s.name.toLowerCase().includes("agenda"),
+  );
+  const hasBenchmarks = template.outputs.includes("benchmarks");
+  const hasRadioReports = template.outputs.includes("radio_reports");
+  const hasSafetyEvents = template.outputs.includes("safety_events");
+  const hasDecisions = template.outputs.includes("decisions");
+  const hasActionItems = template.outputs.includes("action_items");
 
-  if (batch.name === 'foundation' && hasAgenda) {
+  if (batch.name === "foundation" && hasAgenda) {
     relationshipInstructions = `
 ## CRITICAL: Foundation Mapping
 
@@ -664,7 +847,7 @@ You are establishing the foundation for this meeting analysis:
 
 This foundation analysis is ESSENTIAL for subsequent batches to properly link decisions and actions.
 `;
-  } else if (batch.name === 'discussion') {
+  } else if (batch.name === "discussion") {
     if (hasDecisions && previousResults?.agendaItems) {
       relationshipInstructions = `
 ## CRITICAL: Discussion and Decision Mapping
@@ -692,8 +875,11 @@ Analyze the key discussions based on the foundation context provided above.
 Extract discussion content as specified in section requirements.
 `;
     }
-  } else if (batch.name === 'action') {
-    if (hasActionItems && (previousResults?.agendaItems || previousResults?.decisions)) {
+  } else if (batch.name === "action") {
+    if (
+      hasActionItems &&
+      (previousResults?.agendaItems || previousResults?.decisions)
+    ) {
       relationshipInstructions = `
 ## CRITICAL: Action Item and Next Steps Mapping
 
@@ -730,37 +916,37 @@ Using the meeting context above, extract action items and next steps as specifie
   // Determine what structured outputs this batch should generate
   const structuredOutputs: string[] = [];
 
-  if (batch.name === 'foundation') {
-    if (template.outputs.includes('summary')) {
-      structuredOutputs.push('summary');
+  if (batch.name === "foundation") {
+    if (template.outputs.includes("summary")) {
+      structuredOutputs.push("summary");
     }
     if (hasAgenda) {
-      structuredOutputs.push('agendaItems');
+      structuredOutputs.push("agendaItems");
     }
-  } else if (batch.name === 'discussion') {
+  } else if (batch.name === "discussion") {
     if (hasDecisions) {
-      structuredOutputs.push('decisions');
+      structuredOutputs.push("decisions");
     }
-    if (template.outputs.includes('quotes')) {
-      structuredOutputs.push('quotes');
+    if (template.outputs.includes("quotes")) {
+      structuredOutputs.push("quotes");
     }
-  } else if (batch.name === 'action') {
+  } else if (batch.name === "action") {
     if (hasActionItems) {
-      structuredOutputs.push('actionItems');
+      structuredOutputs.push("actionItems");
     }
 
     // Fireground outputs: request once in the final batch to avoid duplicates
-    if (hasBenchmarks) structuredOutputs.push('benchmarks');
-    if (hasRadioReports) structuredOutputs.push('radioReports');
-    if (hasSafetyEvents) structuredOutputs.push('safetyEvents');
+    if (hasBenchmarks) structuredOutputs.push("benchmarks");
+    if (hasRadioReports) structuredOutputs.push("radioReports");
+    if (hasSafetyEvents) structuredOutputs.push("safetyEvents");
   }
 
   // Build structured outputs section
-  let structuredOutputSection = '';
+  let structuredOutputSection = "";
   if (structuredOutputs.length > 0) {
-    structuredOutputSection = '\n## Structured Outputs\n\n';
+    structuredOutputSection = "\n## Structured Outputs\n\n";
 
-    if (structuredOutputs.includes('summary')) {
+    if (structuredOutputs.includes("summary")) {
       structuredOutputSection += `
 **Summary**: Provide a concise 3-5 sentence overview of the entire meeting. Capture:
 - Main topics discussed
@@ -770,7 +956,7 @@ Using the meeting context above, extract action items and next steps as specifie
 `;
     }
 
-    if (structuredOutputs.includes('agendaItems')) {
+    if (structuredOutputs.includes("agendaItems")) {
       structuredOutputSection += `
 **Agenda Items**: Extract ALL agenda topics as structured objects:
 - Assign unique IDs (e.g., "agenda-1", "agenda-2")
@@ -778,27 +964,27 @@ Using the meeting context above, extract action items and next steps as specifie
 `;
     }
 
-    if (structuredOutputs.includes('decisions')) {
+    if (structuredOutputs.includes("decisions")) {
       structuredOutputSection += `
 **Decisions**: Extract ALL decisions, resolutions, and conclusions as structured objects:
 - Assign unique IDs (e.g., "decision-1", "decision-2")
 - Include: decision text, context/rationale, timestamp
-- Link to agenda items using agendaItemIds array${hasAgenda ? ' (REQUIRED - use IDs from context above)' : ' (if applicable)'}
+- Link to agenda items using agendaItemIds array${hasAgenda ? " (REQUIRED - use IDs from context above)" : " (if applicable)"}
 `;
     }
 
-    if (structuredOutputs.includes('actionItems')) {
+    if (structuredOutputs.includes("actionItems")) {
       structuredOutputSection += `
 **Action Items**: Extract ALL tasks, assignments, and follow-up items as structured objects:
 - Assign unique IDs (e.g., "action-1", "action-2")
 - Include: task description, owner (if mentioned), deadline (if mentioned)
 - TIMESTAMP IS REQUIRED: Use the [MM:SS] markers in the transcript to determine when the action was mentioned (convert to seconds)
-- Link to agenda items using agendaItemIds array${hasAgenda ? ' (REQUIRED - use IDs from context above)' : ' (if applicable)'}
-- Link to decisions using decisionIds array${hasDecisions ? ' (REQUIRED - use IDs from context above)' : ' (if applicable)'}
+- Link to agenda items using agendaItemIds array${hasAgenda ? " (REQUIRED - use IDs from context above)" : " (if applicable)"}
+- Link to decisions using decisionIds array${hasDecisions ? " (REQUIRED - use IDs from context above)" : " (if applicable)"}
 `;
     }
 
-    if (structuredOutputs.includes('quotes')) {
+    if (structuredOutputs.includes("quotes")) {
       structuredOutputSection += `
 **Quotes**: Extract 3-5 notable or impactful quotes:
 - Include: exact quote text, speaker (if identifiable), timestamp
@@ -806,7 +992,7 @@ Using the meeting context above, extract action items and next steps as specifie
 `;
     }
 
-    if (structuredOutputs.includes('benchmarks')) {
+    if (structuredOutputs.includes("benchmarks")) {
       structuredOutputSection += `
 **Benchmarks**: Extract benchmark/milestone observations as structured objects:
 - Assign unique IDs (e.g., "benchmark-1", "benchmark-2")
@@ -815,7 +1001,7 @@ Using the meeting context above, extract action items and next steps as specifie
 `;
     }
 
-    if (structuredOutputs.includes('radioReports')) {
+    if (structuredOutputs.includes("radioReports")) {
       structuredOutputSection += `
 **Radio Reports**: Extract structured radio report events (initial/360/entry/command transfer/CAN) as objects:
 - Assign unique IDs (e.g., "report-1", "report-2")
@@ -824,7 +1010,7 @@ Using the meeting context above, extract action items and next steps as specifie
 `;
     }
 
-    if (structuredOutputs.includes('safetyEvents')) {
+    if (structuredOutputs.includes("safetyEvents")) {
       structuredOutputSection += `
 **Safety Events**: Extract safety/accountability events (PAR, MAYDAY, evacuation, strategy change, RIC, safety officer, hazards) as objects:
 - Assign unique IDs (e.g., "safety-1", "safety-2")
@@ -872,7 +1058,9 @@ You MUST respond with valid JSON in this EXACT structure:
 ${jsonExample}
 \`\`\`
 
-${supplementalMaterial ? `## Supplemental Source Material
+${buildAnnotationsPromptSection(annotations)}${
+    supplementalMaterial
+      ? `## Supplemental Source Material
 
 The following supplemental documents and notes have been provided as additional context.
 Use this information to inform your analysis, but note that:
@@ -884,13 +1072,15 @@ ${supplementalMaterial}
 
 ---
 
-` : ''}## Transcript
+`
+      : ""
+  }## Transcript
 
 ${transcript}
 
 ## Response
 
-Provide your complete analysis for the ${batch.name.toUpperCase()} BATCH as valid JSON following the structure above. ${previousResults ? 'Ensure all relationship IDs reference the items provided in the context section.' : 'Ensure all IDs are correctly assigned.'}`;
+Provide your complete analysis for the ${batch.name.toUpperCase()} BATCH as valid JSON following the structure above. ${previousResults ? "Ensure all relationship IDs reference the items provided in the context section." : "Ensure all IDs are correctly assigned."}`;
 }
 
 /**
@@ -908,7 +1098,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
 
   // Add structured outputs
-  if (structuredOutputs.includes('agendaItems')) {
+  if (structuredOutputs.includes("agendaItems")) {
     parts.push(`  "agendaItems": [
     {
       "id": "agenda-1",
@@ -919,7 +1109,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
-  if (structuredOutputs.includes('actionItems')) {
+  if (structuredOutputs.includes("actionItems")) {
     parts.push(`  "actionItems": [
     {
       "id": "action-1",
@@ -933,7 +1123,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
-  if (structuredOutputs.includes('decisions')) {
+  if (structuredOutputs.includes("decisions")) {
     parts.push(`  "decisions": [
     {
       "id": "decision-1",
@@ -945,7 +1135,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
-  if (structuredOutputs.includes('quotes')) {
+  if (structuredOutputs.includes("quotes")) {
     parts.push(`  "quotes": [
     {
       "text": "Exact quote",
@@ -955,7 +1145,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
-  if (structuredOutputs.includes('benchmarks')) {
+  if (structuredOutputs.includes("benchmarks")) {
     parts.push(`  "benchmarks": [
     {
       "id": "benchmark-1",
@@ -968,7 +1158,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
-  if (structuredOutputs.includes('radioReports')) {
+  if (structuredOutputs.includes("radioReports")) {
     parts.push(`  "radioReports": [
     {
       "id": "report-1",
@@ -982,7 +1172,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
-  if (structuredOutputs.includes('safetyEvents')) {
+  if (structuredOutputs.includes("safetyEvents")) {
     parts.push(`  "safetyEvents": [
     {
       "id": "safety-1",
@@ -996,11 +1186,11 @@ function buildJsonExample(structuredOutputs: string[]): string {
   ]`);
   }
 
-  if (structuredOutputs.includes('summary')) {
+  if (structuredOutputs.includes("summary")) {
     parts.push(`  "summary": "Overall meeting summary"`);
   }
 
-  return '{\n' + parts.join(',\n') + '\n}';
+  return "{\n" + parts.join(",\n") + "\n}";
 }
 
 /**
@@ -1010,7 +1200,7 @@ function buildJsonExample(structuredOutputs: string[]): string {
  * @returns true if valid structure
  */
 function isValidBatchResponse(data: unknown): data is HybridBatchResponse {
-  if (!data || typeof data !== 'object') return false;
+  if (!data || typeof data !== "object") return false;
 
   const obj = data as Record<string, unknown>;
 
@@ -1021,25 +1211,32 @@ function isValidBatchResponse(data: unknown): data is HybridBatchResponse {
   for (const section of obj.sections) {
     if (
       !section ||
-      typeof section !== 'object' ||
-      typeof section.name !== 'string' ||
-      typeof section.content !== 'string'
+      typeof section !== "object" ||
+      typeof section.name !== "string" ||
+      typeof section.content !== "string"
     ) {
       return false;
     }
   }
 
   // Optional arrays must be valid if present
-  if (obj.agendaItems !== undefined && !Array.isArray(obj.agendaItems)) return false;
-  if (obj.benchmarks !== undefined && !Array.isArray(obj.benchmarks)) return false;
-  if (obj.radioReports !== undefined && !Array.isArray(obj.radioReports)) return false;
-  if (obj.safetyEvents !== undefined && !Array.isArray(obj.safetyEvents)) return false;
-  if (obj.actionItems !== undefined && !Array.isArray(obj.actionItems)) return false;
-  if (obj.decisions !== undefined && !Array.isArray(obj.decisions)) return false;
+  if (obj.agendaItems !== undefined && !Array.isArray(obj.agendaItems))
+    return false;
+  if (obj.benchmarks !== undefined && !Array.isArray(obj.benchmarks))
+    return false;
+  if (obj.radioReports !== undefined && !Array.isArray(obj.radioReports))
+    return false;
+  if (obj.safetyEvents !== undefined && !Array.isArray(obj.safetyEvents))
+    return false;
+  if (obj.actionItems !== undefined && !Array.isArray(obj.actionItems))
+    return false;
+  if (obj.decisions !== undefined && !Array.isArray(obj.decisions))
+    return false;
   if (obj.quotes !== undefined && !Array.isArray(obj.quotes)) return false;
 
   // Summary must be string if present
-  if (obj.summary !== undefined && typeof obj.summary !== 'string') return false;
+  if (obj.summary !== undefined && typeof obj.summary !== "string")
+    return false;
 
   return true;
 }
@@ -1050,13 +1247,15 @@ function isValidBatchResponse(data: unknown): data is HybridBatchResponse {
  * @param batchResponses - Array of batch responses
  * @returns Complete AnalysisResults object
  */
-function mergeBatchResults(batchResponses: HybridBatchResponse[]): AnalysisResults {
+function mergeBatchResults(
+  batchResponses: HybridBatchResponse[],
+): AnalysisResults {
   const allSections: AnalysisSection[] = [];
   let summary: string | undefined;
   const allAgendaItems: AgendaItem[] = [];
-  const allBenchmarks: NonNullable<AnalysisResults['benchmarks']> = [];
-  const allRadioReports: NonNullable<AnalysisResults['radioReports']> = [];
-  const allSafetyEvents: NonNullable<AnalysisResults['safetyEvents']> = [];
+  const allBenchmarks: NonNullable<AnalysisResults["benchmarks"]> = [];
+  const allRadioReports: NonNullable<AnalysisResults["radioReports"]> = [];
+  const allSafetyEvents: NonNullable<AnalysisResults["safetyEvents"]> = [];
   const allActionItems: ActionItem[] = [];
   const allDecisions: Decision[] = [];
   const allQuotes: Quote[] = [];
@@ -1167,18 +1366,24 @@ export async function executeHybridAnalysis(
   transcript: string,
   openaiClient: OpenAI,
   deployment: string,
-  progressCallback?: (current: number, total: number, batchName: string) => void,
-  config?: HybridAnalysisConfig
+  progressCallback?: (
+    current: number,
+    total: number,
+    batchName: string,
+  ) => void,
+  config?: HybridAnalysisConfig,
 ): Promise<HybridAnalysisResult> {
   const supplementalMaterial = config?.supplementalMaterial;
-  logger.info('Hybrid Analysis', 'Starting batched analysis', {
+  const annotations = config?.annotations;
+  logger.info("Hybrid Analysis", "Starting batched analysis", {
     hasSupplementalMaterial: !!supplementalMaterial,
     supplementalLength: supplementalMaterial?.length || 0,
+    annotationCount: annotations?.length || 0,
   });
 
   // Group sections into batches
   const batches = groupSectionsIntoBatches(template);
-  logger.info('Hybrid Analysis', 'Created batches', {
+  logger.info("Hybrid Analysis", "Created batches", {
     batchCount: batches.length,
     batches: batches.map((b) => ({
       name: b.name,
@@ -1205,10 +1410,14 @@ export async function executeHybridAnalysis(
       progressCallback(i + 1, batches.length, batch.name);
     }
 
-    logger.info('Hybrid Analysis', `Executing batch ${i + 1}/${batches.length}: ${batch.name}`, {
-      sectionCount: batch.sections.length,
-      hasContext: i > 0,
-    });
+    logger.info(
+      "Hybrid Analysis",
+      `Executing batch ${i + 1}/${batches.length}: ${batch.name}`,
+      {
+        sectionCount: batch.sections.length,
+        hasContext: i > 0,
+      },
+    );
 
     // Generate prompt with context from previous batches
     const prompt = generateBatchPrompt(
@@ -1216,20 +1425,25 @@ export async function executeHybridAnalysis(
       transcript,
       template,
       i > 0 ? accumulatedResults : undefined,
-      supplementalMaterial
+      supplementalMaterial,
+      annotations,
     );
 
     // Track this prompt
     promptsUsed.push(prompt);
 
     // Validate token limits before API call
-    const validation = validateTokenLimits(transcript, prompt, `Hybrid Analysis - ${batch.name}`);
+    const validation = validateTokenLimits(
+      transcript,
+      prompt,
+      `Hybrid Analysis - ${batch.name}`,
+    );
     if (validation.warnings.length > 0) {
-      validation.warnings.forEach(w => logger.warn('Hybrid Analysis', w));
+      validation.warnings.forEach((w) => logger.warn("Hybrid Analysis", w));
     }
 
     // Make API call with retry logic
-    logger.info('Hybrid Analysis', `Making API call for ${batch.name} batch`, {
+    logger.info("Hybrid Analysis", `Making API call for ${batch.name} batch`, {
       deployment,
       contextProvided: i > 0,
     });
@@ -1240,67 +1454,81 @@ export async function executeHybridAnalysis(
           model: deployment,
           messages: [
             {
-              role: 'system',
+              role: "system",
               content:
-                'You are an expert fireground radio traffic evaluator for Austin Fire Department (AFD) Training Division. ' +
-                'You provide structured, accurate analysis of radio traffic transcripts. ' +
-                'Do not speculate. If information is not in the transcript, state that it is not stated. ' +
-                'Always respond with valid JSON only.',
+                "You are an expert fireground radio traffic evaluator for Austin Fire Department (AFD) Training Division. " +
+                "You provide structured, accurate analysis of radio traffic transcripts. " +
+                "Do not speculate. If information is not in the transcript, state that it is not stated. " +
+                "Always respond with valid JSON only.",
             },
             {
-              role: 'user',
+              role: "user",
               content: prompt,
             },
           ],
-          ...buildAnalysisChatCompletionParams(deployment, ANALYSIS_CONSTANTS.HYBRID_TEMPERATURE),
-          response_format: { type: 'json_object' }, // Enforce JSON response
+          ...buildAnalysisChatCompletionParams(
+            deployment,
+            ANALYSIS_CONSTANTS.HYBRID_TEMPERATURE,
+          ),
+          response_format: { type: "json_object" }, // Enforce JSON response
         });
 
         // Validate response before returning
         const finishReason = res.choices[0].finish_reason;
         const content = res.choices[0].message.content;
 
-        logger.info('Hybrid Analysis', `Received response for ${batch.name} batch`, {
-          tokensUsed: res.usage?.total_tokens,
-          finishReason: finishReason,
-          contentLength: content?.length ?? 0,
-        });
+        logger.info(
+          "Hybrid Analysis",
+          `Received response for ${batch.name} batch`,
+          {
+            tokensUsed: res.usage?.total_tokens,
+            finishReason: finishReason,
+            contentLength: content?.length ?? 0,
+          },
+        );
 
         // Handle content filter - retry as it's likely a false positive
-        if (finishReason === 'content_filter') {
-          logger.warn('Hybrid Analysis', `Content filter triggered for ${batch.name} batch - retrying`);
-          throw new Error('RETRY'); // Will be caught by retry logic
+        if (finishReason === "content_filter") {
+          logger.warn(
+            "Hybrid Analysis",
+            `Content filter triggered for ${batch.name} batch - retrying`,
+          );
+          throw new Error("RETRY"); // Will be caught by retry logic
         }
 
         // Handle token limit exceeded - fail fast with actionable error
-        if (finishReason === 'length') {
+        if (finishReason === "length") {
           throw new Error(
             `Response truncated due to token limit for ${batch.name} batch. ` +
-            `Consider using Basic strategy for this transcript length.`
+              `Consider using Basic strategy for this transcript length.`,
           );
         }
 
         // Handle empty response
-        if (!content || content.trim() === '') {
-          logger.error('Hybrid Analysis', `Empty response for ${batch.name} batch`, {
-            finishReason,
-            hasContent: !!content,
-            contentLength: content?.length ?? 0,
-          });
-          throw new Error('RETRY'); // Retry for empty responses
+        if (!content || content.trim() === "") {
+          logger.error(
+            "Hybrid Analysis",
+            `Empty response for ${batch.name} batch`,
+            {
+              finishReason,
+              hasContent: !!content,
+              contentLength: content?.length ?? 0,
+            },
+          );
+          throw new Error("RETRY"); // Retry for empty responses
         }
 
         return res;
       },
       3, // Max 3 retry attempts
-      2000 // 2 second initial delay
+      2000, // 2 second initial delay
     );
 
     const content = response.choices[0].message.content;
     if (!content) {
       throw new Error(
         `Empty response from OpenAI for ${batch.name} batch ` +
-        `(finish_reason: ${response.choices[0].finish_reason})`
+          `(finish_reason: ${response.choices[0].finish_reason})`,
       );
     }
 
@@ -1310,26 +1538,43 @@ export async function executeHybridAnalysis(
       parsedResponse = JSON.parse(content);
       parsedResponse = normalizeAnalysisJsonKeys(parsedResponse);
     } catch (error) {
-      logger.error('Hybrid Analysis', `Failed to parse JSON for ${batch.name} batch:`, error);
-      logger.error('Hybrid Analysis', `Response content:`, content.substring(0, 500));
-      throw new Error(`Invalid JSON response from OpenAI for ${batch.name} batch`);
+      logger.error(
+        "Hybrid Analysis",
+        `Failed to parse JSON for ${batch.name} batch:`,
+        error,
+      );
+      logger.error(
+        "Hybrid Analysis",
+        `Response content:`,
+        content.substring(0, 500),
+      );
+      throw new Error(
+        `Invalid JSON response from OpenAI for ${batch.name} batch`,
+      );
     }
 
     // Validate structure
     if (!isValidBatchResponse(parsedResponse)) {
-      logger.error('Hybrid Analysis', `Invalid response structure for ${batch.name} batch`);
-      throw new Error(`Response for ${batch.name} batch does not match expected structure`);
+      logger.error(
+        "Hybrid Analysis",
+        `Invalid response structure for ${batch.name} batch`,
+      );
+      throw new Error(
+        `Response for ${batch.name} batch does not match expected structure`,
+      );
     }
 
     // Store batch response
     batchResponses.push(parsedResponse);
 
     // Update accumulated results for next batch context
-    const batchSections: AnalysisSection[] = parsedResponse.sections.map((s) => ({
-      name: s.name,
-      content: s.content,
-      evidence: [],
-    }));
+    const batchSections: AnalysisSection[] = parsedResponse.sections.map(
+      (s) => ({
+        name: s.name,
+        content: s.content,
+        evidence: [],
+      }),
+    );
 
     accumulatedResults = {
       summary: parsedResponse.summary || accumulatedResults.summary,
@@ -1343,8 +1588,10 @@ export async function executeHybridAnalysis(
           }))
         : accumulatedResults.agendaItems,
       benchmarks: parsedResponse.benchmarks || accumulatedResults.benchmarks,
-      radioReports: parsedResponse.radioReports || accumulatedResults.radioReports,
-      safetyEvents: parsedResponse.safetyEvents || accumulatedResults.safetyEvents,
+      radioReports:
+        parsedResponse.radioReports || accumulatedResults.radioReports,
+      safetyEvents:
+        parsedResponse.safetyEvents || accumulatedResults.safetyEvents,
       decisions: parsedResponse.decisions
         ? parsedResponse.decisions.map((item) => ({
             id: item.id,
@@ -1368,7 +1615,7 @@ export async function executeHybridAnalysis(
       quotes: parsedResponse.quotes || accumulatedResults.quotes,
     };
 
-    logger.info('Hybrid Analysis', `Batch ${batch.name} complete`, {
+    logger.info("Hybrid Analysis", `Batch ${batch.name} complete`, {
       sectionCount: parsedResponse.sections.length,
       agendaItemCount: parsedResponse.agendaItems?.length || 0,
       benchmarkCount: parsedResponse.benchmarks?.length || 0,
@@ -1381,16 +1628,16 @@ export async function executeHybridAnalysis(
   }
 
   // Merge all batch results
-  logger.info('Hybrid Analysis', 'Merging all batch results');
+  logger.info("Hybrid Analysis", "Merging all batch results");
   const rawResults = mergeBatchResults(batchResponses);
 
   // Post-process: ensure unique IDs and validate relationships
   const draftResults = pruneResultsForTemplate(
-    postProcessResults(rawResults, 'Hybrid Analysis'),
-    template
+    postProcessResults(rawResults, "Hybrid Analysis"),
+    template,
   );
 
-  logger.info('Hybrid Analysis', 'Hybrid analysis complete', {
+  logger.info("Hybrid Analysis", "Hybrid analysis complete", {
     batches: batches.length,
     sectionCount: draftResults.sections.length,
     agendaItemCount: draftResults.agendaItems?.length || 0,
@@ -1400,15 +1647,15 @@ export async function executeHybridAnalysis(
 
   // Check if self-evaluation should run
   if (config?.runEvaluation) {
-    logger.info('Hybrid Analysis', 'Running self-evaluation pass');
+    logger.info("Hybrid Analysis", "Running self-evaluation pass");
     const { evaluation, finalResults } = await executeEvaluationPass(
       template,
       transcript,
       draftResults,
-      'hybrid',
+      "hybrid",
       openaiClient,
       deployment,
-      promptsUsed
+      promptsUsed,
     );
 
     return {

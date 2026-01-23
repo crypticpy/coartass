@@ -5,11 +5,12 @@
  * Includes validation, formatting, retry logic, and utility helpers.
  */
 
-import type { AnalysisResults, OutputFormat, TranscriptSegment } from '@/types';
-import type { AnalysisStrategy } from '@/lib/analysis-strategy';
-import type { Template } from '@/types/template';
-import { estimateTokens } from '@/lib/token-utils';
-import { buildChatCompletionParams } from '@/lib/openai-chat-params';
+import type { AnalysisResults, OutputFormat, TranscriptSegment } from "@/types";
+import type { AnalysisStrategy } from "@/lib/analysis-strategy";
+import type { Template } from "@/types/template";
+import type { TranscriptAnnotation } from "@/types/annotation";
+import { estimateTokens } from "@/lib/token-utils";
+import { buildChatCompletionParams } from "@/lib/openai-chat-params";
 import {
   AnalysisError,
   AnalysisErrorCode,
@@ -18,7 +19,7 @@ import {
   wrapError,
   shouldRetry,
   type AnalysisErrorMetadata,
-} from './errors';
+} from "./errors";
 
 /**
  * Format seconds to MM:SS or HH:MM:SS string
@@ -29,9 +30,9 @@ function formatTimestampMarker(seconds: number): string {
   const secs = Math.floor(seconds % 60);
 
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -49,12 +50,78 @@ function formatTimestampMarker(seconds: number): string {
  * // Output:
  * // "[0:00] Hello everyone\n[0:15] Let's start"
  */
-export function formatTranscriptWithTimestamps(segments: TranscriptSegment[]): string {
-  return segments.map(seg => {
-    const timestamp = formatTimestampMarker(seg.start);
-    const speaker = seg.speaker ? `${seg.speaker}: ` : '';
-    return `[${timestamp}] ${speaker}${seg.text}`;
-  }).join('\n');
+export function formatTranscriptWithTimestamps(
+  segments: TranscriptSegment[],
+): string {
+  return segments
+    .map((seg) => {
+      const timestamp = formatTimestampMarker(seg.start);
+      const speaker = seg.speaker ? `${seg.speaker}: ` : "";
+      return `[${timestamp}] ${speaker}${seg.text}`;
+    })
+    .join("\n");
+}
+
+/**
+ * Format trainer annotations for inclusion in analysis prompts.
+ *
+ * Annotations are timestamp-based notes from training officers observing
+ * face-to-face interactions or other events not captured in the audio.
+ * They should be considered alongside the transcript for context.
+ *
+ * @param annotations - Array of annotations to format
+ * @returns Formatted string for prompt inclusion, or undefined if empty
+ *
+ * @example
+ * // Input annotations:
+ * // [{ timestamp: 330, text: "BC and section chief discussed staging" }]
+ * // Output:
+ * // "[5:30] BC and section chief discussed staging"
+ */
+export function formatAnnotationsForPrompt(
+  annotations: TranscriptAnnotation[] | undefined,
+): string | undefined {
+  if (!annotations || annotations.length === 0) {
+    return undefined;
+  }
+
+  // Sort by timestamp
+  const sorted = [...annotations].sort((a, b) => a.timestamp - b.timestamp);
+
+  const lines = sorted.map((ann) => {
+    const timestamp = formatTimestampMarker(ann.timestamp);
+    return `[${timestamp}] ${ann.text}`;
+  });
+
+  return lines.join("\n");
+}
+
+/**
+ * Build the trainer annotations section for analysis prompts.
+ *
+ * @param annotations - Array of annotations
+ * @returns Formatted prompt section or empty string if no annotations
+ */
+export function buildAnnotationsPromptSection(
+  annotations: TranscriptAnnotation[] | undefined,
+): string {
+  const formatted = formatAnnotationsForPrompt(annotations);
+  if (!formatted) {
+    return "";
+  }
+
+  return `## Trainer Annotations
+
+These are timestamped notes from the training officer during video review.
+The trainer observed face-to-face interactions or events not captured in the radio audio.
+Consider this context when evaluating the relevant moments in the transcript.
+NOTE: Annotations HAVE timestamps that correspond to the transcript timeline.
+
+${formatted}
+
+---
+
+`;
 }
 
 /**
@@ -115,14 +182,18 @@ export function getDefaultMaxOutputTokens(deployment: string): number {
   const name = deployment.toLowerCase();
 
   // GPT-5 / reasoning-style deployments: allow large outputs.
-  if (name.includes('gpt-5') || name.includes('o1') || name.includes('o3')) {
+  if (name.includes("gpt-5") || name.includes("o1") || name.includes("o3")) {
     // Default: cap to 8k to reduce latency and avoid gateway timeouts in ACA.
     // Can be overridden via ANALYSIS_MAX_OUTPUT_TOKENS / AZURE_OPENAI_MAX_OUTPUT_TOKENS.
     return 8192;
   }
 
   // GPT-4.1 / "gpt-41" extended-context deployments: allow medium-large outputs.
-  if (name.includes('gpt-41') || name.includes('gpt-4.1') || name.includes('4.1')) {
+  if (
+    name.includes("gpt-41") ||
+    name.includes("gpt-4.1") ||
+    name.includes("4.1")
+  ) {
     return 16000;
   }
 
@@ -134,20 +205,22 @@ export function getDefaultMaxOutputTokens(deployment: string): number {
  * Module-level reasoning effort override.
  * Set via setAnalysisReasoningEffort() before analysis execution.
  */
-let reasoningEffortOverride: 'low' | 'medium' | 'high' | null = null;
+let reasoningEffortOverride: "low" | "medium" | "high" | null = null;
 
 /**
  * Set the reasoning effort for the current analysis run.
  * This overrides the server-side environment variable.
  */
-export function setAnalysisReasoningEffort(effort: 'low' | 'medium' | 'high' | null): void {
+export function setAnalysisReasoningEffort(
+  effort: "low" | "medium" | "high" | null,
+): void {
   reasoningEffortOverride = effort;
 }
 
 /**
  * Get the current reasoning effort (user override or env var).
  */
-export function getAnalysisReasoningEffort(): 'low' | 'medium' | 'high' {
+export function getAnalysisReasoningEffort(): "low" | "medium" | "high" {
   if (reasoningEffortOverride) {
     return reasoningEffortOverride;
   }
@@ -157,14 +230,16 @@ export function getAnalysisReasoningEffort(): 'low' | 'medium' | 'high' {
     process.env.OPENAI_REASONING_EFFORT ||
     process.env.NEXT_PUBLIC_REASONING_EFFORT;
 
-  return envEffortRaw === 'low' || envEffortRaw === 'high' || envEffortRaw === 'medium'
+  return envEffortRaw === "low" ||
+    envEffortRaw === "high" ||
+    envEffortRaw === "medium"
     ? envEffortRaw
-    : 'medium';
+    : "medium";
 }
 
 export function buildAnalysisChatCompletionParams(
   deployment: string,
-  temperature?: number
+  temperature?: number,
 ): ReturnType<typeof buildChatCompletionParams> {
   const reasoningEffort = getAnalysisReasoningEffort();
 
@@ -174,13 +249,15 @@ export function buildAnalysisChatCompletionParams(
     process.env.NEXT_PUBLIC_ANALYSIS_MAX_OUTPUT_TOKENS;
 
   const parsedMax = envMaxRaw ? Number.parseInt(envMaxRaw, 10) : NaN;
-  const configuredMax = Number.isFinite(parsedMax) ? Math.max(256, Math.min(parsedMax, 32000)) : null;
+  const configuredMax = Number.isFinite(parsedMax)
+    ? Math.max(256, Math.min(parsedMax, 32000))
+    : null;
 
   return buildChatCompletionParams(
     deployment,
     configuredMax ?? getDefaultMaxOutputTokens(deployment),
     temperature,
-    reasoningEffort
+    reasoningEffort,
   );
 }
 
@@ -189,12 +266,12 @@ export function buildAnalysisChatCompletionParams(
  */
 export function formatOutputType(format: OutputFormat): string {
   switch (format) {
-    case 'bullet_points':
+    case "bullet_points":
       return `Bulleted list (MUST use "-" character ONLY, NOT numbered lists 1,2,3 or other bullets •,*,+, max ${ANALYSIS_CONSTANTS.MAX_BULLET_POINTS} items, ${ANALYSIS_CONSTANTS.MAX_BULLET_WORDS} words each)`;
-    case 'paragraph':
+    case "paragraph":
       return `Paragraph format (continuous prose, 100-${ANALYSIS_CONSTANTS.MAX_PARAGRAPH_WORDS} words)`;
-    case 'table':
-      return 'Table format (use markdown table syntax if needed, or structured bullets)';
+    case "table":
+      return "Table format (use markdown table syntax if needed, or structured bullets)";
   }
 }
 
@@ -216,7 +293,9 @@ export interface ValidationResult {
  * @param results - Analysis results to validate
  * @returns Validation result with warnings and errors
  */
-export function validateRelationshipIds(results: AnalysisResults): ValidationResult {
+export function validateRelationshipIds(
+  results: AnalysisResults,
+): ValidationResult {
   const warnings: string[] = [];
   const errors: string[] = [];
 
@@ -228,7 +307,7 @@ export function validateRelationshipIds(results: AnalysisResults): ValidationRes
     decision.agendaItemIds?.forEach((id) => {
       if (!agendaIds.has(id)) {
         warnings.push(
-          `Decision "${decision.id}" references non-existent agenda item "${id}"`
+          `Decision "${decision.id}" references non-existent agenda item "${id}"`,
         );
       }
     });
@@ -239,14 +318,14 @@ export function validateRelationshipIds(results: AnalysisResults): ValidationRes
     action.agendaItemIds?.forEach((id) => {
       if (!agendaIds.has(id)) {
         warnings.push(
-          `Action "${action.id}" references non-existent agenda item "${id}"`
+          `Action "${action.id}" references non-existent agenda item "${id}"`,
         );
       }
     });
     action.decisionIds?.forEach((id) => {
       if (!decisionIds.has(id)) {
         warnings.push(
-          `Action "${action.id}" references non-existent decision "${id}"`
+          `Action "${action.id}" references non-existent decision "${id}"`,
         );
       }
     });
@@ -271,7 +350,7 @@ export function validateRelationshipIds(results: AnalysisResults): ValidationRes
  */
 export function ensureUniqueIds<T extends { id: string }>(
   items: T[] | undefined,
-  prefix: string
+  prefix: string,
 ): T[] | undefined {
   if (!items || items.length === 0) return items;
 
@@ -287,7 +366,7 @@ export function ensureUniqueIds<T extends { id: string }>(
       } while (seen.has(newId)); // Ensure the new ID is also unique
 
       console.warn(
-        `[ID Deduplication] Duplicate ID "${item.id}" changed to "${newId}"`
+        `[ID Deduplication] Duplicate ID "${item.id}" changed to "${newId}"`,
       );
       seen.add(newId);
       return { ...item, id: newId };
@@ -311,7 +390,7 @@ export function ensureUniqueIds<T extends { id: string }>(
 export function validateTokenLimits(
   transcript: string,
   prompt: string,
-  strategyName: string
+  strategyName: string,
 ): ValidationResult {
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -323,7 +402,7 @@ export function validateTokenLimits(
   if (totalInputTokens > ANALYSIS_CONSTANTS.MAX_INPUT_TOKENS_WARNING) {
     warnings.push(
       `[${strategyName}] Input tokens (${totalInputTokens.toLocaleString()}) ` +
-        'approaching context limit. Consider using a different strategy.'
+        "approaching context limit. Consider using a different strategy.",
     );
   }
 
@@ -331,7 +410,7 @@ export function validateTokenLimits(
   if (totalInputTokens > 250000) {
     errors.push(
       `[${strategyName}] Input tokens (${totalInputTokens.toLocaleString()}) ` +
-        'exceed safe context limit (250K). Analysis will likely fail.'
+        "exceed safe context limit (250K). Analysis will likely fail.",
     );
   }
 
@@ -413,12 +492,13 @@ export interface RetryResult<T> {
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   config: RetryConfig | number = {},
-  legacyBaseDelay?: number
+  legacyBaseDelay?: number,
 ): Promise<T> {
   // Handle legacy signature: retryWithBackoff(fn, maxRetries, baseDelay)
-  const normalizedConfig: RetryConfig = typeof config === 'number'
-    ? { maxRetries: config, baseDelay: legacyBaseDelay }
-    : config;
+  const normalizedConfig: RetryConfig =
+    typeof config === "number"
+      ? { maxRetries: config, baseDelay: legacyBaseDelay }
+      : config;
 
   const {
     maxRetries = 3,
@@ -481,12 +561,14 @@ export async function retryWithBackoff<T>(
       // Log retry
       const logContext = [
         `Attempt ${attempt}/${maxRetries} failed`,
-        strategyName ? `[${strategyName}]` : '',
-        sectionName ? `Section: ${sectionName}` : '',
+        strategyName ? `[${strategyName}]` : "",
+        sectionName ? `Section: ${sectionName}` : "",
         `Retrying in ${delay}ms...`,
-      ].filter(Boolean).join(' ');
+      ]
+        .filter(Boolean)
+        .join(" ");
 
-      logger.warn('Retry', logContext, { error: lastError.message });
+      logger.warn("Retry", logContext, { error: lastError.message });
 
       // Invoke callback if provided
       if (onRetry) {
@@ -494,12 +576,12 @@ export async function retryWithBackoff<T>(
       }
 
       // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
   // Should never reach here, but TypeScript needs this
-  throw lastError || new Error('Retry failed with no error captured');
+  throw lastError || new Error("Retry failed with no error captured");
 }
 
 /**
@@ -511,7 +593,7 @@ export async function retryWithBackoff<T>(
  */
 export async function retryWithBackoffDetailed<T>(
   fn: () => Promise<T>,
-  config: RetryConfig = {}
+  config: RetryConfig = {},
 ): Promise<RetryResult<T>> {
   const startTime = Date.now();
   let attempts = 0;
@@ -564,21 +646,25 @@ export async function retryWithBackoffDetailed<T>(
       const jitterAmount = delay * jitter * (Math.random() * 2 - 1);
       delay = Math.max(0, Math.round(delay + jitterAmount));
 
-      logger.warn('Retry', `Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms`, {
-        error: lastError.message,
-        strategyName,
-        sectionName,
-      });
+      logger.warn(
+        "Retry",
+        `Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms`,
+        {
+          error: lastError.message,
+          strategyName,
+          sectionName,
+        },
+      );
 
       if (onRetry) {
         onRetry(attempt, lastError, delay);
       }
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
-  throw lastError || new Error('Retry failed with no error captured');
+  throw lastError || new Error("Retry failed with no error captured");
 }
 
 /**
@@ -601,7 +687,7 @@ export async function retryWithBackoffDetailed<T>(
 export async function withTimeout<T>(
   fn: () => Promise<T>,
   timeoutMs: number,
-  operation = 'Operation'
+  operation = "Operation",
 ): Promise<T> {
   let timeoutId: NodeJS.Timeout | undefined;
 
@@ -657,7 +743,7 @@ export type SafeExecuteResult<T> =
  */
 export async function safeExecute<T>(
   fn: () => Promise<T>,
-  metadata: AnalysisErrorMetadata = {}
+  metadata: AnalysisErrorMetadata = {},
 ): Promise<SafeExecuteResult<T>> {
   try {
     const result = await fn();
@@ -665,9 +751,9 @@ export async function safeExecute<T>(
   } catch (error) {
     const analysisError = wrapError(error, metadata);
     logger.error(
-      metadata.strategy || 'Analysis',
+      metadata.strategy || "Analysis",
       analysisError.message,
-      analysisError.toJSON()
+      analysisError.toJSON(),
     );
     return { success: false, result: null, error: analysisError };
   }
@@ -685,7 +771,7 @@ export async function safeExecute<T>(
  */
 export async function executeAllSettled<T>(
   operations: Array<() => Promise<T>>,
-  metadata: AnalysisErrorMetadata = {}
+  metadata: AnalysisErrorMetadata = {},
 ): Promise<{
   results: T[];
   errors: AnalysisError[];
@@ -693,13 +779,13 @@ export async function executeAllSettled<T>(
   successCount: number;
   failureCount: number;
 }> {
-  const settled = await Promise.allSettled(operations.map(op => op()));
+  const settled = await Promise.allSettled(operations.map((op) => op()));
 
   const results: T[] = [];
   const errors: AnalysisError[] = [];
 
   for (const outcome of settled) {
-    if (outcome.status === 'fulfilled') {
+    if (outcome.status === "fulfilled") {
       results.push(outcome.value);
     } else {
       errors.push(wrapError(outcome.reason, metadata));
@@ -728,30 +814,31 @@ export function classifyError(error: unknown): {
   isTimeout: boolean;
   isContentFilter: boolean;
   isTruncated: boolean;
-  suggestedAction: 'retry' | 'fallback' | 'abort' | 'partial';
+  suggestedAction: "retry" | "fallback" | "abort" | "partial";
 } {
-  const analysisError = error instanceof AnalysisError
-    ? error
-    : wrapError(error);
+  const analysisError =
+    error instanceof AnalysisError ? error : wrapError(error);
 
   const isRateLimit = analysisError.code === AnalysisErrorCode.RATE_LIMITED;
   const isTimeout = analysisError.code === AnalysisErrorCode.TIMEOUT;
-  const isContentFilter = analysisError.code === AnalysisErrorCode.CONTENT_FILTER;
-  const isTruncated = analysisError.code === AnalysisErrorCode.RESPONSE_TRUNCATED;
+  const isContentFilter =
+    analysisError.code === AnalysisErrorCode.CONTENT_FILTER;
+  const isTruncated =
+    analysisError.code === AnalysisErrorCode.RESPONSE_TRUNCATED;
   const isPartial = analysisError.code === AnalysisErrorCode.PARTIAL_RESULTS;
 
-  let suggestedAction: 'retry' | 'fallback' | 'abort' | 'partial';
+  let suggestedAction: "retry" | "fallback" | "abort" | "partial";
 
   if (isPartial) {
-    suggestedAction = 'partial';
+    suggestedAction = "partial";
   } else if (isTruncated) {
-    suggestedAction = 'fallback'; // Need simpler strategy
+    suggestedAction = "fallback"; // Need simpler strategy
   } else if (analysisError.isRetryable) {
-    suggestedAction = 'retry';
+    suggestedAction = "retry";
   } else if (analysisError.code === AnalysisErrorCode.ALL_STRATEGIES_FAILED) {
-    suggestedAction = 'abort';
+    suggestedAction = "abort";
   } else {
-    suggestedAction = 'fallback';
+    suggestedAction = "fallback";
   }
 
   return {
@@ -769,7 +856,7 @@ export function classifyError(error: unknown): {
  * Check if a value is a valid timestamp
  */
 function isValidTimestamp(value: unknown): value is number {
-  return typeof value === 'number' && !isNaN(value) && value >= 0;
+  return typeof value === "number" && !isNaN(value) && value >= 0;
 }
 
 /**
@@ -781,7 +868,7 @@ function isValidTimestamp(value: unknown): value is number {
  */
 export function validateTimestamps(
   results: AnalysisResults,
-  transcriptDurationSeconds?: number
+  transcriptDurationSeconds?: number,
 ): string[] {
   const warnings: string[] = [];
 
@@ -790,52 +877,60 @@ export function validateTimestamps(
     timestamp: number | undefined,
     itemType: string,
     index: number,
-    preview: string
+    preview: string,
   ) => {
-    const truncatedPreview = preview.length > 30 ? `${preview.substring(0, 30)}...` : preview;
+    const truncatedPreview =
+      preview.length > 30 ? `${preview.substring(0, 30)}...` : preview;
 
     if (!isValidTimestamp(timestamp)) {
-      warnings.push(`${itemType} ${index + 1} ("${truncatedPreview}") missing timestamp`);
+      warnings.push(
+        `${itemType} ${index + 1} ("${truncatedPreview}") missing timestamp`,
+      );
     } else if (timestamp === 0) {
       // timestamp=0 is suspicious - likely unset by LLM
-      warnings.push(`${itemType} ${index + 1} ("${truncatedPreview}") has timestamp=0 (possibly unset)`);
-    } else if (transcriptDurationSeconds && timestamp > transcriptDurationSeconds) {
       warnings.push(
-        `${itemType} ${index + 1} ("${truncatedPreview}") timestamp ${timestamp}s exceeds duration ${transcriptDurationSeconds}s`
+        `${itemType} ${index + 1} ("${truncatedPreview}") has timestamp=0 (possibly unset)`,
+      );
+    } else if (
+      transcriptDurationSeconds &&
+      timestamp > transcriptDurationSeconds
+    ) {
+      warnings.push(
+        `${itemType} ${index + 1} ("${truncatedPreview}") timestamp ${timestamp}s exceeds duration ${transcriptDurationSeconds}s`,
       );
     }
   };
 
   // Check action items
   results.actionItems?.forEach((item, i) => {
-    checkTimestamp(item.timestamp, 'Action item', i, item.task);
+    checkTimestamp(item.timestamp, "Action item", i, item.task);
   });
 
   // Check benchmark observations (timestamp optional)
   results.benchmarks?.forEach((b, i) => {
     if (b.timestamp !== undefined) {
-      checkTimestamp(b.timestamp, 'Benchmark', i, b.benchmark);
+      checkTimestamp(b.timestamp, "Benchmark", i, b.benchmark);
     }
   });
 
   // Check radio reports
   results.radioReports?.forEach((r, i) => {
-    checkTimestamp(r.timestamp, 'Radio report', i, r.type);
+    checkTimestamp(r.timestamp, "Radio report", i, r.type);
   });
 
   // Check safety events
   results.safetyEvents?.forEach((e, i) => {
-    checkTimestamp(e.timestamp, 'Safety event', i, e.details);
+    checkTimestamp(e.timestamp, "Safety event", i, e.details);
   });
 
   // Check decisions
   results.decisions?.forEach((dec, i) => {
-    checkTimestamp(dec.timestamp, 'Decision', i, dec.decision);
+    checkTimestamp(dec.timestamp, "Decision", i, dec.decision);
   });
 
   // Check quotes
   results.quotes?.forEach((quote, i) => {
-    checkTimestamp(quote.timestamp, 'Quote', i, quote.text);
+    checkTimestamp(quote.timestamp, "Quote", i, quote.text);
   });
 
   return warnings;
@@ -858,36 +953,51 @@ export function validateTimestamps(
 export function postProcessResults(
   results: AnalysisResults,
   strategyName: string,
-  transcriptDurationSeconds?: number
+  transcriptDurationSeconds?: number,
 ): AnalysisResults {
-  logger.info(strategyName, 'Post-processing results');
+  logger.info(strategyName, "Post-processing results");
 
   // 1. Ensure unique IDs
   const processedResults: AnalysisResults = {
     ...results,
-    agendaItems: ensureUniqueIds(results.agendaItems, 'agenda'),
-    benchmarks: ensureUniqueIds(results.benchmarks, 'benchmark'),
-    radioReports: ensureUniqueIds(results.radioReports, 'report'),
-    safetyEvents: ensureUniqueIds(results.safetyEvents, 'safety'),
-    actionItems: ensureUniqueIds(results.actionItems, 'action'),
-    decisions: ensureUniqueIds(results.decisions, 'decision'),
+    agendaItems: ensureUniqueIds(results.agendaItems, "agenda"),
+    benchmarks: ensureUniqueIds(results.benchmarks, "benchmark"),
+    radioReports: ensureUniqueIds(results.radioReports, "report"),
+    safetyEvents: ensureUniqueIds(results.safetyEvents, "safety"),
+    actionItems: ensureUniqueIds(results.actionItems, "action"),
+    decisions: ensureUniqueIds(results.decisions, "decision"),
   };
 
   // 2. Validate relationship IDs
   const validation = validateRelationshipIds(processedResults);
 
   if (!validation.valid) {
-    logger.warn(strategyName, 'Relationship validation warnings', validation.warnings);
+    logger.warn(
+      strategyName,
+      "Relationship validation warnings",
+      validation.warnings,
+    );
   }
 
   if (validation.errors.length > 0) {
-    logger.error(strategyName, 'Relationship validation errors', validation.errors);
+    logger.error(
+      strategyName,
+      "Relationship validation errors",
+      validation.errors,
+    );
   }
 
   // 3. Validate timestamps (with optional duration check)
-  const timestampWarnings = validateTimestamps(processedResults, transcriptDurationSeconds);
+  const timestampWarnings = validateTimestamps(
+    processedResults,
+    transcriptDurationSeconds,
+  );
   if (timestampWarnings.length > 0) {
-    logger.warn(strategyName, 'Timestamp validation warnings', timestampWarnings);
+    logger.warn(
+      strategyName,
+      "Timestamp validation warnings",
+      timestampWarnings,
+    );
   }
 
   // 4. Log statistics
@@ -903,7 +1013,7 @@ export function postProcessResults(
     validationErrors: validation.errors.length,
   };
 
-  logger.info(strategyName, 'Post-processing complete', stats);
+  logger.info(strategyName, "Post-processing complete", stats);
 
   return processedResults;
 }
@@ -916,7 +1026,7 @@ export function postProcessResults(
  */
 export function pruneResultsForTemplate(
   results: AnalysisResults,
-  _template: Template
+  _template: Template,
 ): AnalysisResults {
   const pruned: AnalysisResults = { ...results };
 
@@ -971,7 +1081,9 @@ export function normalizeAnalysisJsonKeys<T>(data: T): T {
 
   // If finalResults exists, normalize inside it as well.
   if (normalized.finalResults && typeof normalized.finalResults === "object") {
-    normalized.finalResults = normalizeAnalysisJsonKeys(normalized.finalResults);
+    normalized.finalResults = normalizeAnalysisJsonKeys(
+      normalized.finalResults,
+    );
   }
 
   return normalized as T;
@@ -983,12 +1095,12 @@ export function normalizeAnalysisJsonKeys<T>(data: T): T {
 export const logger = {
   info: (strategy: string, message: string, meta?: unknown) => {
     const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] [${strategy}]`, message, meta || '');
+    console.log(`[${timestamp}] [${strategy}]`, message, meta || "");
   },
 
   warn: (strategy: string, message: string, meta?: unknown) => {
     const timestamp = new Date().toISOString();
-    console.warn(`[${timestamp}] [${strategy}] WARNING:`, message, meta || '');
+    console.warn(`[${timestamp}] [${strategy}] WARNING:`, message, meta || "");
   },
 
   error: (strategy: string, message: string, error?: unknown) => {
@@ -998,7 +1110,7 @@ export const logger = {
 
   debug: (strategy: string, message: string, meta?: unknown) => {
     const timestamp = new Date().toISOString();
-    console.debug(`[${timestamp}] [${strategy}] DEBUG:`, message, meta || '');
+    console.debug(`[${timestamp}] [${strategy}] DEBUG:`, message, meta || "");
   },
 };
 
@@ -1015,13 +1127,15 @@ export const logger = {
  */
 export function repairTimestamps(
   finalResults: AnalysisResults,
-  draftResults: AnalysisResults
+  draftResults: AnalysisResults,
 ): AnalysisResults {
   let repairCount = 0;
 
   // Helper to check if timestamp is invalid
   const needsRepair = (ts: number | undefined): boolean => {
-    return ts === undefined || ts === null || (typeof ts === 'number' && isNaN(ts));
+    return (
+      ts === undefined || ts === null || (typeof ts === "number" && isNaN(ts))
+    );
   };
 
   // Repair action items
@@ -1031,15 +1145,15 @@ export function repairTimestamps(
       if (draftItem && !needsRepair(draftItem.timestamp)) {
         repairCount++;
         logger.warn(
-          'Timestamp Repair',
-          `Action item "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+          "Timestamp Repair",
+          `Action item "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`,
         );
         return { ...item, timestamp: draftItem.timestamp };
       }
       // No match found - log warning but keep invalid value
       logger.warn(
-        'Timestamp Repair',
-        `Action item "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+        "Timestamp Repair",
+        `Action item "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`,
       );
     }
     return item;
@@ -1049,17 +1163,21 @@ export function repairTimestamps(
   const repairedBenchmarks = finalResults.benchmarks?.map((item) => {
     if (item.timestamp !== undefined && needsRepair(item.timestamp)) {
       const draftItem = draftResults.benchmarks?.find((d) => d.id === item.id);
-      if (draftItem && draftItem.timestamp !== undefined && !needsRepair(draftItem.timestamp)) {
+      if (
+        draftItem &&
+        draftItem.timestamp !== undefined &&
+        !needsRepair(draftItem.timestamp)
+      ) {
         repairCount++;
         logger.warn(
-          'Timestamp Repair',
-          `Benchmark "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+          "Timestamp Repair",
+          `Benchmark "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`,
         );
         return { ...item, timestamp: draftItem.timestamp };
       }
       logger.warn(
-        'Timestamp Repair',
-        `Benchmark "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+        "Timestamp Repair",
+        `Benchmark "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`,
       );
     }
     return item;
@@ -1068,18 +1186,20 @@ export function repairTimestamps(
   // Repair radio reports
   const repairedRadioReports = finalResults.radioReports?.map((item) => {
     if (needsRepair(item.timestamp)) {
-      const draftItem = draftResults.radioReports?.find((d) => d.id === item.id);
+      const draftItem = draftResults.radioReports?.find(
+        (d) => d.id === item.id,
+      );
       if (draftItem && !needsRepair(draftItem.timestamp)) {
         repairCount++;
         logger.warn(
-          'Timestamp Repair',
-          `Radio report "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+          "Timestamp Repair",
+          `Radio report "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`,
         );
         return { ...item, timestamp: draftItem.timestamp };
       }
       logger.warn(
-        'Timestamp Repair',
-        `Radio report "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+        "Timestamp Repair",
+        `Radio report "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`,
       );
     }
     return item;
@@ -1088,18 +1208,20 @@ export function repairTimestamps(
   // Repair safety events
   const repairedSafetyEvents = finalResults.safetyEvents?.map((item) => {
     if (needsRepair(item.timestamp)) {
-      const draftItem = draftResults.safetyEvents?.find((d) => d.id === item.id);
+      const draftItem = draftResults.safetyEvents?.find(
+        (d) => d.id === item.id,
+      );
       if (draftItem && !needsRepair(draftItem.timestamp)) {
         repairCount++;
         logger.warn(
-          'Timestamp Repair',
-          `Safety event "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+          "Timestamp Repair",
+          `Safety event "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`,
         );
         return { ...item, timestamp: draftItem.timestamp };
       }
       logger.warn(
-        'Timestamp Repair',
-        `Safety event "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+        "Timestamp Repair",
+        `Safety event "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`,
       );
     }
     return item;
@@ -1112,14 +1234,14 @@ export function repairTimestamps(
       if (draftItem && !needsRepair(draftItem.timestamp)) {
         repairCount++;
         logger.warn(
-          'Timestamp Repair',
-          `Decision "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+          "Timestamp Repair",
+          `Decision "${item.id}" timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`,
         );
         return { ...item, timestamp: draftItem.timestamp };
       }
       logger.warn(
-        'Timestamp Repair',
-        `Decision "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`
+        "Timestamp Repair",
+        `Decision "${item.id}" has invalid timestamp ${item.timestamp} but no draft match found`,
       );
     }
     return item;
@@ -1130,26 +1252,30 @@ export function repairTimestamps(
     if (needsRepair(item.timestamp)) {
       // Try to find matching quote by text
       const draftItem = draftResults.quotes?.find(
-        (d) => d.text === item.text || d.text.includes(item.text.substring(0, 30))
+        (d) =>
+          d.text === item.text || d.text.includes(item.text.substring(0, 30)),
       );
       if (draftItem && !needsRepair(draftItem.timestamp)) {
         repairCount++;
         logger.warn(
-          'Timestamp Repair',
-          `Quote timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`
+          "Timestamp Repair",
+          `Quote timestamp repaired: ${item.timestamp} → ${draftItem.timestamp}`,
         );
         return { ...item, timestamp: draftItem.timestamp };
       }
       logger.warn(
-        'Timestamp Repair',
-        `Quote has invalid timestamp ${item.timestamp} but no draft match found`
+        "Timestamp Repair",
+        `Quote has invalid timestamp ${item.timestamp} but no draft match found`,
       );
     }
     return item;
   });
 
   if (repairCount > 0) {
-    logger.info('Timestamp Repair', `Repaired ${repairCount} timestamps from draft results`);
+    logger.info(
+      "Timestamp Repair",
+      `Repaired ${repairCount} timestamps from draft results`,
+    );
   }
 
   return {
@@ -1186,8 +1312,8 @@ export function repairEvidence(results: AnalysisResults): AnalysisResults {
       if (section.evidence !== undefined) {
         repairCount++;
         logger.warn(
-          'Evidence Repair',
-          `Section "${section.name}" had invalid evidence (${typeof section.evidence}), defaulting to []`
+          "Evidence Repair",
+          `Section "${section.name}" had invalid evidence (${typeof section.evidence}), defaulting to []`,
         );
       }
       return { ...section, evidence: [] };
@@ -1197,21 +1323,23 @@ export function repairEvidence(results: AnalysisResults): AnalysisResults {
     const repairedEvidence = section.evidence
       .map((ev) => {
         // Skip completely invalid evidence
-        if (!ev || typeof ev !== 'object') {
+        if (!ev || typeof ev !== "object") {
           removeCount++;
           return null;
         }
 
         // Normalize fields with defaults
-        const text = typeof ev.text === 'string' ? ev.text : '';
-        const start = typeof ev.start === 'number' && !isNaN(ev.start) ? ev.start : 0;
-        const end = typeof ev.end === 'number' && !isNaN(ev.end) ? ev.end : 0;
-        const relevance = typeof ev.relevance === 'number' && !isNaN(ev.relevance)
-          ? Math.max(0, Math.min(1, ev.relevance))
-          : 0.5;
+        const text = typeof ev.text === "string" ? ev.text : "";
+        const start =
+          typeof ev.start === "number" && !isNaN(ev.start) ? ev.start : 0;
+        const end = typeof ev.end === "number" && !isNaN(ev.end) ? ev.end : 0;
+        const relevance =
+          typeof ev.relevance === "number" && !isNaN(ev.relevance)
+            ? Math.max(0, Math.min(1, ev.relevance))
+            : 0.5;
 
         // Skip evidence with empty text (not useful)
-        if (text.trim() === '') {
+        if (text.trim() === "") {
           removeCount++;
           return null;
         }
@@ -1234,7 +1362,10 @@ export function repairEvidence(results: AnalysisResults): AnalysisResults {
   });
 
   if (repairCount > 0 || removeCount > 0) {
-    logger.info('Evidence Repair', `Repaired ${repairCount} evidence fields, removed ${removeCount} invalid entries`);
+    logger.info(
+      "Evidence Repair",
+      `Repaired ${repairCount} evidence fields, removed ${removeCount} invalid entries`,
+    );
   }
 
   return {
@@ -1253,14 +1384,14 @@ export function repairEvidence(results: AnalysisResults): AnalysisResults {
 export function logPerformanceMetrics(
   strategyName: string,
   estimatedSeconds: string,
-  actualMs: number
+  actualMs: number,
 ): void {
   const actualSeconds = (actualMs / 1000).toFixed(1);
-  const [minEst, maxEst] = estimatedSeconds.split('-').map((s) => parseInt(s));
+  const [minEst, maxEst] = estimatedSeconds.split("-").map((s) => parseInt(s));
   const avgEst = (minEst + maxEst) / 2;
   const withinEstimate = actualMs / 1000 <= maxEst;
 
-  logger.info(strategyName, 'Performance metrics', {
+  logger.info(strategyName, "Performance metrics", {
     estimated: estimatedSeconds,
     actual: `${actualSeconds}s`,
     withinEstimate,

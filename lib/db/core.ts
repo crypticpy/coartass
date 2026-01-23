@@ -12,6 +12,8 @@ import type { AudioMetadata } from "@/types/audio";
 import type { Conversation } from "@/types/chat";
 import type { SavedRecording } from "@/types/recording";
 import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
+import type { TranscriptAnnotation } from "@/types/annotation";
+import type { PersistedSupplementalDocument } from "@/types/supplemental";
 import { computeTranscriptSearchTokens } from "./search";
 
 /**
@@ -21,7 +23,7 @@ export class DatabaseError extends Error {
   constructor(
     message: string,
     public readonly code?: string,
-    public readonly originalError?: Error
+    public readonly originalError?: Error,
   ) {
     super(message);
     this.name = "DatabaseError";
@@ -69,6 +71,12 @@ export class AustinRTASSDB extends Dexie {
   /** RTASS rubric templates table storing custom rubric templates */
   rtassRubricTemplates!: Table<RtassRubricTemplate, string>;
 
+  /** Annotations table storing trainer notes linked to transcript timestamps */
+  annotations!: Table<TranscriptAnnotation, string>;
+
+  /** Supplemental documents table storing persistent docs attached to transcripts */
+  supplementalDocuments!: Table<PersistedSupplementalDocument, string>;
+
   constructor() {
     super("AustinRTASSDB");
 
@@ -95,13 +103,15 @@ export class AustinRTASSDB extends Dexie {
     // Version 3 adds compound indexes for better query performance with large datasets
     this.version(3).stores({
       // Transcripts: added compound index [filename+createdAt] for efficient filtering
-      transcripts: "id, filename, createdAt, metadata.duration, [filename+createdAt]",
+      transcripts:
+        "id, filename, createdAt, metadata.duration, [filename+createdAt]",
 
       // Templates: unchanged
       templates: "id, category, isCustom, createdAt, name",
 
       // Analyses: added compound index [transcriptId+createdAt] for efficient transcript-based queries
-      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
 
       // Audio files: unchanged
       audioFiles: "transcriptId, storedAt",
@@ -112,7 +122,8 @@ export class AustinRTASSDB extends Dexie {
       transcripts:
         "id, filename, createdAt, metadata.duration, [filename+createdAt], fingerprint.fileHash",
       templates: "id, category, isCustom, createdAt, name",
-      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
       audioFiles: "transcriptId, storedAt",
     });
 
@@ -121,7 +132,8 @@ export class AustinRTASSDB extends Dexie {
       transcripts:
         "id, filename, createdAt, metadata.duration, [filename+createdAt], fingerprint.fileHash",
       templates: "id, category, isCustom, createdAt, name",
-      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
       audioFiles: "transcriptId, storedAt",
       // Conversations: indexed by id (primary), transcriptId (FK), and compound [transcriptId+updatedAt]
       conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
@@ -132,7 +144,8 @@ export class AustinRTASSDB extends Dexie {
       transcripts:
         "id, filename, createdAt, metadata.duration, [filename+createdAt], fingerprint.fileHash",
       templates: "id, category, isCustom, createdAt, name",
-      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
       audioFiles: "transcriptId, storedAt",
       conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
       // Recordings: indexed by id (auto-increment primary key), status, transcriptId (optional FK), and metadata.createdAt
@@ -144,7 +157,8 @@ export class AustinRTASSDB extends Dexie {
       transcripts:
         "id, filename, createdAt, metadata.duration, metadata.fileSize, [filename+createdAt], fingerprint.fileHash",
       templates: "id, category, isCustom, createdAt, name",
-      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
       audioFiles: "transcriptId, storedAt",
       conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
       recordings: "++id, status, transcriptId, metadata.createdAt",
@@ -155,11 +169,13 @@ export class AustinRTASSDB extends Dexie {
       transcripts:
         "id, filename, createdAt, metadata.duration, metadata.fileSize, [filename+createdAt], fingerprint.fileHash",
       templates: "id, category, isCustom, createdAt, name",
-      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
       audioFiles: "transcriptId, storedAt",
       conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
       recordings: "++id, status, transcriptId, metadata.createdAt",
-      rtassScorecards: "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
+      rtassScorecards:
+        "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
     });
 
     // Version 9 adds RTASS rubric templates (custom rubrics created by trainers)
@@ -167,11 +183,13 @@ export class AustinRTASSDB extends Dexie {
       transcripts:
         "id, filename, createdAt, metadata.duration, metadata.fileSize, [filename+createdAt], fingerprint.fileHash",
       templates: "id, category, isCustom, createdAt, name",
-      analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
       audioFiles: "transcriptId, storedAt",
       conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
       recordings: "++id, status, transcriptId, metadata.createdAt",
-      rtassScorecards: "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
+      rtassScorecards:
+        "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
       rtassRubricTemplates: "id, jurisdiction, createdAt, name",
     });
 
@@ -181,23 +199,48 @@ export class AustinRTASSDB extends Dexie {
         transcripts:
           "id, filename, createdAt, metadata.duration, metadata.fileSize, [filename+createdAt], fingerprint.fileHash, *searchTokens",
         templates: "id, category, isCustom, createdAt, name",
-        analyses: "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+        analyses:
+          "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
         audioFiles: "transcriptId, storedAt",
         conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
         recordings: "++id, status, transcriptId, metadata.createdAt",
-        rtassScorecards: "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
+        rtassScorecards:
+          "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
         rtassRubricTemplates: "id, jurisdiction, createdAt, name",
       })
       .upgrade(async (tx) => {
         const transcripts = tx.table<Transcript, string>("transcripts");
         await transcripts.toCollection().modify((t) => {
           const transcript = t as Transcript;
-          if (Array.isArray(transcript.searchTokens) && transcript.searchTokens.length > 0) {
+          if (
+            Array.isArray(transcript.searchTokens) &&
+            transcript.searchTokens.length > 0
+          ) {
             return;
           }
           transcript.searchTokens = computeTranscriptSearchTokens(transcript);
         });
       });
+
+    // Version 11 adds annotations and supplemental documents tables
+    this.version(11).stores({
+      transcripts:
+        "id, filename, createdAt, metadata.duration, metadata.fileSize, [filename+createdAt], fingerprint.fileHash, *searchTokens",
+      templates: "id, category, isCustom, createdAt, name",
+      analyses:
+        "id, transcriptId, templateId, createdAt, [transcriptId+createdAt]",
+      audioFiles: "transcriptId, storedAt",
+      conversations: "id, transcriptId, updatedAt, [transcriptId+updatedAt]",
+      recordings: "++id, status, transcriptId, metadata.createdAt",
+      rtassScorecards:
+        "id, transcriptId, rubricTemplateId, createdAt, [transcriptId+createdAt]",
+      rtassRubricTemplates: "id, jurisdiction, createdAt, name",
+      // Annotations: indexed by id (primary), transcriptId (FK), timestamp, and compound for efficient queries
+      annotations: "id, transcriptId, timestamp, [transcriptId+timestamp]",
+      // Supplemental documents: indexed by id (primary), transcriptId (FK), addedAt, and compound
+      supplementalDocuments:
+        "id, transcriptId, addedAt, [transcriptId+addedAt]",
+    });
 
     // Map tables to classes for better type inference
     this.transcripts = this.table("transcripts");
@@ -208,6 +251,8 @@ export class AustinRTASSDB extends Dexie {
     this.recordings = this.table("recordings");
     this.rtassScorecards = this.table("rtassScorecards");
     this.rtassRubricTemplates = this.table("rtassRubricTemplates");
+    this.annotations = this.table("annotations");
+    this.supplementalDocuments = this.table("supplementalDocuments");
   }
 }
 
@@ -226,7 +271,7 @@ export function getDatabase(): AustinRTASSDB {
     if (typeof window === "undefined" || !window.indexedDB) {
       throw new DatabaseError(
         "IndexedDB is not supported in this environment",
-        "INDEXEDDB_NOT_SUPPORTED"
+        "INDEXEDDB_NOT_SUPPORTED",
       );
     }
 
@@ -277,7 +322,7 @@ export async function deleteDatabase(): Promise<void> {
     throw new DatabaseError(
       "Failed to delete database",
       "DATABASE_DELETE_FAILED",
-      error instanceof Error ? error : undefined
+      error instanceof Error ? error : undefined,
     );
   }
 }

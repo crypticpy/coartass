@@ -12,28 +12,39 @@
  * - Graceful degradation ensuring analysis always returns a result
  */
 
-import type { Template, AnalysisResults, EvaluationResults, TranscriptSegment } from '@/types';
-import type { AnalysisStrategy } from '@/lib/analysis-strategy';
-import type OpenAI from 'openai';
-import { recommendStrategy, getStrategyMetadata, capStrategy, getEffectiveMaxStrategy } from '@/lib/analysis-strategy';
-import { estimateTokens } from '@/lib/token-utils';
+import type {
+  Template,
+  AnalysisResults,
+  EvaluationResults,
+  TranscriptSegment,
+} from "@/types";
+import type { TranscriptAnnotation } from "@/types/annotation";
+import type { AnalysisStrategy } from "@/lib/analysis-strategy";
+import type OpenAI from "openai";
+import {
+  recommendStrategy,
+  getStrategyMetadata,
+  capStrategy,
+  getEffectiveMaxStrategy,
+} from "@/lib/analysis-strategy";
+import { estimateTokens } from "@/lib/token-utils";
 
 // Import all strategy executors
 import {
   executeBasicAnalysis,
   type BasicAnalysisConfig,
   type BasicAnalysisResult,
-} from './basic';
+} from "./basic";
 import {
   executeHybridAnalysis,
   type HybridAnalysisConfig,
   type HybridAnalysisResult,
-} from './hybrid';
+} from "./hybrid";
 import {
   executeAdvancedAnalysis,
   type AdvancedAnalysisConfig,
   type AdvancedAnalysisResult,
-} from './advanced';
+} from "./advanced";
 
 // Import error handling
 import {
@@ -43,19 +54,19 @@ import {
   AllStrategiesFailedError,
   hasPartialResults,
   wrapError,
-} from './errors';
+} from "./errors";
 
 // Import shared utilities
-import { logger, classifyError, setAnalysisReasoningEffort } from './shared';
+import { logger, classifyError, setAnalysisReasoningEffort } from "./shared";
 
 // Re-export shared utilities
-export * from './shared';
+export * from "./shared";
 
 // Re-export evaluator
-export * from './evaluator';
+export * from "./evaluator";
 
 // Re-export errors
-export * from './errors';
+export * from "./errors";
 
 /**
  * Configuration for analysis execution
@@ -66,7 +77,7 @@ export interface AnalysisConfig {
    * If 'auto', strategy is selected based on transcript length.
    * Defaults to 'auto'.
    */
-  strategy?: AnalysisStrategy | 'auto';
+  strategy?: AnalysisStrategy | "auto";
 
   /**
    * Whether to run self-evaluation pass after main analysis.
@@ -115,11 +126,18 @@ export interface AnalysisConfig {
   supplementalMaterial?: string;
 
   /**
+   * Trainer annotations - timestamped notes from training officers.
+   * These are observations of face-to-face interactions or events not captured
+   * in the audio. They are injected into prompts to provide additional context.
+   */
+  annotations?: TranscriptAnnotation[];
+
+  /**
    * User-configurable reasoning effort for GPT-5/reasoning models.
    * Low = faster but may miss nuance, High = slower but more thorough.
    * Overrides the server-side AZURE_OPENAI_REASONING_EFFORT env var.
    */
-  reasoningEffort?: 'low' | 'medium' | 'high';
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 /**
@@ -167,7 +185,11 @@ export interface AnalysisExecutionResult {
 /**
  * Strategy fallback order: more complex -> simpler
  */
-const STRATEGY_FALLBACK_ORDER: AnalysisStrategy[] = ['advanced', 'hybrid', 'basic'];
+const STRATEGY_FALLBACK_ORDER: AnalysisStrategy[] = [
+  "advanced",
+  "hybrid",
+  "basic",
+];
 
 /**
  * Get the next fallback strategy.
@@ -175,10 +197,15 @@ const STRATEGY_FALLBACK_ORDER: AnalysisStrategy[] = ['advanced', 'hybrid', 'basi
  * @param currentStrategy - Strategy that failed
  * @returns Next simpler strategy or null if none available
  */
-function getNextFallbackStrategy(currentStrategy: AnalysisStrategy): AnalysisStrategy | null {
+function getNextFallbackStrategy(
+  currentStrategy: AnalysisStrategy,
+): AnalysisStrategy | null {
   const currentIndex = STRATEGY_FALLBACK_ORDER.indexOf(currentStrategy);
 
-  if (currentIndex === -1 || currentIndex >= STRATEGY_FALLBACK_ORDER.length - 1) {
+  if (
+    currentIndex === -1 ||
+    currentIndex >= STRATEGY_FALLBACK_ORDER.length - 1
+  ) {
     return null; // No simpler strategy available
   }
 
@@ -230,9 +257,13 @@ class AnalysisCircuitBreaker {
 
     if (this.state.failureCount >= this.failureThreshold) {
       this.state.isOpen = true;
-      logger.warn('Circuit Breaker', `Circuit opened after ${this.failureThreshold} failures`, {
-        failedStrategy: strategy,
-      });
+      logger.warn(
+        "Circuit Breaker",
+        `Circuit opened after ${this.failureThreshold} failures`,
+        {
+          failedStrategy: strategy,
+        },
+      );
     }
   }
 
@@ -241,9 +272,13 @@ class AnalysisCircuitBreaker {
    */
   recordSuccess(): void {
     if (this.state.failureCount > 0) {
-      logger.info('Circuit Breaker', 'Circuit reset after successful execution', {
-        previousFailures: this.state.failureCount,
-      });
+      logger.info(
+        "Circuit Breaker",
+        "Circuit reset after successful execution",
+        {
+          previousFailures: this.state.failureCount,
+        },
+      );
     }
 
     this.state = {
@@ -259,7 +294,7 @@ class AnalysisCircuitBreaker {
    * @param _strategy - Strategy to check (reserved for future per-strategy tracking)
    * @returns Whether the strategy should be attempted
    */
-   
+
   shouldAttempt(_strategy: AnalysisStrategy): boolean {
     // Check if enough time has passed to try again
     if (this.state.isOpen) {
@@ -267,7 +302,10 @@ class AnalysisCircuitBreaker {
 
       if (timeSinceFailure >= this.resetTimeoutMs) {
         // Half-open: allow one attempt
-        logger.info('Circuit Breaker', 'Attempting circuit reset after timeout');
+        logger.info(
+          "Circuit Breaker",
+          "Attempting circuit reset after timeout",
+        );
         return true;
       }
 
@@ -282,24 +320,32 @@ class AnalysisCircuitBreaker {
    * Get the recommended strategy based on circuit state.
    * Returns a simpler strategy if the preferred one has been failing.
    */
-  getRecommendedStrategy(preferredStrategy: AnalysisStrategy): AnalysisStrategy {
+  getRecommendedStrategy(
+    preferredStrategy: AnalysisStrategy,
+  ): AnalysisStrategy {
     if (!this.state.isOpen) {
       return preferredStrategy;
     }
 
     // If circuit is open, recommend a simpler strategy
-    if (this.state.failedStrategy === 'advanced') {
-      logger.info('Circuit Breaker', 'Recommending hybrid due to advanced failures');
-      return 'hybrid';
+    if (this.state.failedStrategy === "advanced") {
+      logger.info(
+        "Circuit Breaker",
+        "Recommending hybrid due to advanced failures",
+      );
+      return "hybrid";
     }
 
-    if (this.state.failedStrategy === 'hybrid') {
-      logger.info('Circuit Breaker', 'Recommending basic due to hybrid failures');
-      return 'basic';
+    if (this.state.failedStrategy === "hybrid") {
+      logger.info(
+        "Circuit Breaker",
+        "Recommending basic due to hybrid failures",
+      );
+      return "basic";
     }
 
     // If basic is failing, still try it but with low expectations
-    return 'basic';
+    return "basic";
   }
 
   /**
@@ -325,16 +371,16 @@ const circuitBreaker = new AnalysisCircuitBreaker();
  */
 function createEmptyResults(template: Template): AnalysisResults {
   return {
-    sections: template.sections.map(section => ({
+    sections: template.sections.map((section) => ({
       name: section.name,
-      content: '[Analysis failed - no content extracted]',
+      content: "[Analysis failed - no content extracted]",
       evidence: [],
     })),
     agendaItems: [],
     actionItems: [],
     decisions: [],
     quotes: [],
-    summary: 'Analysis could not be completed due to errors.',
+    summary: "Analysis could not be completed due to errors.",
   };
 }
 
@@ -343,7 +389,10 @@ function createEmptyResults(template: Template): AnalysisResults {
  * Takes the best available content from each attempt.
  */
 function mergePartialResults(
-  attempts: Array<{ strategy: AnalysisStrategy; results?: Partial<AnalysisResults> }>
+  attempts: Array<{
+    strategy: AnalysisStrategy;
+    results?: Partial<AnalysisResults>;
+  }>,
 ): Partial<AnalysisResults> {
   const merged: Partial<AnalysisResults> = {
     sections: [],
@@ -359,10 +408,11 @@ function mergePartialResults(
     // Merge sections (avoid duplicates by name)
     if (attempt.results.sections) {
       for (const section of attempt.results.sections) {
-        const existing = merged.sections?.find(s => s.name === section.name);
-        if (!existing || (existing.content.length < section.content.length)) {
+        const existing = merged.sections?.find((s) => s.name === section.name);
+        if (!existing || existing.content.length < section.content.length) {
           // Replace with longer/better content
-          merged.sections = merged.sections?.filter(s => s.name !== section.name) || [];
+          merged.sections =
+            merged.sections?.filter((s) => s.name !== section.name) || [];
           merged.sections.push(section);
         }
       }
@@ -370,7 +420,7 @@ function mergePartialResults(
 
     // Merge other arrays (simple concatenation, dedup by id where applicable)
     if (attempt.results.agendaItems) {
-      const existingIds = new Set(merged.agendaItems?.map(a => a.id) || []);
+      const existingIds = new Set(merged.agendaItems?.map((a) => a.id) || []);
       for (const item of attempt.results.agendaItems) {
         if (!existingIds.has(item.id)) {
           merged.agendaItems = merged.agendaItems || [];
@@ -381,7 +431,7 @@ function mergePartialResults(
     }
 
     if (attempt.results.decisions) {
-      const existingIds = new Set(merged.decisions?.map(d => d.id) || []);
+      const existingIds = new Set(merged.decisions?.map((d) => d.id) || []);
       for (const item of attempt.results.decisions) {
         if (!existingIds.has(item.id)) {
           merged.decisions = merged.decisions || [];
@@ -392,7 +442,7 @@ function mergePartialResults(
     }
 
     if (attempt.results.actionItems) {
-      const existingIds = new Set(merged.actionItems?.map(a => a.id) || []);
+      const existingIds = new Set(merged.actionItems?.map((a) => a.id) || []);
       for (const item of attempt.results.actionItems) {
         if (!existingIds.has(item.id)) {
           merged.actionItems = merged.actionItems || [];
@@ -404,7 +454,7 @@ function mergePartialResults(
 
     if (attempt.results.quotes) {
       // Quotes don't have IDs, dedup by text
-      const existingTexts = new Set(merged.quotes?.map(q => q.text) || []);
+      const existingTexts = new Set(merged.quotes?.map((q) => q.text) || []);
       for (const quote of attempt.results.quotes) {
         if (!existingTexts.has(quote.text)) {
           merged.quotes = merged.quotes || [];
@@ -437,49 +487,69 @@ async function executeStrategyWithRecovery(
   runEvaluation: boolean,
   progressCallback?: (current: number, total: number, message: string) => void,
   segments?: TranscriptSegment[],
-  supplementalMaterial?: string
-): Promise<BasicAnalysisResult | HybridAnalysisResult | AdvancedAnalysisResult> {
-  logger.info('Strategy Execution', `Executing ${strategy} strategy`, {
+  supplementalMaterial?: string,
+  annotations?: TranscriptAnnotation[],
+): Promise<
+  BasicAnalysisResult | HybridAnalysisResult | AdvancedAnalysisResult
+> {
+  logger.info("Strategy Execution", `Executing ${strategy} strategy`, {
     templateName: template.name,
     sectionCount: template.sections.length,
     runEvaluation,
     hasSupplementalMaterial: !!supplementalMaterial,
+    annotationCount: annotations?.length || 0,
   });
 
   try {
     switch (strategy) {
-      case 'basic':
-        return await executeBasicAnalysis(template, transcript, openaiClient, deployment, {
-          runEvaluation,
-          runEnrichment: segments && segments.length > 0,
-          supplementalMaterial,
-        } as BasicAnalysisConfig, segments);
+      case "basic":
+        return await executeBasicAnalysis(
+          template,
+          transcript,
+          openaiClient,
+          deployment,
+          {
+            runEvaluation,
+            runEnrichment: segments && segments.length > 0,
+            supplementalMaterial,
+            annotations,
+          } as BasicAnalysisConfig,
+          segments,
+        );
 
-      case 'hybrid':
+      case "hybrid":
         return await executeHybridAnalysis(
           template,
           transcript,
           openaiClient,
           deployment,
           progressCallback,
-          { runEvaluation, supplementalMaterial } as HybridAnalysisConfig
+          {
+            runEvaluation,
+            supplementalMaterial,
+            annotations,
+          } as HybridAnalysisConfig,
         );
 
-      case 'advanced':
+      case "advanced":
         return await executeAdvancedAnalysis(
           template,
           transcript,
           openaiClient,
           deployment,
           progressCallback,
-          { runEvaluation, supplementalMaterial } as AdvancedAnalysisConfig
+          {
+            runEvaluation,
+            supplementalMaterial,
+            annotations,
+          } as AdvancedAnalysisConfig,
         );
 
       default:
         throw new StrategyError(
           strategy,
           `Unknown strategy: ${strategy}`,
-          AnalysisErrorCode.STRATEGY_FAILED
+          AnalysisErrorCode.STRATEGY_FAILED,
         );
     }
   } catch (error) {
@@ -496,7 +566,7 @@ async function executeStrategyWithRecovery(
       strategy,
       wrappedError.message,
       wrappedError.code,
-      wrappedError.metadata
+      wrappedError.metadata,
     );
   }
 }
@@ -543,13 +613,13 @@ export async function executeAnalysis(
   transcript: string,
   openaiClient: OpenAI,
   deployment: string,
-  config: AnalysisConfig = {}
+  config: AnalysisConfig = {},
 ): Promise<AnalysisExecutionResult> {
   const startTime = Date.now();
 
   // Default configuration
   const {
-    strategy: strategyOption = 'auto',
+    strategy: strategyOption = "auto",
     runEvaluation = true,
     progressCallback,
     enableFallback = true,
@@ -557,6 +627,7 @@ export async function executeAnalysis(
     maxFallbackAttempts = 3,
     segments,
     supplementalMaterial,
+    annotations,
     reasoningEffort,
   } = config;
 
@@ -564,7 +635,10 @@ export async function executeAnalysis(
   // This affects buildAnalysisChatCompletionParams in all strategies
   setAnalysisReasoningEffort(reasoningEffort || null);
   if (reasoningEffort) {
-    logger.info('Analysis', `Using user-specified reasoning effort: ${reasoningEffort}`);
+    logger.info(
+      "Analysis",
+      `Using user-specified reasoning effort: ${reasoningEffort}`,
+    );
   }
 
   // Determine initial strategy to use
@@ -572,9 +646,12 @@ export async function executeAnalysis(
   let wasAutoSelected = false;
 
   // Compute effective max strategy from template config and content type
-  const effectiveMaxStrategy = getEffectiveMaxStrategy(template.maxStrategy, template.contentType);
+  const effectiveMaxStrategy = getEffectiveMaxStrategy(
+    template.maxStrategy,
+    template.contentType,
+  );
 
-  if (strategyOption === 'auto') {
+  if (strategyOption === "auto") {
     // Pass template's maxStrategy and contentType to recommendStrategy for auto-capping
     const recommendation = recommendStrategy(transcript, {
       maxStrategy: template.maxStrategy,
@@ -591,7 +668,7 @@ export async function executeAnalysis(
       strategy = capStrategy(strategy, effectiveMaxStrategy);
     }
 
-    logger.info('Analysis', `Auto-selected strategy: ${strategy}`, {
+    logger.info("Analysis", `Auto-selected strategy: ${strategy}`, {
       originalRecommendation: recommendation.strategy,
       reasoning: recommendation.reasoning,
       circuitBreakerTripped: circuitBreaker.isTripped(),
@@ -606,7 +683,10 @@ export async function executeAnalysis(
     if (effectiveMaxStrategy) {
       const cappedStrategy = capStrategy(strategy, effectiveMaxStrategy);
       if (cappedStrategy !== strategy) {
-        logger.warn('Analysis', `Strategy capped to ${effectiveMaxStrategy} (template: ${template.maxStrategy}, contentType: ${template.contentType}), using ${cappedStrategy} instead of ${strategy}`);
+        logger.warn(
+          "Analysis",
+          `Strategy capped to ${effectiveMaxStrategy} (template: ${template.maxStrategy}, contentType: ${template.contentType}), using ${cappedStrategy} instead of ${strategy}`,
+        );
         strategy = cappedStrategy;
       }
     }
@@ -615,19 +695,22 @@ export async function executeAnalysis(
     if (!circuitBreaker.shouldAttempt(strategy)) {
       const fallback = circuitBreaker.getRecommendedStrategy(strategy);
       if (fallback !== strategy) {
-        logger.warn('Analysis', `Circuit breaker active, using ${fallback} instead of ${strategy}`);
+        logger.warn(
+          "Analysis",
+          `Circuit breaker active, using ${fallback} instead of ${strategy}`,
+        );
         strategy = fallback;
       }
     }
 
-    logger.info('Analysis', `Using specified strategy: ${strategy}`);
+    logger.info("Analysis", `Using specified strategy: ${strategy}`);
   }
 
   // Get strategy metadata
   const strategyMetadata = getStrategyMetadata(strategy);
   const actualTokens = estimateTokens(transcript);
 
-  logger.info('Analysis', 'Starting analysis', {
+  logger.info("Analysis", "Starting analysis", {
     strategy,
     wasAutoSelected,
     templateName: template.name,
@@ -639,6 +722,7 @@ export async function executeAnalysis(
     estimatedApiCalls: strategyMetadata.apiCalls,
     hasSupplementalMaterial: !!supplementalMaterial,
     supplementalLength: supplementalMaterial?.length || 0,
+    annotationCount: annotations?.length || 0,
   });
 
   // Track attempts for potential partial results recovery
@@ -668,7 +752,8 @@ export async function executeAnalysis(
         runEvaluation,
         progressCallback,
         segments,
-        supplementalMaterial
+        supplementalMaterial,
+        annotations,
       );
 
       // Success! Record it and reset circuit breaker
@@ -678,7 +763,7 @@ export async function executeAnalysis(
       const durationMs = endTime - startTime;
       const durationSec = (durationMs / 1000).toFixed(1);
 
-      logger.info('Analysis', 'Analysis complete', {
+      logger.info("Analysis", "Analysis complete", {
         strategy: currentStrategy,
         durationMs,
         durationSec: `${durationSec}s`,
@@ -694,11 +779,12 @@ export async function executeAnalysis(
       });
 
       // Handle different property names: basic uses `promptUsed` (string), others use `promptsUsed` (string[])
-      const promptsUsed = 'promptsUsed' in result
-        ? result.promptsUsed
-        : 'promptUsed' in result
-          ? [result.promptUsed]
-          : [];
+      const promptsUsed =
+        "promptsUsed" in result
+          ? result.promptsUsed
+          : "promptUsed" in result
+            ? [result.promptUsed]
+            : [];
 
       return {
         strategy: currentStrategy,
@@ -718,7 +804,6 @@ export async function executeAnalysis(
         },
         warnings: warnings.length > 0 ? warnings : undefined,
       };
-
     } catch (error) {
       // Record the failure
       circuitBreaker.recordFailure(currentStrategy);
@@ -741,7 +826,7 @@ export async function executeAnalysis(
       });
 
       const classification = classifyError(error);
-      logger.warn('Analysis', `Strategy ${currentStrategy} failed`, {
+      logger.warn("Analysis", `Strategy ${currentStrategy} failed`, {
         errorCode: classification.code,
         isRetryable: classification.isRetryable,
         suggestedAction: classification.suggestedAction,
@@ -759,26 +844,28 @@ export async function executeAnalysis(
 
       if (!nextStrategy) {
         // No more fallbacks available
-        logger.error('Analysis', 'All strategies exhausted', {
+        logger.error("Analysis", "All strategies exhausted", {
           attemptsMade: attemptCount,
-          strategies: strategyAttempts.map(a => a.strategy),
+          strategies: strategyAttempts.map((a) => a.strategy),
         });
 
         // Try to return partial results if available
-        if (returnPartialResults && strategyAttempts.some(a => a.results)) {
+        if (returnPartialResults && strategyAttempts.some((a) => a.results)) {
           const merged = mergePartialResults(strategyAttempts);
           const sectionCount = merged.sections?.length || 0;
 
           if (sectionCount > 0) {
-            logger.info('Analysis', 'Returning merged partial results', {
+            logger.info("Analysis", "Returning merged partial results", {
               sectionCount,
               agendaItems: merged.agendaItems?.length || 0,
               decisions: merged.decisions?.length || 0,
               actionItems: merged.actionItems?.length || 0,
             });
 
-            warnings.push('Analysis partially completed due to errors');
-            warnings.push(`Successfully extracted ${sectionCount} of ${template.sections.length} sections`);
+            warnings.push("Analysis partially completed due to errors");
+            warnings.push(
+              `Successfully extracted ${sectionCount} of ${template.sections.length} sections`,
+            );
 
             // Create complete result from partial data
             const results: AnalysisResults = {
@@ -797,15 +884,17 @@ export async function executeAnalysis(
               metadata: {
                 estimatedDuration: strategyMetadata.speed,
                 apiCalls: strategyMetadata.apiCalls,
-                quality: 'partial',
+                quality: "partial",
                 actualTokens,
                 wasAutoSelected,
                 usedFallback: true,
                 originalStrategy: strategy,
                 isPartial: true,
                 failedSections: template.sections
-                  .filter(s => !merged.sections?.some(ms => ms.name === s.name))
-                  .map(s => s.name),
+                  .filter(
+                    (s) => !merged.sections?.some((ms) => ms.name === s.name),
+                  )
+                  .map((s) => s.name),
                 circuitBreakerTripped: circuitBreaker.isTripped(),
               },
               warnings,
@@ -815,8 +904,11 @@ export async function executeAnalysis(
 
         // No usable partial results - throw comprehensive error
         throw new AllStrategiesFailedError(
-          strategyAttempts.map(a => ({ strategy: a.strategy, error: a.error })),
-          mergePartialResults(strategyAttempts)
+          strategyAttempts.map((a) => ({
+            strategy: a.strategy,
+            error: a.error,
+          })),
+          mergePartialResults(strategyAttempts),
         );
       }
 
@@ -826,10 +918,12 @@ export async function executeAnalysis(
         usedFallback = true;
       }
 
-      warnings.push(`Strategy ${currentStrategy} failed, falling back to ${nextStrategy}`);
+      warnings.push(
+        `Strategy ${currentStrategy} failed, falling back to ${nextStrategy}`,
+      );
       currentStrategy = nextStrategy;
 
-      logger.info('Analysis', `Falling back to ${nextStrategy} strategy`, {
+      logger.info("Analysis", `Falling back to ${nextStrategy} strategy`, {
         previousStrategy: originalStrategy,
         attemptNumber: attemptCount + 1,
       });
@@ -837,19 +931,22 @@ export async function executeAnalysis(
   }
 
   // Should not reach here, but provide graceful fallback
-  logger.error('Analysis', 'Unexpected: exceeded max fallback attempts without result');
+  logger.error(
+    "Analysis",
+    "Unexpected: exceeded max fallback attempts without result",
+  );
 
   // Return empty results as last resort
-  warnings.push('Analysis failed after all retry attempts');
+  warnings.push("Analysis failed after all retry attempts");
 
   return {
-    strategy: 'basic',
+    strategy: "basic",
     results: createEmptyResults(template),
     promptsUsed: [],
     metadata: {
-      estimatedDuration: 'N/A',
-      apiCalls: 'N/A',
-      quality: 'failed',
+      estimatedDuration: "N/A",
+      apiCalls: "N/A",
+      quality: "failed",
       actualTokens,
       wasAutoSelected,
       usedFallback: true,
@@ -874,20 +971,22 @@ export function getStrategyRecommendation(transcript: string): {
   circuitBreakerActive: boolean;
 } {
   const recommendation = recommendStrategy(transcript);
-  const adjustedStrategy = circuitBreaker.getRecommendedStrategy(recommendation.strategy);
+  const adjustedStrategy = circuitBreaker.getRecommendedStrategy(
+    recommendation.strategy,
+  );
   const metadata = getStrategyMetadata(adjustedStrategy);
   const tokens = estimateTokens(transcript);
 
   const reasons = {
     basic:
       `Short meeting (${tokens.toLocaleString()} tokens). ` +
-      'Basic strategy provides quick analysis in 2-4 minutes.',
+      "Basic strategy provides quick analysis in 2-4 minutes.",
     hybrid:
       `Medium meeting (${tokens.toLocaleString()} tokens). ` +
-      'Hybrid strategy balances speed and quality with contextual batching.',
+      "Hybrid strategy balances speed and quality with contextual batching.",
     advanced:
       `Long/complex meeting (${tokens.toLocaleString()} tokens). ` +
-      'Advanced strategy provides highest quality with cascading analysis.',
+      "Advanced strategy provides highest quality with cascading analysis.",
   };
 
   let reason = reasons[adjustedStrategy];
@@ -910,7 +1009,7 @@ export function getStrategyRecommendation(transcript: string): {
  */
 export function resetCircuitBreaker(): void {
   circuitBreaker.recordSuccess();
-  logger.info('Circuit Breaker', 'Manually reset');
+  logger.info("Circuit Breaker", "Manually reset");
 }
 
 /**

@@ -36,7 +36,12 @@ export {
   updateTranscriptSummary,
 } from "./db/transcripts";
 
-export { saveTemplate, getTemplate, getAllTemplates, deleteTemplate } from "./db/templates";
+export {
+  saveTemplate,
+  getTemplate,
+  getAllTemplates,
+  deleteTemplate,
+} from "./db/templates";
 
 export {
   saveAnalysis,
@@ -92,5 +97,28 @@ export {
   calculateStorageUsage,
   getLargestTranscriptsBySize,
 } from "./db/storage";
+
+export {
+  saveAnnotation,
+  getAnnotation,
+  getAnnotationsByTranscript,
+  updateAnnotation,
+  deleteAnnotation,
+  deleteAnnotationsByTranscript,
+  countAnnotationsByTranscript,
+} from "./db/annotations";
+
+export {
+  toPersistedDocument,
+  saveSupplementalDocument,
+  saveSupplementalDocumentsBatch,
+  getSupplementalDocument,
+  getSupplementalDocumentsByTranscript,
+  deleteSupplementalDocument,
+  deleteSupplementalDocumentsByTranscript,
+  countSupplementalDocumentsByTranscript,
+  getTotalSupplementalTokens,
+  getFormattedSupplementalContent,
+} from "./db/supplemental-documents";
 
 export { getDatabase as default } from "./db/core";
