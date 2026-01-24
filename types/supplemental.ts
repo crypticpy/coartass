@@ -6,6 +6,8 @@
  * for analysis.
  */
 
+import type { VisinetReport } from "@/lib/visinet-parser";
+
 /**
  * Supported document types for supplemental materials.
  */
@@ -15,6 +17,18 @@ export type SupplementalDocumentType =
   | "pptx"
   | "txt"
   | "pasted";
+
+/**
+ * Document classification for different types of supplemental content.
+ * Used to apply appropriate parsing and formatting for analysis.
+ */
+export type SupplementalDocumentCategory =
+  | "visinet" // CAD/dispatch report from Visinet
+  | "sop" // Standard Operating Procedure
+  | "policy" // Department policy document
+  | "training" // Training material
+  | "report" // Incident report or after-action review
+  | "other"; // Uncategorized
 
 /**
  * Processing status for a supplemental document.
@@ -33,6 +47,9 @@ export interface SupplementalDocument {
 
   /** Document type */
   type: SupplementalDocumentType;
+
+  /** Document category for specialized parsing/formatting */
+  category?: SupplementalDocumentCategory;
 
   /** Extracted text content */
   text: string;
@@ -54,6 +71,12 @@ export interface SupplementalDocument {
 
   /** Timestamp when document was added */
   addedAt: Date;
+
+  /** Whether to include this document in analysis (default: true) */
+  includeInAnalysis?: boolean;
+
+  /** Parsed Visinet report data (only for category='visinet') */
+  visinetData?: VisinetReport;
 }
 
 /**
@@ -192,3 +215,92 @@ export const EMPTY_SUPPLEMENTAL_STATE: SupplementalState = {
   totalTokens: 0,
   isProcessing: false,
 };
+
+/**
+ * Detect document category based on filename and content.
+ * Returns 'other' if no specific category is detected.
+ */
+export function detectDocumentCategory(
+  filename: string,
+  text: string,
+): SupplementalDocumentCategory {
+  const lowerFilename = filename.toLowerCase();
+  const lowerText = text.toLowerCase();
+
+  // Check for Visinet report indicators
+  const visinetIndicators = [
+    "incident detail report",
+    "data source: data warehouse",
+    "resources assigned",
+    "personnel assigned",
+    "visinet",
+  ];
+  const visinetMatches = visinetIndicators.filter((ind) =>
+    lowerText.includes(ind),
+  ).length;
+  if (visinetMatches >= 2) {
+    return "visinet";
+  }
+
+  // Check for SOP indicators
+  if (
+    lowerFilename.includes("sop") ||
+    lowerText.includes("standard operating procedure") ||
+    lowerText.includes("operational guideline")
+  ) {
+    return "sop";
+  }
+
+  // Check for policy indicators
+  if (
+    lowerFilename.includes("policy") ||
+    lowerText.includes("department policy") ||
+    lowerText.includes("administrative directive")
+  ) {
+    return "policy";
+  }
+
+  // Check for training material indicators
+  if (
+    lowerFilename.includes("training") ||
+    lowerFilename.includes("curriculum") ||
+    lowerText.includes("learning objectives")
+  ) {
+    return "training";
+  }
+
+  // Check for report indicators
+  if (
+    lowerFilename.includes("report") ||
+    lowerFilename.includes("aar") ||
+    lowerText.includes("after action") ||
+    lowerText.includes("incident report")
+  ) {
+    return "report";
+  }
+
+  return "other";
+}
+
+/**
+ * Get human-readable category label.
+ */
+export function getCategoryLabel(
+  category: SupplementalDocumentCategory,
+): string {
+  switch (category) {
+    case "visinet":
+      return "CAD Report";
+    case "sop":
+      return "SOP";
+    case "policy":
+      return "Policy";
+    case "training":
+      return "Training";
+    case "report":
+      return "Report";
+    case "other":
+    default:
+      return "Document";
+  }
+}
