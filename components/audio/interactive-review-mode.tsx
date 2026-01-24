@@ -11,11 +11,17 @@
  * Design: Industrial/Command Center aesthetic with fire department colors
  */
 
-'use client';
+"use client";
 
-import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { useDisclosure } from '@mantine/hooks';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
+import { createPortal } from "react-dom";
+import { useDisclosure } from "@mantine/hooks";
 import {
   Play,
   Pause,
@@ -30,31 +36,27 @@ import {
   AlertTriangle,
   XCircle,
   FileSearch,
-} from 'lucide-react';
-import {
-  Text,
-  Box,
-  Tooltip,
-  Slider,
-  Badge,
-} from '@mantine/core';
-import { WaveformPlayer } from './waveform-player';
-import { AudioControlsModal } from './audio-controls-modal';
-import { ScorecardSelectorMenu } from './scorecard-selector-menu';
-import { ScorecardOverlayPanel } from './scorecard-overlay-panel';
-import { useAudioSync } from '@/hooks/use-audio-sync';
+  StickyNote,
+} from "lucide-react";
+import { Text, Box, Tooltip, Slider, Badge } from "@mantine/core";
+import { WaveformPlayer } from "./waveform-player";
+import { AudioControlsModal } from "./audio-controls-modal";
+import { ScorecardSelectorMenu } from "./scorecard-selector-menu";
+import { ScorecardOverlayPanel } from "./scorecard-overlay-panel";
+import { useAudioSync } from "@/hooks/use-audio-sync";
 import {
   mapEvidenceToSegments,
   getEvidenceForSegment,
   type EvidenceMarker,
-} from '@/lib/scorecard-evidence-utils';
-import type { TranscriptSegment } from '@/types/transcript';
-import type { PlaybackSpeed } from '@/types/audio';
+} from "@/lib/scorecard-evidence-utils";
+import type { TranscriptSegment } from "@/types/transcript";
+import type { TranscriptAnnotation } from "@/types/annotation";
+import type { PlaybackSpeed } from "@/types/audio";
 import type {
   RtassScorecard,
   RtassRubricTemplate,
   RtassScorecardCriterion,
-} from '@/types/rtass';
+} from "@/types/rtass";
 
 /**
  * Props for the InteractiveReviewMode component
@@ -76,6 +78,8 @@ interface InteractiveReviewModeProps {
   onClose?: () => void;
   /** Cache key for waveform peaks */
   cacheKey?: string;
+  /** Map of segment index to annotations at that segment */
+  annotationsBySegment?: Map<number, TranscriptAnnotation[]>;
 }
 
 /**
@@ -86,7 +90,7 @@ interface TimingBenchmark {
   title: string;
   targetSeconds: number;
   actualSeconds?: number;
-  status: 'met' | 'close' | 'missed' | 'pending';
+  status: "met" | "close" | "missed" | "pending";
   delta?: number;
 }
 
@@ -94,10 +98,10 @@ interface TimingBenchmark {
  * Speed button options for the simplified controls
  */
 const SPEED_OPTIONS: { value: PlaybackSpeed; label: string }[] = [
-  { value: 0.75, label: '0.75x' },
-  { value: 1, label: '1x' },
-  { value: 1.25, label: '1.25x' },
-  { value: 1.5, label: '1.5x' },
+  { value: 0.75, label: "0.75x" },
+  { value: 1, label: "1x" },
+  { value: 1.25, label: "1.25x" },
+  { value: 1.5, label: "1.5x" },
 ];
 
 /**
@@ -109,9 +113,9 @@ function formatIncidentClock(seconds: number): string {
   const secs = Math.floor(seconds % 60);
 
   if (hrs > 0) {
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -120,7 +124,7 @@ function formatIncidentClock(seconds: number): string {
 function formatSegmentTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -129,7 +133,7 @@ function formatSegmentTime(seconds: number): string {
 function extractTimingBenchmarks(
   rubric?: RtassRubricTemplate,
   scorecard?: RtassScorecard,
-  currentTime?: number
+  currentTime?: number,
 ): TimingBenchmark[] {
   if (!rubric) return [];
 
@@ -137,7 +141,7 @@ function extractTimingBenchmarks(
 
   for (const section of rubric.sections) {
     for (const criterion of section.criteria) {
-      if (criterion.type === 'timing' && criterion.timing?.targetSeconds) {
+      if (criterion.type === "timing" && criterion.timing?.targetSeconds) {
         // Find matching scorecard criterion for actual timing
         const scorecardCriterion = scorecard?.sections
           .flatMap((s) => s.criteria)
@@ -145,25 +149,28 @@ function extractTimingBenchmarks(
 
         const targetSeconds = criterion.timing.targetSeconds;
         let actualSeconds: number | undefined;
-        let status: TimingBenchmark['status'] = 'pending';
+        let status: TimingBenchmark["status"] = "pending";
         let delta: number | undefined;
 
-        if (scorecardCriterion?.observedEvents && scorecardCriterion.observedEvents.length > 0) {
+        if (
+          scorecardCriterion?.observedEvents &&
+          scorecardCriterion.observedEvents.length > 0
+        ) {
           // Use the first observed event as the actual time
           actualSeconds = scorecardCriterion.observedEvents[0].at;
           delta = actualSeconds - targetSeconds;
 
           if (delta <= 0) {
-            status = 'met';
+            status = "met";
           } else if (delta <= targetSeconds * 0.2) {
             // Within 20% of target
-            status = 'close';
+            status = "close";
           } else {
-            status = 'missed';
+            status = "missed";
           }
         } else if (currentTime !== undefined && currentTime > targetSeconds) {
           // Target time has passed without observation
-          status = 'missed';
+          status = "missed";
         }
 
         benchmarks.push({
@@ -184,32 +191,32 @@ function extractTimingBenchmarks(
 /**
  * Get status color for benchmark
  */
-function getBenchmarkColor(status: TimingBenchmark['status']): string {
+function getBenchmarkColor(status: TimingBenchmark["status"]): string {
   switch (status) {
-    case 'met':
-      return 'var(--review-green)';
-    case 'close':
-      return 'var(--review-amber)';
-    case 'missed':
-      return 'var(--review-red)';
-    case 'pending':
+    case "met":
+      return "var(--review-green)";
+    case "close":
+      return "var(--review-amber)";
+    case "missed":
+      return "var(--review-red)";
+    case "pending":
     default:
-      return 'var(--review-text-dim)';
+      return "var(--review-text-dim)";
   }
 }
 
 /**
  * Get status icon for benchmark
  */
-function getBenchmarkIcon(status: TimingBenchmark['status']) {
+function getBenchmarkIcon(status: TimingBenchmark["status"]) {
   switch (status) {
-    case 'met':
+    case "met":
       return <CheckCircle2 size={14} />;
-    case 'close':
+    case "close":
       return <AlertTriangle size={14} />;
-    case 'missed':
+    case "missed":
       return <XCircle size={14} />;
-    case 'pending':
+    case "pending":
     default:
       return <Target size={14} />;
   }
@@ -229,6 +236,7 @@ export function InteractiveReviewMode({
   duration,
   onClose,
   cacheKey,
+  annotationsBySegment,
 }: InteractiveReviewModeProps) {
   const transcriptRef = useRef<HTMLDivElement>(null);
   // Track if component is mounted (SSR-safe portal pattern)
@@ -236,18 +244,22 @@ export function InteractiveReviewMode({
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const userScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showBenchmarks, setShowBenchmarks] = useState(true);
-  const [audioControlsOpened, { open: openAudioControls, close: closeAudioControls }] =
-    useDisclosure(false);
+  const [
+    audioControlsOpened,
+    { open: openAudioControls, close: closeAudioControls },
+  ] = useDisclosure(false);
 
   // Selected scorecard state - default to the initial scorecard if provided
   const [selectedScorecardId, setSelectedScorecardId] = useState<string | null>(
-    initialScorecard?.id ?? null
+    initialScorecard?.id ?? null,
   );
 
   // Get the currently selected scorecard
   const selectedScorecard = useMemo(() => {
     if (!selectedScorecardId) return undefined;
-    return scorecards.find((sc) => sc.id === selectedScorecardId) ?? initialScorecard;
+    return (
+      scorecards.find((sc) => sc.id === selectedScorecardId) ?? initialScorecard
+    );
   }, [selectedScorecardId, scorecards, initialScorecard]);
 
   // Build evidence map for selected scorecard
@@ -257,11 +269,13 @@ export function InteractiveReviewMode({
   }, [selectedScorecard, segments]);
 
   // Use audio sync hook
-  const { syncState, controls, registerWaveSurfer, enhancement } = useAudioSync({
-    segments,
-    initialSpeed: 1,
-    initialVolume: 0.8,
-  });
+  const { syncState, controls, registerWaveSurfer, enhancement } = useAudioSync(
+    {
+      segments,
+      initialSpeed: 1,
+      initialVolume: 0.8,
+    },
+  );
 
   const {
     currentTime,
@@ -273,14 +287,14 @@ export function InteractiveReviewMode({
     activeSegmentIndex,
   } = syncState;
 
-  const isPlaying = state === 'playing';
-  const isLoading = state === 'loading';
+  const isPlaying = state === "playing";
+  const isLoading = state === "loading";
   const effectiveDuration = duration || syncDuration;
 
   // Extract timing benchmarks (for timeline markers)
   const benchmarks = useMemo(
     () => extractTimingBenchmarks(rubric, selectedScorecard, currentTime),
-    [rubric, selectedScorecard, currentTime]
+    [rubric, selectedScorecard, currentTime],
   );
 
   // Handler for criterion clicks - jump to evidence timestamp
@@ -292,25 +306,28 @@ export function InteractiveReviewMode({
         if (evidence?.start !== undefined) {
           controls.seek(evidence.start);
         }
-      } else if (criterion.observedEvents && criterion.observedEvents.length > 0) {
+      } else if (
+        criterion.observedEvents &&
+        criterion.observedEvents.length > 0
+      ) {
         // For timing criteria, jump to the observed event
         controls.seek(criterion.observedEvents[0].at);
       }
     },
-    [controls]
+    [controls],
   );
 
   // Get verdict color for evidence markers
   const getVerdictColor = useCallback((verdict: string): string => {
     switch (verdict) {
-      case 'met':
-        return 'var(--review-green)';
-      case 'missed':
-        return 'var(--review-red)';
-      case 'partial':
-        return 'var(--review-amber)';
+      case "met":
+        return "var(--review-green)";
+      case "missed":
+        return "var(--review-red)";
+      case "partial":
+        return "var(--review-amber)";
       default:
-        return 'var(--review-text-dim)';
+        return "var(--review-text-dim)";
     }
   }, []);
 
@@ -319,9 +336,9 @@ export function InteractiveReviewMode({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR-safe portal mounting pattern
     setIsMounted(true);
     // Lock body scroll when mounted
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     };
   }, []);
 
@@ -329,12 +346,12 @@ export function InteractiveReviewMode({
   useEffect(() => {
     if (!isUserScrolling && activeSegmentIndex >= 0 && transcriptRef.current) {
       const activeElement = transcriptRef.current.querySelector(
-        `[data-segment-index="${activeSegmentIndex}"]`
+        `[data-segment-index="${activeSegmentIndex}"]`,
       );
       if (activeElement) {
         activeElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
+          behavior: "smooth",
+          block: "center",
         });
       }
     }
@@ -363,16 +380,19 @@ export function InteractiveReviewMode({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
       switch (e.key) {
-        case ' ':
+        case " ":
           e.preventDefault();
           controls.togglePlayPause();
           break;
-        case 'ArrowLeft':
+        case "ArrowLeft":
           e.preventDefault();
           if (e.shiftKey) {
             // Skip to previous segment
@@ -383,7 +403,7 @@ export function InteractiveReviewMode({
             controls.skipBackward(5);
           }
           break;
-        case 'ArrowRight':
+        case "ArrowRight":
           e.preventDefault();
           if (e.shiftKey) {
             // Skip to next segment
@@ -394,19 +414,19 @@ export function InteractiveReviewMode({
             controls.skipForward(5);
           }
           break;
-        case 'Escape':
+        case "Escape":
           e.preventDefault();
           onClose?.();
           break;
-        case 'm':
+        case "m":
           e.preventDefault();
           controls.toggleMute();
           break;
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [controls, activeSegmentIndex, segments.length, onClose]);
 
   // Skip to next/previous transmission
@@ -427,11 +447,12 @@ export function InteractiveReviewMode({
     (index: number) => {
       controls.jumpToSegment(index);
     },
-    [controls]
+    [controls],
   );
 
   // Calculate timeline progress
-  const progressPercent = effectiveDuration > 0 ? (currentTime / effectiveDuration) * 100 : 0;
+  const progressPercent =
+    effectiveDuration > 0 ? (currentTime / effectiveDuration) * 100 : 0;
 
   if (!isMounted) return null;
 
@@ -451,6 +472,8 @@ export function InteractiveReviewMode({
           --review-red: #ef4444;
           --review-green: #22c55e;
           --review-blue: #3b82f6;
+          --review-teal: #14b8a6;
+          --review-teal-dim: rgba(20, 184, 166, 0.15);
 
           position: fixed;
           inset: 0;
@@ -460,11 +483,7 @@ export function InteractiveReviewMode({
           display: flex;
           flex-direction: column;
           font-family:
-            'JetBrains Mono',
-            'SF Mono',
-            'Fira Code',
-            ui-monospace,
-            monospace;
+            "JetBrains Mono", "SF Mono", "Fira Code", ui-monospace, monospace;
           overflow: hidden;
         }
 
@@ -586,7 +605,7 @@ export function InteractiveReviewMode({
           line-height: 1.6;
           color: var(--review-text-dim);
           font-family:
-            'Inter',
+            "Inter",
             -apple-system,
             BlinkMacSystemFont,
             sans-serif;
@@ -850,11 +869,13 @@ export function InteractiveReviewMode({
       <div className="review-header">
         <div>
           <div className="incident-clock-label">Incident Time</div>
-          <div className="incident-clock">{formatIncidentClock(currentTime)}</div>
+          <div className="incident-clock">
+            {formatIncidentClock(currentTime)}
+          </div>
         </div>
 
         {/* Scorecard Selector + Overall Score */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {scorecards.length > 0 && (
             <ScorecardSelectorMenu
               scorecards={scorecards}
@@ -866,26 +887,26 @@ export function InteractiveReviewMode({
           {selectedScorecard && (
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 12,
-                padding: '8px 16px',
-                backgroundColor: 'var(--review-surface-elevated)',
+                padding: "8px 16px",
+                backgroundColor: "var(--review-surface-elevated)",
                 borderRadius: 8,
-                border: '1px solid var(--review-border)',
+                border: "1px solid var(--review-border)",
               }}
             >
               <span
                 style={{
-                  fontSize: 'clamp(24px, 4vw, 36px)',
+                  fontSize: "clamp(24px, 4vw, 36px)",
                   fontWeight: 700,
-                  fontVariantNumeric: 'tabular-nums',
+                  fontVariantNumeric: "tabular-nums",
                   color:
-                    selectedScorecard.overall.status === 'pass'
-                      ? 'var(--review-green)'
-                      : selectedScorecard.overall.status === 'needs_improvement'
-                        ? 'var(--review-amber)'
-                        : 'var(--review-red)',
+                    selectedScorecard.overall.status === "pass"
+                      ? "var(--review-green)"
+                      : selectedScorecard.overall.status === "needs_improvement"
+                        ? "var(--review-amber)"
+                        : "var(--review-red)",
                   lineHeight: 1,
                 }}
               >
@@ -894,30 +915,36 @@ export function InteractiveReviewMode({
               <Badge
                 size="sm"
                 color={
-                  selectedScorecard.overall.status === 'pass'
-                    ? 'green'
-                    : selectedScorecard.overall.status === 'needs_improvement'
-                      ? 'yellow'
-                      : 'red'
+                  selectedScorecard.overall.status === "pass"
+                    ? "green"
+                    : selectedScorecard.overall.status === "needs_improvement"
+                      ? "yellow"
+                      : "red"
                 }
                 variant="light"
               >
-                {selectedScorecard.overall.status === 'pass'
-                  ? 'Pass'
-                  : selectedScorecard.overall.status === 'needs_improvement'
-                    ? 'Needs Work'
-                    : 'Fail'}
+                {selectedScorecard.overall.status === "pass"
+                  ? "Pass"
+                  : selectedScorecard.overall.status === "needs_improvement"
+                    ? "Needs Work"
+                    : "Fail"}
               </Badge>
             </div>
           )}
         </div>
 
-        <div style={{ textAlign: 'right' }}>
+        <div style={{ textAlign: "right" }}>
           <div className="incident-clock-label">Total Duration</div>
-          <div className="duration-display">{formatIncidentClock(effectiveDuration)}</div>
+          <div className="duration-display">
+            {formatIncidentClock(effectiveDuration)}
+          </div>
         </div>
 
-        <button className="close-button" onClick={onClose} aria-label="Close review mode">
+        <button
+          className="close-button"
+          onClick={onClose}
+          aria-label="Close review mode"
+        >
           <X size={20} />
         </button>
       </div>
@@ -926,29 +953,70 @@ export function InteractiveReviewMode({
       <div className="review-main">
         {/* Transcript Panel */}
         <div className="transcript-panel">
-          <div className="transcript-scroll" ref={transcriptRef} onScroll={handleScroll}>
+          <div
+            className="transcript-scroll"
+            ref={transcriptRef}
+            onScroll={handleScroll}
+          >
             {segments.map((segment, index) => {
               const segmentEvidence = getEvidenceForSegment(index, evidenceMap);
               const hasEvidence = segmentEvidence.length > 0;
+              const annotations = annotationsBySegment?.get(index) ?? [];
+              const hasAnnotations = annotations.length > 0;
 
               return (
                 <div
                   key={segment.index}
                   data-segment-index={index}
-                  className={`transcript-segment ${index === activeSegmentIndex ? 'active' : ''} ${hasEvidence ? 'has-evidence' : ''}`}
+                  className={`transcript-segment ${index === activeSegmentIndex ? "active" : ""} ${hasEvidence ? "has-evidence" : ""}`}
                   onClick={() => handleSegmentClick(index)}
                   style={{
-                    borderRightWidth: hasEvidence ? '4px' : undefined,
-                    borderRightStyle: hasEvidence ? 'solid' : undefined,
-                    borderRightColor: hasEvidence ? getVerdictColor(segmentEvidence[0].verdict) : undefined,
+                    borderRightWidth: hasEvidence ? "4px" : undefined,
+                    borderRightStyle: hasEvidence ? "solid" : undefined,
+                    borderRightColor: hasEvidence
+                      ? getVerdictColor(segmentEvidence[0].verdict)
+                      : undefined,
+                    backgroundColor: hasAnnotations
+                      ? "var(--review-teal-dim)"
+                      : undefined,
+                    borderLeftColor: hasAnnotations
+                      ? "var(--review-teal)"
+                      : undefined,
                   }}
                 >
                   <div className="segment-meta">
-                    <span className="segment-timestamp">[{formatSegmentTime(segment.start)}]</span>
-                    {segment.speaker && <span className="segment-speaker">{segment.speaker}</span>}
+                    <span className="segment-timestamp">
+                      [{formatSegmentTime(segment.start)}]
+                    </span>
+                    {segment.speaker && (
+                      <span className="segment-speaker">{segment.speaker}</span>
+                    )}
+                    {/* Annotation indicator */}
+                    {hasAnnotations && (
+                      <Tooltip
+                        label={`${annotations.length} annotation${annotations.length > 1 ? "s" : ""}`}
+                        withArrow
+                      >
+                        <Badge
+                          size="xs"
+                          variant="light"
+                          color="teal"
+                          style={{ cursor: "pointer" }}
+                          leftSection={<StickyNote size={10} />}
+                        >
+                          {annotations.length}
+                        </Badge>
+                      </Tooltip>
+                    )}
                     {/* Evidence markers */}
                     {hasEvidence && (
-                      <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 4,
+                          marginLeft: hasAnnotations ? 0 : "auto",
+                        }}
+                      >
                         {segmentEvidence.slice(0, 3).map((marker, idx) => (
                           <Tooltip
                             key={`${marker.criterionId}-${idx}`}
@@ -959,21 +1027,21 @@ export function InteractiveReviewMode({
                               size="xs"
                               variant="light"
                               color={
-                                marker.verdict === 'met'
-                                  ? 'green'
-                                  : marker.verdict === 'missed'
-                                    ? 'red'
-                                    : marker.verdict === 'partial'
-                                      ? 'yellow'
-                                      : 'gray'
+                                marker.verdict === "met"
+                                  ? "green"
+                                  : marker.verdict === "missed"
+                                    ? "red"
+                                    : marker.verdict === "partial"
+                                      ? "yellow"
+                                      : "gray"
                               }
-                              style={{ cursor: 'pointer' }}
+                              style={{ cursor: "pointer" }}
                             >
-                              {marker.verdict === 'met' ? (
+                              {marker.verdict === "met" ? (
                                 <CheckCircle2 size={10} />
-                              ) : marker.verdict === 'missed' ? (
+                              ) : marker.verdict === "missed" ? (
                                 <XCircle size={10} />
-                              ) : marker.verdict === 'partial' ? (
+                              ) : marker.verdict === "partial" ? (
                                 <AlertTriangle size={10} />
                               ) : (
                                 <FileSearch size={10} />
@@ -990,6 +1058,47 @@ export function InteractiveReviewMode({
                     )}
                   </div>
                   <div className="segment-text">{segment.text}</div>
+                  {/* Annotation text display */}
+                  {hasAnnotations && (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        paddingTop: 12,
+                        borderTop: "1px dashed var(--review-teal)",
+                      }}
+                    >
+                      {annotations.map((ann) => (
+                        <div
+                          key={ann.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: 8,
+                            marginBottom: 6,
+                          }}
+                        >
+                          <StickyNote
+                            size={14}
+                            style={{
+                              color: "var(--review-teal)",
+                              flexShrink: 0,
+                              marginTop: 2,
+                            }}
+                          />
+                          <Text
+                            size="sm"
+                            style={{
+                              color: "var(--review-teal)",
+                              fontStyle: "italic",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            {ann.text}
+                          </Text>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1018,7 +1127,9 @@ export function InteractiveReviewMode({
                 <div key={benchmark.id} className="benchmark-item">
                   <div className="benchmark-header">
                     <span className="benchmark-title">{benchmark.title}</span>
-                    <span style={{ color: getBenchmarkColor(benchmark.status) }}>
+                    <span
+                      style={{ color: getBenchmarkColor(benchmark.status) }}
+                    >
                       {getBenchmarkIcon(benchmark.status)}
                     </span>
                   </div>
@@ -1039,15 +1150,15 @@ export function InteractiveReviewMode({
                             className="benchmark-delta"
                             style={{
                               backgroundColor:
-                                benchmark.status === 'met'
-                                  ? 'rgba(34, 197, 94, 0.2)'
-                                  : benchmark.status === 'close'
-                                    ? 'rgba(245, 158, 11, 0.2)'
-                                    : 'rgba(239, 68, 68, 0.2)',
+                                benchmark.status === "met"
+                                  ? "rgba(34, 197, 94, 0.2)"
+                                  : benchmark.status === "close"
+                                    ? "rgba(245, 158, 11, 0.2)"
+                                    : "rgba(239, 68, 68, 0.2)",
                               color: getBenchmarkColor(benchmark.status),
                             }}
                           >
-                            {benchmark.delta > 0 ? '+' : ''}
+                            {benchmark.delta > 0 ? "+" : ""}
                             {benchmark.delta}s
                           </span>
                         )}
@@ -1065,14 +1176,18 @@ export function InteractiveReviewMode({
       <div className="review-controls">
         {/* Timeline */}
         <div className="timeline-bar">
-          <div className="timeline-progress" style={{ width: `${progressPercent}%` }} />
+          <div
+            className="timeline-progress"
+            style={{ width: `${progressPercent}%` }}
+          />
         </div>
 
         {/* Benchmark markers on timeline */}
         {showBenchmarks && benchmarks.length > 0 && effectiveDuration > 0 && (
           <div className="timeline-markers">
             {benchmarks.map((benchmark) => {
-              const position = (benchmark.targetSeconds / effectiveDuration) * 100;
+              const position =
+                (benchmark.targetSeconds / effectiveDuration) * 100;
               if (position > 100) return null;
               return (
                 <div
@@ -1083,9 +1198,14 @@ export function InteractiveReviewMode({
                 >
                   <div
                     className="marker-line"
-                    style={{ backgroundColor: getBenchmarkColor(benchmark.status) }}
+                    style={{
+                      backgroundColor: getBenchmarkColor(benchmark.status),
+                    }}
                   />
-                  <span className="marker-label" style={{ color: getBenchmarkColor(benchmark.status) }}>
+                  <span
+                    className="marker-label"
+                    style={{ color: getBenchmarkColor(benchmark.status) }}
+                  >
                     {formatSegmentTime(benchmark.targetSeconds)}
                   </span>
                 </div>
@@ -1108,14 +1228,21 @@ export function InteractiveReviewMode({
           </Tooltip>
 
           {/* Play/Pause */}
-          <Tooltip label={isPlaying ? 'Pause (Space)' : 'Play (Space)'} withArrow>
+          <Tooltip
+            label={isPlaying ? "Pause (Space)" : "Play (Space)"}
+            withArrow
+          >
             <button
               className="play-button"
               onClick={controls.togglePlayPause}
               disabled={isLoading}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
+              aria-label={isPlaying ? "Pause" : "Play"}
             >
-              {isPlaying ? <Pause size={32} /> : <Play size={32} style={{ marginLeft: 4 }} />}
+              {isPlaying ? (
+                <Pause size={32} />
+              ) : (
+                <Play size={32} style={{ marginLeft: 4 }} />
+              )}
             </button>
           </Tooltip>
 
@@ -1136,7 +1263,7 @@ export function InteractiveReviewMode({
             {SPEED_OPTIONS.map((option) => (
               <button
                 key={option.value}
-                className={`speed-button ${speed === option.value ? 'active' : ''}`}
+                className={`speed-button ${speed === option.value ? "active" : ""}`}
                 onClick={() => controls.setSpeed(option.value)}
               >
                 {option.label}
@@ -1146,12 +1273,12 @@ export function InteractiveReviewMode({
 
           {/* Volume control */}
           <div className="volume-control">
-            <Tooltip label={muted ? 'Unmute (M)' : 'Mute (M)'} withArrow>
+            <Tooltip label={muted ? "Unmute (M)" : "Mute (M)"} withArrow>
               <button
                 className="nav-button"
                 onClick={controls.toggleMute}
                 style={{ width: 44, height: 44 }}
-                aria-label={muted ? 'Unmute' : 'Mute'}
+                aria-label={muted ? "Unmute" : "Mute"}
               >
                 {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
@@ -1164,9 +1291,12 @@ export function InteractiveReviewMode({
               style={{ width: 100 }}
               aria-label={`Volume: ${Math.round(volume * 100)}%`}
               styles={{
-                track: { backgroundColor: 'var(--review-border)' },
-                bar: { backgroundColor: 'var(--review-amber)' },
-                thumb: { backgroundColor: 'var(--review-amber)', borderColor: 'var(--review-amber)' },
+                track: { backgroundColor: "var(--review-border)" },
+                bar: { backgroundColor: "var(--review-amber)" },
+                thumb: {
+                  backgroundColor: "var(--review-amber)",
+                  borderColor: "var(--review-amber)",
+                },
               }}
             />
           </div>
@@ -1183,13 +1313,13 @@ export function InteractiveReviewMode({
                   enhancement.highPassEnabled ||
                   enhancement.compressorEnabled ||
                   enhancement.volumeBoost > 1
-                    ? 'var(--review-amber)'
+                    ? "var(--review-amber)"
                     : undefined,
                 color:
                   enhancement.highPassEnabled ||
                   enhancement.compressorEnabled ||
                   enhancement.volumeBoost > 1
-                    ? 'var(--review-bg)'
+                    ? "var(--review-bg)"
                     : undefined,
               }}
               aria-label="Audio settings"
@@ -1201,7 +1331,9 @@ export function InteractiveReviewMode({
           {/* Toggle scorecard/benchmarks panel (if available) */}
           {(selectedScorecard || benchmarks.length > 0) && (
             <Tooltip
-              label={showBenchmarks ? 'Hide scorecard panel' : 'Show scorecard panel'}
+              label={
+                showBenchmarks ? "Hide scorecard panel" : "Show scorecard panel"
+              }
               withArrow
             >
               <button
@@ -1210,10 +1342,16 @@ export function InteractiveReviewMode({
                 style={{
                   width: 44,
                   height: 44,
-                  backgroundColor: showBenchmarks ? 'var(--review-amber)' : undefined,
-                  color: showBenchmarks ? 'var(--review-bg)' : undefined,
+                  backgroundColor: showBenchmarks
+                    ? "var(--review-amber)"
+                    : undefined,
+                  color: showBenchmarks ? "var(--review-bg)" : undefined,
                 }}
-                aria-label={showBenchmarks ? 'Hide scorecard panel' : 'Show scorecard panel'}
+                aria-label={
+                  showBenchmarks
+                    ? "Hide scorecard panel"
+                    : "Show scorecard panel"
+                }
               >
                 <Target size={18} />
               </button>
@@ -1226,15 +1364,22 @@ export function InteractiveReviewMode({
           size="xs"
           ta="center"
           mt="md"
-          style={{ color: 'var(--review-text-dim)', fontFamily: 'inherit' }}
+          style={{ color: "var(--review-text-dim)", fontFamily: "inherit" }}
         >
-          Space: play/pause | Arrows: skip 5s | Shift+Arrows: prev/next transmission | M: mute | Esc:
-          close
+          Space: play/pause | Arrows: skip 5s | Shift+Arrows: prev/next
+          transmission | M: mute | Esc: close
         </Text>
       </div>
 
       {/* Hidden waveform player for audio sync */}
-      <Box style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', height: 0 }}>
+      <Box
+        style={{
+          position: "absolute",
+          opacity: 0,
+          pointerEvents: "none",
+          height: 0,
+        }}
+      >
         <WaveformPlayer
           audioUrl={audioUrl}
           cacheKey={cacheKey}

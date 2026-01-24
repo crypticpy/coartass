@@ -71,9 +71,9 @@ import type { AudioPlayerControls } from "@/types/audio";
 import type { Template } from "@/types/template";
 import type { RtassScorecard, RtassRubricTemplate } from "@/types/rtass";
 import { useAnnotations } from "@/hooks/use-annotations";
-import { SupplementalDocsManager } from "@/components/analysis/supplemental-docs-manager";
+import { useSupplementalDocsPersistent } from "@/hooks/use-supplemental-docs-persistent";
+import { SupplementalDocsModal } from "@/components/analysis/supplemental-docs-modal";
 import { AnnotationEditor } from "@/components/transcript/annotation-editor";
-import { AnnotationPanel } from "@/components/transcript/annotation-panel";
 
 // Dynamic import for RadioPlaybackInterface (contains heavy WaveSurfer dependency)
 const RadioPlaybackInterface = dynamic(
@@ -163,6 +163,7 @@ export default function TranscriptDetailPage() {
   const [showReviewMode, setShowReviewMode] = useState(false);
   const [annotationEditorOpen, setAnnotationEditorOpen] = useState(false);
   const [annotationEditorTimestamp, setAnnotationEditorTimestamp] = useState(0);
+  const [docsModalOpen, setDocsModalOpen] = useState(false);
   const hasSetInitialTab = useRef(false);
 
   const audioControlsRef = useRef<AudioPlayerControls | null>(null);
@@ -227,13 +228,14 @@ export default function TranscriptDetailPage() {
 
   // Annotations management
   const {
-    annotations,
-    annotationsBySegment: _annotationsBySegment, // TODO: Pass to TranscriptViewer for segment display
+    annotationsBySegment,
     addAnnotation,
-    updateAnnotation,
-    deleteAnnotation,
     isProcessing: annotationsProcessing,
   } = useAnnotations(transcriptId, transcript?.segments ?? []);
+
+  // Supplemental documents
+  const { documents: supplementalDocs } =
+    useSupplementalDocsPersistent(transcriptId);
 
   function normalizeRubricDates(
     rubric: RtassRubricTemplate,
@@ -644,7 +646,7 @@ export default function TranscriptDetailPage() {
 
   // Handle segment change from audio player
   const handleSegmentChange = useCallback(
-    (segment: TranscriptSegment | null, index: number) => {
+    (_segment: TranscriptSegment | null, index: number) => {
       setActiveSegmentIndex(index);
     },
     [],
@@ -700,8 +702,7 @@ export default function TranscriptDetailPage() {
   );
 
   // Handle adding annotation from segment list
-  // TODO: Pass to TranscriptViewer once it supports annotation props
-  const _handleAddAnnotation = useCallback(
+  const handleAddAnnotationFromSegment = useCallback(
     (_segmentIndex: number, timestamp: number) => {
       setAnnotationEditorTimestamp(timestamp);
       setAnnotationEditorOpen(true);
@@ -716,14 +717,6 @@ export default function TranscriptDetailPage() {
       setAnnotationEditorOpen(false);
     },
     [addAnnotation, annotationEditorTimestamp],
-  );
-
-  // Handle annotation click (seek to timestamp)
-  const handleAnnotationClick = useCallback(
-    (annotation: { timestamp: number }) => {
-      handleTimestampClick(annotation.timestamp);
-    },
-    [handleTimestampClick],
   );
 
   // Handle scroll for sticky tabs shadow (throttled for performance)
@@ -838,6 +831,10 @@ export default function TranscriptDetailPage() {
             onExport={handleExport}
             onDelete={handleDelete}
             onAnalyze={handleAnalyze}
+            onDocuments={() => setDocsModalOpen(true)}
+            documentCount={
+              supplementalDocs.filter((d) => d.status === "ready").length
+            }
             isDeleting={isDeleting}
             hasExistingAnalyses={analyses.length > 0}
           />
@@ -862,39 +859,10 @@ export default function TranscriptDetailPage() {
                 onSegmentChange={handleSegmentChange}
                 onControlsReady={handleControlsReady}
                 onReviewModeClick={() => setShowReviewMode(true)}
+                annotationsBySegment={annotationsBySegment}
               />
             </Paper>
           )}
-
-          {/* Supplemental Documents & Annotations Sidebar */}
-          <Group align="flex-start" gap="md">
-            {/* Supplemental Documents Manager */}
-            <Box style={{ flex: "1 1 300px", maxWidth: 400 }}>
-              <SupplementalDocsManager
-                transcriptId={transcriptId}
-                collapsible
-                defaultCollapsed
-              />
-            </Box>
-
-            {/* Annotations Panel */}
-            <Box style={{ flex: "1 1 300px", maxWidth: 400 }}>
-              <Paper withBorder p="sm" radius="sm">
-                <AnnotationPanel
-                  annotations={annotations}
-                  onAnnotationClick={handleAnnotationClick}
-                  onUpdate={updateAnnotation}
-                  onDelete={deleteAnnotation}
-                  onAddNew={() => {
-                    setAnnotationEditorTimestamp(0);
-                    setAnnotationEditorOpen(true);
-                  }}
-                  isLoading={annotationsProcessing}
-                  maxHeight={300}
-                />
-              </Paper>
-            </Box>
-          </Group>
 
           {/* Sticky Tabs Section */}
           <div
@@ -977,6 +945,9 @@ export default function TranscriptDetailPage() {
                     onSegmentClick={
                       audioUrl ? handleTranscriptSegmentClick : undefined
                     }
+                    annotationsBySegment={annotationsBySegment}
+                    onAddAnnotation={handleAddAnnotationFromSegment}
+                    showAnnotations
                   />
                 </Paper>
               </Tabs.Panel>
@@ -1099,6 +1070,7 @@ export default function TranscriptDetailPage() {
           duration={transcript.metadata.duration}
           cacheKey={transcript.id}
           onClose={() => setShowReviewMode(false)}
+          annotationsBySegment={annotationsBySegment}
         />
       )}
 
@@ -1109,6 +1081,13 @@ export default function TranscriptDetailPage() {
         timestamp={annotationEditorTimestamp}
         onSave={handleSaveAnnotation}
         isLoading={annotationsProcessing}
+      />
+
+      {/* Supplemental Documents Modal */}
+      <SupplementalDocsModal
+        opened={docsModalOpen}
+        onClose={() => setDocsModalOpen(false)}
+        transcriptId={transcriptId}
       />
     </div>
   );

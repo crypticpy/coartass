@@ -23,11 +23,10 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Plus } from "lucide-react";
+import { Plus, StickyNote } from "lucide-react";
 import { formatTimestamp, highlightText } from "@/lib/transcript-utils";
 import type { TranscriptSegment } from "@/types/transcript";
 import type { TranscriptAnnotation } from "@/types/annotation";
-import { AnnotationIndicator } from "./annotation-badge";
 
 // Fixed notification ID to prevent stacking when rapidly clicking segments
 const SEEK_NOTIFICATION_ID = "segment-seek";
@@ -152,11 +151,13 @@ const SegmentItem = memo(
           border: isActive
             ? "1px solid var(--mantine-color-default-border)"
             : hasAnnotations
-              ? "1px solid var(--mantine-color-cyan-3)"
+              ? "1px solid var(--mantine-color-teal-4)"
               : "1px solid transparent",
           backgroundColor: isActive
             ? "var(--mantine-color-default-hover)"
-            : "var(--mantine-color-default)",
+            : hasAnnotations
+              ? "var(--mantine-color-teal-0)"
+              : "var(--mantine-color-default)",
           cursor: onClick ? "pointer" : "default",
           transition: "all 150ms ease",
           minHeight: 60,
@@ -182,14 +183,10 @@ const SegmentItem = memo(
           />
         )}
 
-        {/* Timestamp and Annotation Controls */}
+        {/* Timestamp */}
         <Box
           style={{
             flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 4,
             paddingTop: 2,
           }}
         >
@@ -207,34 +204,6 @@ const SegmentItem = memo(
           >
             {timestamp}
           </Text>
-
-          {/* Annotation indicator and Add Note button */}
-          {showAnnotations && (
-            <Group gap={4} wrap="nowrap">
-              {hasAnnotations && (
-                <AnnotationIndicator
-                  annotations={annotations}
-                  onClick={onAnnotationClick}
-                />
-              )}
-              {(isHovered || isActive) && onAddAnnotation && (
-                <Tooltip label="Add note">
-                  <ActionIcon
-                    size="xs"
-                    variant="subtle"
-                    color="cyan"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAddAnnotation();
-                    }}
-                    aria-label="Add annotation"
-                  >
-                    <Plus size={12} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </Group>
-          )}
         </Box>
 
         {/* Text Content */}
@@ -264,7 +233,69 @@ const SegmentItem = memo(
               {segment.speaker}
             </Badge>
           )}
+
+          {/* Annotation text displayed inline */}
+          {hasAnnotations && (
+            <Box
+              mt="xs"
+              pt="xs"
+              style={{
+                borderTop: "1px dashed var(--mantine-color-teal-3)",
+              }}
+            >
+              {annotations.map((ann) => (
+                <Group
+                  key={ann.id}
+                  gap="xs"
+                  wrap="nowrap"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAnnotationClick?.();
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <StickyNote size={12} color="var(--mantine-color-teal-6)" />
+                  <Text
+                    size="xs"
+                    c="teal.7"
+                    style={{
+                      fontStyle: "italic",
+                      flex: 1,
+                    }}
+                  >
+                    {ann.text}
+                  </Text>
+                </Group>
+              ))}
+            </Box>
+          )}
         </Box>
+
+        {/* Add Note button on the right */}
+        {showAnnotations && (isHovered || isActive) && onAddAnnotation && (
+          <Box
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <Tooltip label="Add note" position="left">
+              <ActionIcon
+                size="md"
+                variant="light"
+                color="teal"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddAnnotation();
+                }}
+                aria-label="Add annotation"
+              >
+                <Plus size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Box>
+        )}
       </Box>
     );
   },
