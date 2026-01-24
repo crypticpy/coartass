@@ -38,6 +38,7 @@
     "pdfjs-dist": "^5.4.530",
     "react": "^18",
     "react-dom": "^18",
+    "unpdf": "^1.4.0",
     "uuid": "^13.0.0",
     "wavesurfer.js": "^7.11.1",
     "zod": "^4.1.13"
