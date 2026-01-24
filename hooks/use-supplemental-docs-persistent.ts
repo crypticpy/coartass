@@ -25,11 +25,15 @@ import {
 } from "@/lib/db";
 import { parseDocument, validateFile } from "@/lib/document-parser";
 import { estimateTokens } from "@/lib/token-utils";
-import { getDocumentTypeFromExtension } from "@/types/supplemental";
+import {
+  getDocumentTypeFromExtension,
+  detectDocumentCategory,
+} from "@/types/supplemental";
 import type {
   SupplementalDocument,
   PersistedSupplementalDocument,
 } from "@/types/supplemental";
+import { isVisinetReport, parseVisinetReport } from "@/lib/visinet-parser";
 import { v4 as uuidv4 } from "uuid";
 
 /**
@@ -74,6 +78,15 @@ export interface UseSupplementalDocsPersistentReturn {
 
   /** Clear error */
   clearError: () => void;
+
+  /** Toggle whether a document is included in analysis */
+  toggleIncludeInAnalysis: (id: string) => Promise<void>;
+
+  /** Update a specific document */
+  updateDocument: (
+    id: string,
+    updates: Partial<PersistedSupplementalDocument>,
+  ) => Promise<void>;
 }
 
 /**
@@ -181,18 +194,48 @@ export function useSupplementalDocsPersistent(
           // Parse file
           try {
             const result = await parseDocument(file);
-            return {
+
+            // Detect document category
+            const category = detectDocumentCategory(file.name, result.text);
+
+            // Build base document
+            const doc: PersistedSupplementalDocument = {
               id,
               transcriptId,
               filename: file.name,
               type: docType || "txt",
+              category,
               text: result.text,
               tokenCount: result.tokenCount,
               status: "ready" as const,
               warnings: result.warnings,
               fileSize: file.size,
               addedAt: new Date(),
-            } satisfies PersistedSupplementalDocument;
+              includeInAnalysis: true,
+            };
+
+            // If it's a Visinet report, parse structured data
+            if (category === "visinet" && isVisinetReport(result.text)) {
+              try {
+                const visinetData = parseVisinetReport(result.text);
+                doc.visinetData = visinetData;
+                // Add any parse warnings
+                if (visinetData.parseWarnings.length > 0) {
+                  doc.warnings = [
+                    ...(doc.warnings || []),
+                    ...visinetData.parseWarnings,
+                  ];
+                }
+              } catch (_visinetError) {
+                // Non-fatal: we still have the raw text
+                doc.warnings = [
+                  ...(doc.warnings || []),
+                  "Could not parse Visinet structured data",
+                ];
+              }
+            }
+
+            return doc;
           } catch (parseError) {
             return {
               id,
@@ -339,6 +382,64 @@ export function useSupplementalDocsPersistent(
     setError(null);
   }, []);
 
+  /**
+   * Toggle whether a document is included in analysis.
+   */
+  const toggleIncludeInAnalysis = useCallback(
+    async (id: string) => {
+      const doc = documents?.find((d) => d.id === id);
+      if (!doc) return;
+
+      setIsProcessing(true);
+      setError(null);
+
+      try {
+        const updatedDoc: PersistedSupplementalDocument = {
+          ...doc,
+          includeInAnalysis: !(doc.includeInAnalysis !== false),
+        };
+        await saveSupplementalDocument(updatedDoc);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to update document";
+        setError(message);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [documents],
+  );
+
+  /**
+   * Update a specific document with partial changes.
+   */
+  const updateDocument = useCallback(
+    async (id: string, updates: Partial<PersistedSupplementalDocument>) => {
+      const doc = documents?.find((d) => d.id === id);
+      if (!doc) return;
+
+      setIsProcessing(true);
+      setError(null);
+
+      try {
+        const updatedDoc: PersistedSupplementalDocument = {
+          ...doc,
+          ...updates,
+          id, // Ensure ID is not overwritten
+          transcriptId: doc.transcriptId, // Ensure transcriptId is not overwritten
+        };
+        await saveSupplementalDocument(updatedDoc);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to update document";
+        setError(message);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [documents],
+  );
+
   return {
     documents: documents ?? [],
     isLoading,
@@ -353,5 +454,7 @@ export function useSupplementalDocsPersistent(
     getFormattedContent,
     hasContent,
     clearError,
+    toggleIncludeInAnalysis,
+    updateDocument,
   };
 }

@@ -11,6 +11,8 @@ import type {
   SupplementalDocument,
   PersistedSupplementalDocument,
 } from "@/types/supplemental";
+import { getCategoryLabel } from "@/types/supplemental";
+import { formatVisinetForAnalysis } from "@/lib/visinet-parser";
 
 /**
  * Convert a SupplementalDocument to a PersistedSupplementalDocument.
@@ -218,6 +220,9 @@ export async function getTotalSupplementalTokens(
  * Format all supplemental documents as a single string for analysis inclusion.
  * Each document is prefixed with its filename as a header.
  *
+ * Respects the includeInAnalysis flag and formats Visinet documents specially
+ * to provide structured dispatch data.
+ *
  * @param transcriptId - The parent transcript ID
  * @returns Formatted string combining all document content, or undefined if none
  * @throws {DatabaseError} If retrieval fails
@@ -231,15 +236,32 @@ export async function getFormattedSupplementalContent(
     return undefined;
   }
 
-  // Filter to only ready documents with content
-  const readyDocs = docs.filter(
-    (doc) => doc.status === "ready" && doc.text.trim(),
+  // Filter to only ready documents that are included in analysis and have content
+  const includedDocs = docs.filter(
+    (doc) =>
+      doc.status === "ready" &&
+      doc.text.trim() &&
+      doc.includeInAnalysis !== false,
   );
 
-  if (readyDocs.length === 0) {
+  if (includedDocs.length === 0) {
     return undefined;
   }
 
-  const parts = readyDocs.map((doc) => `### ${doc.filename}\n\n${doc.text}`);
+  // Format each document based on its category
+  const parts = includedDocs.map((doc) => {
+    const categoryLabel = doc.category
+      ? getCategoryLabel(doc.category)
+      : "Document";
+
+    // For Visinet reports with parsed data, use the formatted summary
+    if (doc.category === "visinet" && doc.visinetData) {
+      return formatVisinetForAnalysis(doc.visinetData);
+    }
+
+    // For other documents, use the filename as header with raw text
+    return `### ${doc.filename} (${categoryLabel})\n\n${doc.text}`;
+  });
+
   return parts.join("\n\n---\n\n");
 }
