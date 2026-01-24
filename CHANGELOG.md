@@ -5,6 +5,30 @@ All notable changes to Austin RTASS will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-01-23
+
+### Added
+
+- **Visinet CAD Report Parser**: Comprehensive parser for extracting structured data from Visinet dispatch reports including incident info, location with coordinates, unit response times, personnel assignments, and CAD narrative.
+
+- **Server-Side PDF Parsing**: New `/api/parse-pdf` endpoint using unpdf library for reliable PDF text extraction in serverless environments. Eliminates browser-side pdfjs-dist worker issues.
+
+- **Supplemental Document Categories**: Auto-detection of document types (Visinet, SOP, policy, training, report) with color-coded badges and category labels.
+
+- **Include/Exclude Controls**: Toggle individual documents for inclusion in analysis prompts, allowing selective context injection.
+
+- **Supplemental Documents Modal**: Full-featured document management UI with drag-and-drop upload, category display, token counts, and Visinet summary visualization.
+
+- **Visinet Summary Display**: Rich visualization of parsed Visinet data showing incident details, location, response timeline, and units assigned.
+
+### Changed
+
+- **Document Parser**: Simplified PDF parsing to use server-side API instead of browser-side pdfjs-dist.
+
+- **Supplemental Docs Persistence**: Enhanced with Visinet detection, category storage, and include/exclude flag support.
+
+- **Analysis Context**: Supplemental documents now formatted specially for Visinet reports with structured data extraction.
+
 ## [0.14.1] - 2026-01-20
 
 ### Fixed
@@ -117,6 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date       | Highlights                                               |
 | ------- | ---------- | -------------------------------------------------------- |
+| 0.15.0  | 2026-01-23 | Visinet parser, PDF API, supplemental docs modal         |
 | 0.14.1  | 2026-01-20 | Deployment security fix, skip link fix, PDF improvements |
 | 0.14.0  | 2026-01-02 | Interactive review mode, scorecard overlay               |
 | 0.13.0  | 2026-01-01 | Scorecard PDF export, rubric builder UI                  |
