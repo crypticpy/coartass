@@ -8,14 +8,14 @@
  * - Combined content for API submission
  */
 
-'use client';
+"use client";
 
-import { useState, useCallback, useMemo } from 'react';
-import { parseDocument, validateFile } from '@/lib/document-parser';
-import { estimateTokens } from '@/lib/token-utils';
-import type { SupplementalDocument } from '@/types/supplemental';
-import { SUPPLEMENTAL_LIMITS } from '@/types/supplemental';
-import { getDocumentTypeFromExtension } from '@/types/supplemental';
+import { useState, useCallback, useMemo } from "react";
+import { parseDocument, validateFile } from "@/lib/document-parser";
+import { estimateTokens } from "@/lib/token-utils";
+import type { SupplementalDocument } from "@/types/supplemental";
+import { SUPPLEMENTAL_LIMITS } from "@/types/supplemental";
+import { getDocumentTypeFromExtension } from "@/types/supplemental";
 
 /**
  * Return type for the useSupplementalUpload hook.
@@ -58,7 +58,7 @@ export interface UseSupplementalUploadReturn {
  * Generate a unique ID for documents.
  */
 function generateId(): string {
-  return `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `doc-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 /**
@@ -87,7 +87,7 @@ function generateId(): string {
 export function useSupplementalUpload(): UseSupplementalUploadReturn {
   const [isEnabled, setIsEnabled] = useState(false);
   const [documents, setDocuments] = useState<SupplementalDocument[]>([]);
-  const [pastedText, setPastedTextState] = useState('');
+  const [pastedText, setPastedTextState] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Calculate pasted text tokens
@@ -98,7 +98,7 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
   // Calculate total tokens from all sources
   const totalTokens = useMemo(() => {
     const documentTokens = documents
-      .filter((doc) => doc.status === 'ready')
+      .filter((doc) => doc.status === "ready")
       .reduce((sum, doc) => sum + doc.tokenCount, 0);
     return documentTokens + pastedTextTokens;
   }, [documents, pastedTextTokens]);
@@ -106,7 +106,7 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
   // Check if there's any content
   const hasContent = useMemo(() => {
     return (
-      documents.some((doc) => doc.status === 'ready' && doc.text.trim()) ||
+      documents.some((doc) => doc.status === "ready" && doc.text.trim()) ||
       pastedText.trim().length > 0
     );
   }, [documents, pastedText]);
@@ -114,10 +114,13 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
   /**
    * Add one or more files for parsing.
    * Files are validated and parsed asynchronously.
+   * Auto-enables supplemental upload when files are added.
    */
   const addFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
 
+    // Auto-enable when files are added - user intent is clear
+    setIsEnabled(true);
     setIsProcessing(true);
 
     // Process files in parallel
@@ -129,10 +132,10 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
       const initialDoc: SupplementalDocument = {
         id,
         filename: file.name,
-        type: docType || 'txt',
-        text: '',
+        type: docType || "txt",
+        text: "",
         tokenCount: 0,
-        status: 'parsing',
+        status: "parsing",
         fileSize: file.size,
         addedAt: new Date(),
       };
@@ -148,11 +151,11 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
             doc.id === id
               ? {
                   ...doc,
-                  status: 'error' as const,
+                  status: "error" as const,
                   error: validationError,
                 }
-              : doc
-          )
+              : doc,
+          ),
         );
         return;
       }
@@ -168,11 +171,11 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
                   ...doc,
                   text: result.text,
                   tokenCount: result.tokenCount,
-                  status: 'ready' as const,
+                  status: "ready" as const,
                   warnings: result.warnings,
                 }
-              : doc
-          )
+              : doc,
+          ),
         );
       } catch (error) {
         setDocuments((prev) =>
@@ -180,11 +183,14 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
             doc.id === id
               ? {
                   ...doc,
-                  status: 'error' as const,
-                  error: error instanceof Error ? error.message : 'Failed to parse document',
+                  status: "error" as const,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to parse document",
                 }
-              : doc
-          )
+              : doc,
+          ),
         );
       }
     });
@@ -212,7 +218,7 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
    */
   const clear = useCallback(() => {
     setDocuments([]);
-    setPastedTextState('');
+    setPastedTextState("");
   }, []);
 
   /**
@@ -233,7 +239,9 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
     const parts: string[] = [];
 
     // Add document content
-    const readyDocs = documents.filter((doc) => doc.status === 'ready' && doc.text.trim());
+    const readyDocs = documents.filter(
+      (doc) => doc.status === "ready" && doc.text.trim(),
+    );
     for (const doc of readyDocs) {
       parts.push(`### ${doc.filename}\n\n${doc.text}`);
     }
@@ -247,7 +255,7 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
       return undefined;
     }
 
-    return parts.join('\n\n---\n\n');
+    return parts.join("\n\n---\n\n");
   }, [isEnabled, documents, pastedText]);
 
   return {
@@ -283,18 +291,18 @@ export function useSupplementalUpload(): UseSupplementalUploadReturn {
 export function getTokenWarningLevel(
   supplementalTokens: number,
   transcriptTokens: number,
-  contextLimit: number
-): 'none' | 'warning' | 'critical' {
+  contextLimit: number,
+): "none" | "warning" | "critical" {
   const totalTokens = supplementalTokens + transcriptTokens;
   const usagePercent = (totalTokens / contextLimit) * 100;
 
   if (usagePercent >= 95) {
-    return 'critical';
+    return "critical";
   }
   if (usagePercent >= SUPPLEMENTAL_LIMITS.WARNING_THRESHOLD_PERCENT) {
-    return 'warning';
+    return "warning";
   }
-  return 'none';
+  return "none";
 }
 
 /**

@@ -5,6 +5,28 @@ All notable changes to Austin RTASS will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-01-23
+
+### Added
+
+- **Scorecard Supplemental Docs Integration**: RTASS scorecard generation now includes supplemental documents from the document manager, providing richer context for rubric-based evaluations.
+
+### Fixed
+
+- **Analysis Error Messages**: Fixed empty `{}` error messages from OpenAI SDK by properly extracting nested error structures.
+
+- **Supplemental Docs in Analysis**: Fixed supplemental documents from the document manager not being included in analysis. Both persistent docs (from document manager) and session uploads are now properly combined.
+
+- **Token Display**: Analysis page now shows breakdown of transcript tokens, supplemental tokens, and total tokens before running analysis.
+
+- **Output Token Limits**: Increased GPT-5 output token limit from 8192 to 16384 to prevent truncated responses on complex analyses.
+
+- **Timestamp Format**: Fixed analysis outputting timestamp ranges like `[207-228]` instead of single integers. Prompts now explicitly require single timestamps for proper evidence linking.
+
+### Changed
+
+- **Template Supplemental Support**: Added `supportsSupplementalMaterial: true` flag to AFD Post-Incident Review and Radio Quick Review templates to enable supplemental document injection.
+
 ## [0.15.0] - 2026-01-23
 
 ### Added

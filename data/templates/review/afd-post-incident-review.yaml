@@ -6,6 +6,7 @@ icon: ClipboardCheck
 category: review
 contentType: radio-traffic
 maxStrategy: hybrid
+supportsSupplementalMaterial: true
 outputs:
   - summary
   - benchmarks

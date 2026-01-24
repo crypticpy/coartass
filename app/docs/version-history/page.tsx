@@ -131,6 +131,94 @@ function VersionCard({ entry }: { entry: VersionEntry }) {
 
 const versionHistory: VersionEntry[] = [
   {
+    version: "0.15.1",
+    date: "2026-01-23",
+    title: "Supplemental Docs & Analysis Fixes",
+    highlights:
+      "Fixed supplemental document integration for both analysis and scorecards, improved error handling and token limits.",
+    changes: [
+      {
+        type: "feature",
+        description: "Scorecard Supplemental Docs Integration",
+        details: [
+          "RTASS scorecard generation now includes supplemental documents",
+          "Documents from document manager passed to rubric evaluation",
+          "Provides richer context for evidence-based scoring",
+        ],
+      },
+      {
+        type: "fix",
+        description: "Supplemental Docs in Analysis",
+        details: [
+          "Fixed persistent docs from document manager not included in analysis",
+          "Both persistent docs and session uploads now properly combined",
+          "Token display shows transcript + supplemental breakdown",
+        ],
+      },
+      {
+        type: "fix",
+        description: "Analysis Error Handling",
+        details: [
+          "Fixed empty {} error messages from OpenAI SDK",
+          "Properly extracts nested error structures for clear messages",
+          "Increased GPT-5 output token limit from 8192 to 16384",
+        ],
+      },
+      {
+        type: "fix",
+        description: "Timestamp Format in Analysis",
+        details: [
+          "Fixed analysis outputting timestamp ranges like [207-228]",
+          "Prompts now require single integers for proper evidence linking",
+        ],
+      },
+      {
+        type: "improvement",
+        description: "Template Supplemental Support",
+        details: [
+          "Added supportsSupplementalMaterial flag to AFD templates",
+          "Post-Incident Review and Radio Quick Review now support docs",
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.15.0",
+    date: "2026-01-23",
+    title: "Visinet CAD Report Parser & Supplemental Documents",
+    highlights:
+      "Comprehensive Visinet parser with server-side PDF processing and document management UI.",
+    changes: [
+      {
+        type: "feature",
+        description: "Visinet CAD Report Parser",
+        details: [
+          "Extracts structured data from Visinet dispatch reports",
+          "Parses incident info, location, unit response times, personnel",
+          "Auto-detection of document types with color-coded badges",
+        ],
+      },
+      {
+        type: "feature",
+        description: "Server-Side PDF Parsing",
+        details: [
+          "New /api/parse-pdf endpoint using unpdf library",
+          "Reliable PDF extraction in serverless environments",
+          "Eliminates browser-side pdfjs-dist worker issues",
+        ],
+      },
+      {
+        type: "feature",
+        description: "Supplemental Documents Modal",
+        details: [
+          "Full-featured document management with drag-and-drop",
+          "Category display, token counts, include/exclude toggles",
+          "Visinet summary visualization with parsed data",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.14.1",
     date: "2026-01-20",
     title: "Deployment Security & Accessibility Fixes",

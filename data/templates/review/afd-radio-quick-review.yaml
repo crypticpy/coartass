@@ -6,6 +6,7 @@ icon: Radio
 category: review
 contentType: radio-traffic
 maxStrategy: basic
+supportsSupplementalMaterial: true
 outputs:
   - summary
   - benchmarks

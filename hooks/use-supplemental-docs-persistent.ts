@@ -139,11 +139,13 @@ export function useSupplementalDocsPersistent(
 
   const isLoading = documents === undefined;
 
-  // Calculate total tokens from ready documents
+  // Calculate total tokens from ready documents that are included in analysis
   const totalTokens = useMemo(() => {
     if (!documents) return 0;
     return documents
-      .filter((doc) => doc.status === "ready")
+      .filter(
+        (doc) => doc.status === "ready" && doc.includeInAnalysis !== false,
+      )
       .reduce((sum, doc) => sum + doc.tokenCount, 0);
   }, [documents]);
 

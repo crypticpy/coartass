@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
     const estimatedTokens = estimateTokens(transcript.text);
     const deploymentInfo = getDeploymentInfo(estimatedTokens);
 
-    log.debug("Processing analysis request", {
+    log.info("Processing analysis request", {
       transcriptId,
       templateId,
       templateName: template.name,
@@ -242,10 +242,19 @@ export async function POST(request: NextRequest) {
       effectiveOutputs: effectiveTemplate.outputs,
       requestedStrategy: strategy || "auto",
       runEvaluation: runEvaluation !== false,
-      hasSupplementalMaterial: !!supplementalMaterial,
-      supplementalLength: supplementalMaterial?.length || 0,
-      annotationCount: annotations?.length || 0,
     });
+
+    // Log supplemental material status prominently
+    if (supplementalMaterial) {
+      const supplementalTokens = estimateTokens(supplementalMaterial);
+      log.info("Supplemental material included in analysis", {
+        length: supplementalMaterial.length,
+        estimatedTokens: supplementalTokens,
+        annotationCount: annotations?.length || 0,
+      });
+    } else {
+      log.info("No supplemental material provided for analysis");
+    }
 
     // Validate environment configuration and get model/client
     let deployment: string;
@@ -312,9 +321,35 @@ export async function POST(request: NextRequest) {
         },
       );
     } catch (error) {
-      log.error("Analysis execution failed", {
-        message: error instanceof Error ? error.message : String(error),
-      });
+      // Extract error message from various error structures
+      // OpenAI SDK errors may have nested error.error.message
+      const extractErrorMessage = (err: unknown): string => {
+        if (err instanceof Error) {
+          // Check for OpenAI API error structure (error.error.message)
+          const apiError = err as Error & { error?: { message?: string } };
+          if (apiError.error?.message) {
+            return apiError.error.message;
+          }
+          if (err.message) {
+            return err.message;
+          }
+        }
+        if (err && typeof err === "object") {
+          const obj = err as Record<string, unknown>;
+          // Handle plain objects with error or message properties
+          if (typeof obj.error === "string") return obj.error;
+          if (typeof obj.message === "string") return obj.message;
+          if (obj.error && typeof obj.error === "object") {
+            const nested = obj.error as Record<string, unknown>;
+            if (typeof nested.message === "string") return nested.message;
+          }
+        }
+        const str = String(err);
+        return str === "[object Object]" ? "Unknown analysis error" : str;
+      };
+
+      const errorMsg = extractErrorMessage(error);
+      log.error("Analysis execution failed", { message: errorMsg });
 
       // Build error details - only include stack trace in development
       const errorDetails: Record<string, unknown> = {
@@ -326,7 +361,7 @@ export async function POST(request: NextRequest) {
       }
 
       return errorResponse(
-        error instanceof Error ? error.message : "Analysis execution failed",
+        errorMsg || "Analysis execution failed",
         500,
         errorDetails,
       );

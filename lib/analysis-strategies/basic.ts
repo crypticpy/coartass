@@ -41,6 +41,7 @@ import {
   TIMESTAMP_INSTRUCTION,
   buildAnnotationsPromptSection,
 } from "./shared";
+import { estimateTokens } from "@/lib/token-utils";
 import { executeEvaluationPass } from "./evaluator";
 import { getCitationsClient, getCitationsDeployment } from "../openai";
 import {
@@ -667,10 +668,23 @@ export async function executeBasicAnalysis(
     throw new Error(validation.errors.join("; "));
   }
 
+  // Log token breakdown for debugging
+  const transcriptTokens = estimateTokens(transcript);
+  const promptTokens = estimateTokens(prompt);
+  const supplementalTokens = supplementalMaterial
+    ? estimateTokens(supplementalMaterial)
+    : 0;
+
   console.log("[Basic Analysis] Making single API call", {
     deployment,
     templateSections: template.sections.length,
     outputs: template.outputs,
+    tokenBreakdown: {
+      transcript: transcriptTokens,
+      supplemental: supplementalTokens,
+      promptOverhead: promptTokens - transcriptTokens - supplementalTokens,
+      totalInput: promptTokens,
+    },
   });
 
   const response = await retryWithBackoff(
@@ -716,9 +730,18 @@ export async function executeBasicAnalysis(
 
       // Handle token limit exceeded - fail fast with actionable error
       if (finishReason === "length") {
+        const inputTokens = res.usage?.prompt_tokens ?? 0;
+        const outputTokens = res.usage?.completion_tokens ?? 0;
+        console.error("[Basic Analysis] Response truncated", {
+          inputTokens,
+          outputTokens,
+          totalTokens: res.usage?.total_tokens,
+          contentLength: content?.length ?? 0,
+        });
         throw new Error(
-          "Response truncated due to token limit. " +
-            "The transcript may be too long for Basic strategy. Consider using shorter content.",
+          `Response truncated due to token limit (input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}). ` +
+            "The combined transcript and supplemental documents may be too large. " +
+            "Try removing some supplemental documents or using a shorter transcript.",
         );
       }
 

@@ -148,6 +148,8 @@ You MUST extract accurate timestamps for ALL action items, decisions, and quotes
 - NEVER use timestamp: 0 unless the content is actually at [0:00]
 - If the exact line doesn't have a marker, use the NEAREST PRECEDING marker
 - Every extracted item MUST have a non-zero timestamp (unless truly at [0:00])
+- Output timestamps as SINGLE integers (e.g., 207), NEVER as ranges (e.g., NOT [207-228] or 207–228)
+- When referencing a time span in prose, use the START timestamp only
 `;
 
 /**
@@ -183,9 +185,11 @@ export function getDefaultMaxOutputTokens(deployment: string): number {
 
   // GPT-5 / reasoning-style deployments: allow large outputs.
   if (name.includes("gpt-5") || name.includes("o1") || name.includes("o3")) {
-    // Default: cap to 8k to reduce latency and avoid gateway timeouts in ACA.
+    // Increased to 16k to handle complex templates with multiple sections,
+    // benchmarks, radio reports, and safety events. The 8k limit was causing
+    // JSON truncation on detailed analyses.
     // Can be overridden via ANALYSIS_MAX_OUTPUT_TOKENS / AZURE_OPENAI_MAX_OUTPUT_TOKENS.
-    return 8192;
+    return 16384;
   }
 
   // GPT-4.1 / "gpt-41" extended-context deployments: allow medium-large outputs.

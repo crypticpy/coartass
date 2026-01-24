@@ -6,13 +6,13 @@
  * and provides export functionality.
  */
 
-'use client';
+"use client";
 
-import React, { useState, useCallback, useMemo } from 'react';
-import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { useDisclosure } from '@mantine/hooks';
+import React, { useState, useCallback, useMemo } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useLiveQuery } from "dexie-react-hooks";
+import { useDisclosure } from "@mantine/hooks";
 import {
   ArrowLeft,
   Loader2,
@@ -26,7 +26,7 @@ import {
   Info,
   RefreshCw,
   Search,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Container,
   Stack,
@@ -47,30 +47,39 @@ import {
   SimpleGrid,
   Paper,
   TextInput,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { useAnalysis } from '@/hooks/use-analysis';
-import { useSupplementalUpload } from '@/hooks/use-supplemental-upload';
-import { getTranscript, getAllTemplates, getAnalysisByTranscript } from '@/lib/db';
-import { estimateTokens, getDeploymentInfo, formatTokenCount } from '@/lib/token-utils';
+} from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { useAnalysis } from "@/hooks/use-analysis";
+import { useSupplementalUpload } from "@/hooks/use-supplemental-upload";
+import { useSupplementalDocsPersistent } from "@/hooks/use-supplemental-docs-persistent";
+import {
+  getTranscript,
+  getAllTemplates,
+  getAnalysisByTranscript,
+} from "@/lib/db";
+import {
+  estimateTokens,
+  getDeploymentInfo,
+  formatTokenCount,
+} from "@/lib/token-utils";
 import {
   getUserCategorySettings,
   getEffectiveCategory,
   type UserCategorySettings,
-} from '@/lib/user-categories';
-import { AnalysisViewer } from '@/components/analysis/analysis-viewer';
-import { TemplateDetail } from '@/components/templates/template-detail';
-import { StrategySelector } from '@/components/analysis/strategy-selector';
-import { EvaluationDisplay } from '@/components/analysis/evaluation-display';
-import { StrategyBadge } from '@/components/analysis/strategy-badge';
-import { AnalysisExportMenu } from '@/components/analysis/analysis-export-menu';
-import { ExportOptionsModal } from '@/components/analysis/export-options-modal';
-import { AnalysisProgressCard } from '@/components/analysis/analysis-progress-card';
-import { SupplementalUpload } from '@/components/analysis/supplemental-upload';
-import type { Transcript } from '@/types/transcript';
-import type { Template } from '@/types/template';
-import type { Analysis } from '@/types/analysis';
-import type { AnalysisStrategy } from '@/lib/analysis-strategy';
+} from "@/lib/user-categories";
+import { AnalysisViewer } from "@/components/analysis/analysis-viewer";
+import { TemplateDetail } from "@/components/templates/template-detail";
+import { StrategySelector } from "@/components/analysis/strategy-selector";
+import { EvaluationDisplay } from "@/components/analysis/evaluation-display";
+import { StrategyBadge } from "@/components/analysis/strategy-badge";
+import { AnalysisExportMenu } from "@/components/analysis/analysis-export-menu";
+import { ExportOptionsModal } from "@/components/analysis/export-options-modal";
+import { AnalysisProgressCard } from "@/components/analysis/analysis-progress-card";
+import { SupplementalUpload } from "@/components/analysis/supplemental-upload";
+import type { Transcript } from "@/types/transcript";
+import type { Template } from "@/types/template";
+import type { Analysis } from "@/types/analysis";
+import type { AnalysisStrategy } from "@/lib/analysis-strategy";
 
 /**
  * Compact Template Card Component (Phase 2)
@@ -89,26 +98,41 @@ function CompactTemplateCard({
       p="sm"
       withBorder
       style={{
-        cursor: 'pointer',
-        borderColor: selected ? 'var(--aph-blue)' : undefined,
+        cursor: "pointer",
+        borderColor: selected ? "var(--aph-blue)" : undefined,
         borderWidth: selected ? 2 : 1,
         minHeight: 80,
-        transition: 'all 150ms ease',
-        boxShadow: selected ? '0 2px 8px rgba(68, 73, 156, 0.12)' : undefined,
+        transition: "all 150ms ease",
+        boxShadow: selected ? "0 2px 8px rgba(68, 73, 156, 0.12)" : undefined,
       }}
       onClick={onSelect}
     >
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
-          <ThemeIcon size="lg" variant="light" color="blue" style={{ flexShrink: 0 }}>
+          <ThemeIcon
+            size="lg"
+            variant="light"
+            color="blue"
+            style={{ flexShrink: 0 }}
+          >
             <FileText size={20} />
           </ThemeIcon>
           <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-            <Text size="sm" fw={600} lineClamp={2}>{template.name}</Text>
-            <Text size="xs" c="dimmed">{template.sections.length} sections</Text>
+            <Text size="sm" fw={600} lineClamp={2}>
+              {template.name}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {template.sections.length} sections
+            </Text>
           </Stack>
         </Group>
-        {selected && <CheckCircle size={20} color="var(--aph-blue)" style={{ flexShrink: 0 }} />}
+        {selected && (
+          <CheckCircle
+            size={20}
+            color="var(--aph-blue)"
+            style={{ flexShrink: 0 }}
+          />
+        )}
       </Group>
     </Paper>
   );
@@ -119,25 +143,38 @@ function CompactTemplateCard({
  */
 export default function AnalyzePage() {
   const params = useParams();
-  const { state, analyzeTranscript, cancelAnalysis, clearAnalysis, reset } = useAnalysis();
+  const { state, analyzeTranscript, cancelAnalysis, clearAnalysis, reset } =
+    useAnalysis();
 
   const transcriptId = params.id as string;
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null,
+  );
   const [viewingTemplate, setViewingTemplate] = useState<Template | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('review');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>("review");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [userSettings, setUserSettings] = useState<UserCategorySettings>({
     customCategories: [],
     templateAssignments: {},
   });
-  const [selectedStrategy, setSelectedStrategy] = useState<AnalysisStrategy | 'auto'>('auto');
+  const [selectedStrategy, setSelectedStrategy] = useState<
+    AnalysisStrategy | "auto"
+  >("auto");
   const [runEvaluation, setRunEvaluation] = useState<boolean>(true);
-  const [evaluationView, setEvaluationView] = useState<'draft' | 'final'>('final');
+  const [evaluationView, setEvaluationView] = useState<"draft" | "final">(
+    "final",
+  );
   const [phasesExpanded, setPhasesExpanded] = useState<boolean>(true);
-  const [exportOptionsOpened, { open: openExportOptions, close: closeExportOptions }] = useDisclosure(false);
+  const [
+    exportOptionsOpened,
+    { open: openExportOptions, close: closeExportOptions },
+  ] = useDisclosure(false);
 
-  // Supplemental material upload state
+  // Supplemental material upload state (temporary, session-only)
   const supplementalUpload = useSupplementalUpload();
+
+  // Persistent supplemental documents (stored in IndexedDB with transcript)
+  const persistentDocs = useSupplementalDocsPersistent(transcriptId);
 
   // Reset analysis state on page load to clear any stale/cached state
   React.useEffect(() => {
@@ -150,45 +187,37 @@ export default function AnalyzePage() {
   }, []);
 
   // Load transcript from IndexedDB
-  const transcript = useLiveQuery<Transcript | undefined>(
-    async () => {
-      if (!transcriptId) return undefined;
-      try {
-        return await getTranscript(transcriptId);
-      } catch (error) {
-        console.error('Error loading transcript:', error);
-        return undefined;
-      }
-    },
-    [transcriptId]
-  );
+  const transcript = useLiveQuery<Transcript | undefined>(async () => {
+    if (!transcriptId) return undefined;
+    try {
+      return await getTranscript(transcriptId);
+    } catch (error) {
+      console.error("Error loading transcript:", error);
+      return undefined;
+    }
+  }, [transcriptId]);
 
   // Load all templates
-  const templates = useLiveQuery<Template[]>(
-    async () => {
-      try {
-        return await getAllTemplates();
-      } catch (error) {
-        console.error('Error loading templates:', error);
-        return [];
-      }
-    },
-    []
-  );
+  const templates = useLiveQuery<Template[]>(async () => {
+    try {
+      return await getAllTemplates();
+    } catch (error) {
+      console.error("Error loading templates:", error);
+      return [];
+    }
+  }, []);
 
   // Load existing analyses
-  const existingAnalyses = useLiveQuery<Analysis[]>(
-    async () => {
+  const existingAnalyses =
+    useLiveQuery<Analysis[]>(async () => {
       if (!transcriptId) return [];
       try {
         return await getAnalysisByTranscript(transcriptId);
       } catch (error) {
-        console.error('Error loading existing analyses:', error);
+        console.error("Error loading existing analyses:", error);
         return [];
       }
-    },
-    [transcriptId]
-  ) || [];
+    }, [transcriptId]) || [];
 
   // Filter templates by selected category and search query
   const filteredTemplates = useMemo(() => {
@@ -196,17 +225,17 @@ export default function AnalyzePage() {
 
     let result: Template[] = [];
 
-    if (selectedCategory === 'custom') {
+    if (selectedCategory === "custom") {
       // Show user's custom-created templates
-      result = templates.filter(t => t.isCustom);
+      result = templates.filter((t) => t.isCustom);
     } else if (userSettings.customCategories.includes(selectedCategory)) {
       // User-defined category: show templates assigned to it
-      result = templates.filter(t =>
-        userSettings.templateAssignments[t.id] === selectedCategory
+      result = templates.filter(
+        (t) => userSettings.templateAssignments[t.id] === selectedCategory,
       );
     } else {
       // Built-in category: show templates in this category (considering user overrides)
-      result = templates.filter(t => {
+      result = templates.filter((t) => {
         if (t.isCustom) return false;
         const effectiveCategory = getEffectiveCategory(t.id, t.name);
         return effectiveCategory === selectedCategory;
@@ -216,9 +245,7 @@ export default function AnalyzePage() {
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      result = result.filter(t =>
-        t.name.toLowerCase().includes(query)
-      );
+      result = result.filter((t) => t.name.toLowerCase().includes(query));
     }
 
     return result;
@@ -227,15 +254,20 @@ export default function AnalyzePage() {
   // Count templates per category - includes user-defined categories
   const categoryCounts = useMemo(() => {
     if (!templates) return { meeting: 0, interview: 0, review: 0, custom: 0 };
-    const counts: Record<string, number> = { meeting: 0, interview: 0, review: 0, custom: 0 };
+    const counts: Record<string, number> = {
+      meeting: 0,
+      interview: 0,
+      review: 0,
+      custom: 0,
+    };
 
     // Count user-defined category assignments
-    userSettings.customCategories.forEach(cat => {
+    userSettings.customCategories.forEach((cat) => {
       counts[cat] = 0;
     });
 
     // Single pass through templates
-    templates.forEach(t => {
+    templates.forEach((t) => {
       if (t.isCustom) {
         counts.custom++;
       } else {
@@ -256,40 +288,67 @@ export default function AnalyzePage() {
   const handleAnalyze = useCallback(async () => {
     if (!transcript || !selectedTemplate) {
       notifications.show({
-        title: 'Error',
-        message: 'Please select a template first.',
-        color: 'red',
+        title: "Error",
+        message: "Please select a template first.",
+        color: "red",
       });
       return;
     }
 
-    // Get supplemental content if enabled and template supports it
-    const supplementalContent = selectedTemplate.supportsSupplementalMaterial
-      ? supplementalUpload.getSupplementalContent()
-      : undefined;
+    // Get supplemental content if template supports it
+    // Combine persistent docs (from document manager) + temporary session uploads
+    let supplementalContent: string | undefined;
+    if (selectedTemplate.supportsSupplementalMaterial) {
+      const parts: string[] = [];
+
+      // Get persistent docs content (from IndexedDB document manager)
+      const persistentContent = await persistentDocs.getFormattedContent();
+      if (persistentContent) {
+        parts.push(persistentContent);
+      }
+
+      // Get temporary session uploads content
+      const sessionContent = supplementalUpload.getSupplementalContent();
+      if (sessionContent) {
+        parts.push(sessionContent);
+      }
+
+      if (parts.length > 0) {
+        supplementalContent = parts.join("\n\n---\n\n");
+      }
+    }
 
     const analysis = await analyzeTranscript(
       transcript,
       selectedTemplate,
       selectedStrategy,
       runEvaluation,
-      supplementalContent
+      supplementalContent,
     );
 
     if (analysis) {
       notifications.show({
-        title: 'Analysis Complete',
-        message: 'Your transcript has been analyzed successfully.',
-        color: 'green',
+        title: "Analysis Complete",
+        message: "Your transcript has been analyzed successfully.",
+        color: "green",
       });
-    } else if (state.error && !state.error.includes('cancelled')) {
+    } else if (state.error && !state.error.includes("cancelled")) {
       notifications.show({
-        title: 'Analysis Failed',
+        title: "Analysis Failed",
         message: state.error,
-        color: 'red',
+        color: "red",
       });
     }
-  }, [transcript, selectedTemplate, selectedStrategy, runEvaluation, analyzeTranscript, state.error, supplementalUpload]);
+  }, [
+    transcript,
+    selectedTemplate,
+    selectedStrategy,
+    runEvaluation,
+    analyzeTranscript,
+    state.error,
+    supplementalUpload,
+    persistentDocs,
+  ]);
 
   // Handle retry after error
   const handleRetry = useCallback(() => {
@@ -300,21 +359,33 @@ export default function AnalyzePage() {
   const handleCancel = useCallback(() => {
     cancelAnalysis();
     notifications.show({
-      title: 'Analysis Cancelled',
-      message: 'The analysis has been cancelled.',
-      color: 'blue',
+      title: "Analysis Cancelled",
+      message: "The analysis has been cancelled.",
+      color: "blue",
     });
   }, [cancelAnalysis]);
-
 
   // Loading state
   if (isLoading) {
     return (
       <Container size="xl" py="xl">
-        <Box style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+        <Box
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 400,
+          }}
+        >
           <Stack align="center" gap="md">
-            <Loader2 size={32} className="animate-spin" style={{ color: 'var(--aph-blue)' }} />
-            <Text size="sm" c="dimmed">Loading...</Text>
+            <Loader2
+              size={32}
+              className="animate-spin"
+              style={{ color: "var(--aph-blue)" }}
+            />
+            <Text size="sm" c="dimmed">
+              Loading...
+            </Text>
           </Stack>
         </Box>
       </Container>
@@ -325,13 +396,13 @@ export default function AnalyzePage() {
   if (!transcript) {
     return (
       <Container size="lg" py="xl">
-        <Stack gap="xl" style={{ maxWidth: 600, margin: '0 auto' }}>
+        <Stack gap="xl" style={{ maxWidth: 600, margin: "0 auto" }}>
           <Button
             component={Link}
             href="/transcripts"
             variant="subtle"
             leftSection={<ArrowLeft size={16} />}
-            styles={{ root: { minHeight: 44, width: 'fit-content' } }}
+            styles={{ root: { minHeight: 44, width: "fit-content" } }}
           >
             Back to Transcripts
           </Button>
@@ -342,10 +413,11 @@ export default function AnalyzePage() {
             title="Transcript Not Found"
             icon={<AlertCircle size={16} />}
           >
-            The transcript you&apos;re trying to analyze doesn&apos;t exist or may have been deleted.
+            The transcript you&apos;re trying to analyze doesn&apos;t exist or
+            may have been deleted.
           </Alert>
 
-          <Box style={{ display: 'flex', justifyContent: 'center' }}>
+          <Box style={{ display: "flex", justifyContent: "center" }}>
             <Button
               component={Link}
               href="/transcripts"
@@ -363,13 +435,13 @@ export default function AnalyzePage() {
   if (!templates || templates.length === 0) {
     return (
       <Container size="lg" py="xl">
-        <Stack gap="xl" style={{ maxWidth: 600, margin: '0 auto' }}>
+        <Stack gap="xl" style={{ maxWidth: 600, margin: "0 auto" }}>
           <Button
             component={Link}
             href={`/transcripts/${transcriptId}`}
             variant="subtle"
             leftSection={<ArrowLeft size={16} />}
-            styles={{ root: { minHeight: 44, width: 'fit-content' } }}
+            styles={{ root: { minHeight: 44, width: "fit-content" } }}
           >
             Back to Transcript
           </Button>
@@ -414,7 +486,7 @@ export default function AnalyzePage() {
           href={`/transcripts/${transcriptId}`}
           variant="subtle"
           leftSection={<ArrowLeft size={16} />}
-          styles={{ root: { minHeight: 44, width: 'fit-content' } }}
+          styles={{ root: { minHeight: 44, width: "fit-content" } }}
         >
           Back to Transcript
         </Button>
@@ -437,55 +509,80 @@ export default function AnalyzePage() {
         <Divider />
 
         {/* Token count and deployment info */}
-        {transcript && (
+        {transcript &&
           (() => {
-            const deploymentInfo = getDeploymentInfo(estimateTokens(transcript.text));
-            const {isExtended, isHighUtilization} = deploymentInfo;
+            const transcriptTokens = estimateTokens(transcript.text);
+            // Combine tokens from persistent docs + any temporary session uploads
+            const persistentDocsTokens = persistentDocs.totalTokens;
+            const sessionUploadTokens = supplementalUpload.isEnabled
+              ? supplementalUpload.totalTokens
+              : 0;
+            const supplementalTokens =
+              persistentDocsTokens + sessionUploadTokens;
+            const totalTokens = transcriptTokens + supplementalTokens;
+            const deploymentInfo = getDeploymentInfo(totalTokens);
+            const { isExtended, isHighUtilization } = deploymentInfo;
             const isCritical = deploymentInfo.isCriticalUtilization;
 
             return (
               <Alert
                 variant="light"
-                color={isExtended ? 'cyan' : 'blue'}
+                color={isExtended ? "cyan" : "blue"}
                 title={
                   <Group gap="xs">
-                    {isExtended ? 'Extended Context Analysis' : 'Transcript Size'}
+                    {isExtended
+                      ? "Extended Context Analysis"
+                      : "Analysis Context"}
                     <Badge
                       variant="light"
-                      color={isExtended ? 'cyan' : 'blue'}
+                      color={isExtended ? "cyan" : "blue"}
                       size="sm"
                     >
-                      {isExtended ? 'GPT-41' : 'GPT-5'}
+                      {isExtended ? "GPT-41" : "GPT-5"}
                     </Badge>
                   </Group>
                 }
                 icon={isExtended ? <Zap size={16} /> : <Info size={16} />}
               >
                 <Stack gap="md">
-                  <Text size="sm">
-                    This transcript is approximately{' '}
-                    <Text component="span" fw={600}>
-                      {formatTokenCount(deploymentInfo.estimatedTokens)}
-                    </Text>
-                    .
-                    {isExtended ? (
-                      <>
-                        {' '}Using{' '}
-                        <Text component="span" fw={600}>
-                          {deploymentInfo.deployment}
-                        </Text>{' '}
-                        deployment with extended context (up to{' '}
-                        {deploymentInfo.tokenLimit.toLocaleString()} tokens).
-                      </>
-                    ) : (
-                      <>
-                        {' '}Using{' '}
-                        <Text component="span" fw={600}>
-                          {deploymentInfo.deployment}
-                        </Text>{' '}
-                        deployment (up to {deploymentInfo.tokenLimit.toLocaleString()} tokens).
-                      </>
+                  {/* Token breakdown */}
+                  <Stack gap={4}>
+                    <Group justify="space-between">
+                      <Text size="sm" c="dimmed">
+                        Transcript:
+                      </Text>
+                      <Text size="sm" fw={500}>
+                        {formatTokenCount(transcriptTokens)}
+                      </Text>
+                    </Group>
+                    {supplementalTokens > 0 && (
+                      <Group justify="space-between">
+                        <Text size="sm" c="dimmed">
+                          Supplemental docs:
+                        </Text>
+                        <Text size="sm" fw={500}>
+                          {formatTokenCount(supplementalTokens)}
+                        </Text>
+                      </Group>
                     )}
+                    <Divider my={4} />
+                    <Group justify="space-between">
+                      <Text size="sm" fw={600}>
+                        Total to analyze:
+                      </Text>
+                      <Text size="sm" fw={600}>
+                        {formatTokenCount(totalTokens)}
+                      </Text>
+                    </Group>
+                  </Stack>
+
+                  <Text size="sm" c="dimmed">
+                    Using{" "}
+                    <Text component="span" fw={600}>
+                      {deploymentInfo.deployment}
+                    </Text>{" "}
+                    deployment{isExtended ? " with extended context" : ""} (up
+                    to {deploymentInfo.tokenLimit.toLocaleString()} tokens).
                   </Text>
 
                   {/* Progress bar showing token utilization */}
@@ -496,7 +593,13 @@ export default function AnalyzePage() {
                       </Text>
                       <Text
                         size="xs"
-                        c={isCritical ? 'red' : isHighUtilization ? 'orange' : 'dimmed'}
+                        c={
+                          isCritical
+                            ? "red"
+                            : isHighUtilization
+                              ? "orange"
+                              : "dimmed"
+                        }
                         fw={isCritical || isHighUtilization ? 600 : 400}
                       >
                         {deploymentInfo.utilizationPercentage}%
@@ -504,7 +607,13 @@ export default function AnalyzePage() {
                     </Group>
                     <Progress
                       value={deploymentInfo.utilizationPercentage}
-                      color={isCritical ? 'red' : isHighUtilization ? 'orange' : 'blue'}
+                      color={
+                        isCritical
+                          ? "red"
+                          : isHighUtilization
+                            ? "orange"
+                            : "blue"
+                      }
                       size="sm"
                     />
                   </Box>
@@ -512,32 +621,38 @@ export default function AnalyzePage() {
                   {/* Warning for high utilization */}
                   {isCritical && (
                     <Text size="sm" c="red" fw={500}>
-                      ⚠️ Critical: Transcript is using {deploymentInfo.utilizationPercentage}% of
-                      token limit. Analysis may exceed limits. Consider preprocessing the
-                      transcript.
+                      ⚠️ Critical: Analysis context is using{" "}
+                      {deploymentInfo.utilizationPercentage}% of token limit.
+                      Analysis may exceed limits. Consider reducing supplemental
+                      docs or preprocessing the transcript.
                     </Text>
                   )}
                   {isHighUtilization && !isCritical && (
                     <Text size="sm" c="orange" fw={500}>
-                      ⚠️ Warning: High token usage ({deploymentInfo.utilizationPercentage}%).
-                      Monitor for potential token limit issues.
+                      ⚠️ Warning: High token usage (
+                      {deploymentInfo.utilizationPercentage}%). Monitor for
+                      potential token limit issues.
                     </Text>
                   )}
 
                   {isExtended && !isHighUtilization && (
                     <Text size="sm" c="dimmed">
-                      ✓ Extended context deployment can handle transcripts up to 1 million tokens.
+                      ✓ Extended context deployment can handle up to 1 million
+                      tokens.
                     </Text>
                   )}
                 </Stack>
               </Alert>
             );
-          })()
-        )}
+          })()}
 
         {/* Template Selection (only show if no analysis in progress/complete) */}
         {!state.analysis && !state.loading && (
-          <Stack gap="md" data-template-selection data-tour-id="template-selector">
+          <Stack
+            gap="md"
+            data-template-selection
+            data-tour-id="template-selector"
+          >
             <div>
               <Title order={2} size="h2" mb="xs">
                 Select Review Template
@@ -561,23 +676,29 @@ export default function AnalyzePage() {
               value={selectedCategory}
               onChange={setSelectedCategory}
               data={[
-                { label: `Reviews (${categoryCounts.review})`, value: 'review' },
+                {
+                  label: `Reviews (${categoryCounts.review})`,
+                  value: "review",
+                },
                 // User-defined categories
-                ...userSettings.customCategories.map(cat => ({
+                ...userSettings.customCategories.map((cat) => ({
                   label: `${cat} (${categoryCounts[cat] || 0})`,
                   value: cat,
                 })),
-                { label: `My Templates (${categoryCounts.custom})`, value: 'custom' }
+                {
+                  label: `My Templates (${categoryCounts.custom})`,
+                  value: "custom",
+                },
               ]}
               size="sm"
-              style={{ minHeight: 44, overflowX: 'auto' }}
+              style={{ minHeight: 44, overflowX: "auto" }}
             />
 
             {/* Phase 3: Responsive Grid with SimpleGrid */}
             <SimpleGrid
               cols={{ base: 2, sm: 2, md: 3, lg: 4 }}
-              spacing={{ base: 'xs', sm: 'sm', md: 'md' }}
-              verticalSpacing={{ base: 'xs', sm: 'sm' }}
+              spacing={{ base: "xs", sm: "sm", md: "md" }}
+              verticalSpacing={{ base: "xs", sm: "sm" }}
             >
               {filteredTemplates.map((template) => (
                 <CompactTemplateCard
@@ -591,16 +712,42 @@ export default function AnalyzePage() {
 
             {/* Phase 5: Selected Template Preview */}
             {selectedTemplate && (
-              <Paper p="md" withBorder style={{ backgroundColor: 'rgba(68, 73, 156, 0.04)' }}>
-                <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
+              <Paper
+                p="md"
+                withBorder
+                style={{ backgroundColor: "rgba(68, 73, 156, 0.04)" }}
+              >
+                <Group
+                  justify="space-between"
+                  align="flex-start"
+                  wrap="wrap"
+                  gap="sm"
+                >
                   <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
                     <Group gap="xs" wrap="nowrap">
-                      <ThemeIcon size="sm" variant="light" color="blue" style={{ flexShrink: 0 }}>
+                      <ThemeIcon
+                        size="sm"
+                        variant="light"
+                        color="blue"
+                        style={{ flexShrink: 0 }}
+                      >
                         <Info size={16} />
                       </ThemeIcon>
-                      <Text size="sm" fw={600} style={{ wordBreak: 'break-word' }}>{selectedTemplate.name}</Text>
+                      <Text
+                        size="sm"
+                        fw={600}
+                        style={{ wordBreak: "break-word" }}
+                      >
+                        {selectedTemplate.name}
+                      </Text>
                     </Group>
-                    <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word' }}>{selectedTemplate.description}</Text>
+                    <Text
+                      size="xs"
+                      c="dimmed"
+                      style={{ wordBreak: "break-word" }}
+                    >
+                      {selectedTemplate.description}
+                    </Text>
                   </Stack>
                   <Button
                     size="xs"
@@ -649,7 +796,7 @@ export default function AnalyzePage() {
             )}
 
             {/* Analyze Button */}
-            <Box style={{ display: 'flex', justifyContent: 'center' }}>
+            <Box style={{ display: "flex", justifyContent: "center" }}>
               <Button
                 size="lg"
                 data-tour-id="run-analysis-button"
@@ -658,7 +805,9 @@ export default function AnalyzePage() {
                 leftSection={<Sparkles size={20} />}
                 styles={{ root: { minHeight: 44 } }}
               >
-                {existingAnalyses.length > 0 ? 'Re-Analyze Transcript' : 'Analyze Transcript'}
+                {existingAnalyses.length > 0
+                  ? "Re-Analyze Transcript"
+                  : "Analyze Transcript"}
               </Button>
             </Box>
           </Stack>
@@ -680,27 +829,34 @@ export default function AnalyzePage() {
 
         {/* Error State - Improved with Recovery Options */}
         {state.error && !state.loading && (
-          <Card padding="lg" radius="md" withBorder style={{ borderColor: 'var(--mantine-color-red-4)' }}>
+          <Card
+            padding="lg"
+            radius="md"
+            withBorder
+            style={{ borderColor: "var(--mantine-color-red-4)" }}
+          >
             <Stack gap="md">
               <Group gap="sm" align="flex-start">
                 <AlertCircle size={24} color="var(--mantine-color-red-6)" />
                 <div style={{ flex: 1 }}>
                   <Title order={4} size="h5" c="red" mb="xs">
-                    {state.error.includes('cancelled') ? 'Analysis Cancelled' : 'Analysis Failed'}
+                    {state.error.includes("cancelled")
+                      ? "Analysis Cancelled"
+                      : "Analysis Failed"}
                   </Title>
                   <Text size="sm" c="dimmed" mb="sm">
                     {state.error}
                   </Text>
 
                   {/* Helpful suggestions based on error type */}
-                  {!state.error.includes('cancelled') && (
+                  {!state.error.includes("cancelled") && (
                     <Box
                       p="md"
                       mb="md"
                       style={{
-                        backgroundColor: 'rgba(250, 179, 174, 0.1)',
-                        borderRadius: '8px',
-                        border: '1px solid var(--mantine-color-red-2)',
+                        backgroundColor: "rgba(250, 179, 174, 0.1)",
+                        borderRadius: "8px",
+                        border: "1px solid var(--mantine-color-red-2)",
                       }}
                     >
                       <Text size="sm" fw={500} mb="xs">
@@ -713,16 +869,25 @@ export default function AnalyzePage() {
                         </Group>
                         <Group gap="xs">
                           <Text size="xs">•</Text>
-                          <Text size="xs">Try a different template with fewer sections</Text>
+                          <Text size="xs">
+                            Try a different template with fewer sections
+                          </Text>
                         </Group>
                         <Group gap="xs">
                           <Text size="xs">•</Text>
-                          <Text size="xs">Ensure the transcript isn&apos;t too long (check token usage above)</Text>
+                          <Text size="xs">
+                            Ensure the transcript isn&apos;t too long (check
+                            token usage above)
+                          </Text>
                         </Group>
-                        {(state.error.includes('token') || state.error.includes('limit')) && (
+                        {(state.error.includes("token") ||
+                          state.error.includes("limit")) && (
                           <Group gap="xs">
                             <Text size="xs">•</Text>
-                            <Text size="xs" fw={600}>The transcript may exceed AI model limits - consider shortening it</Text>
+                            <Text size="xs" fw={600}>
+                              The transcript may exceed AI model limits -
+                              consider shortening it
+                            </Text>
                           </Group>
                         )}
                       </Stack>
@@ -738,16 +903,23 @@ export default function AnalyzePage() {
                       leftSection={<RefreshCw size={16} />}
                       styles={{ root: { minHeight: 40 } }}
                     >
-                      {state.error.includes('cancelled') ? 'Start New Analysis' : 'Retry Analysis'}
+                      {state.error.includes("cancelled")
+                        ? "Start New Analysis"
+                        : "Retry Analysis"}
                     </Button>
-                    {!state.error.includes('cancelled') && (
+                    {!state.error.includes("cancelled") && (
                       <Button
                         variant="outline"
                         onClick={() => {
                           // Scroll to template selection
-                          const templateSection = document.querySelector('[data-template-selection]');
+                          const templateSection = document.querySelector(
+                            "[data-template-selection]",
+                          );
                           if (templateSection) {
-                            templateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            templateSection.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
                           }
                           clearAnalysis();
                         }}
@@ -799,7 +971,7 @@ export default function AnalyzePage() {
             <AnalysisViewer
               analysis={state.analysis}
               template={selectedTemplate}
-              showDraftResults={evaluationView === 'draft'}
+              showDraftResults={evaluationView === "draft"}
             />
 
             {/* Evaluation Display */}
@@ -841,17 +1013,17 @@ export default function AnalyzePage() {
         radius="md"
         padding="xl"
         styles={{
-          header: { 
-            paddingBottom: 20, 
-            borderBottom: '1px solid var(--mantine-color-gray-2)',
-            marginBottom: 0 
+          header: {
+            paddingBottom: 20,
+            borderBottom: "1px solid var(--mantine-color-gray-2)",
+            marginBottom: 0,
           },
-          body: { 
-            paddingTop: 24 
+          body: {
+            paddingTop: 24,
           },
           title: {
-            width: '100%'
-          }
+            width: "100%",
+          },
         }}
       >
         {viewingTemplate && <TemplateDetail template={viewingTemplate} />}

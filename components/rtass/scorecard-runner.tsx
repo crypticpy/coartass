@@ -17,10 +17,22 @@ import {
 } from "@mantine/core";
 import { AlertCircle, Ban, Sparkles, Trash2 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
-import { deleteRtassScorecard, getRtassScorecardsByTranscript, saveRtassScorecard } from "@/lib/db";
-import { useAllRtassRubrics, type RubricWithSource } from "@/hooks/use-rtass-rubrics";
+import {
+  deleteRtassScorecard,
+  getRtassScorecardsByTranscript,
+  saveRtassScorecard,
+} from "@/lib/db";
+import {
+  useAllRtassRubrics,
+  type RubricWithSource,
+} from "@/hooks/use-rtass-rubrics";
+import { useSupplementalDocsPersistent } from "@/hooks/use-supplemental-docs-persistent";
 import type { Transcript } from "@/types/transcript";
-import type { RtassRubricTemplate, RtassScorecard, RtassScorecardSection } from "@/types/rtass";
+import type {
+  RtassRubricTemplate,
+  RtassScorecard,
+  RtassScorecardSection,
+} from "@/types/rtass";
 import { ScorecardViewer } from "./scorecard-viewer";
 import { ScorecardCompare } from "./scorecard-compare";
 
@@ -30,10 +42,15 @@ type SectionScoreResponse = {
   modelInfo: RtassScorecard["modelInfo"];
 };
 
-function normalizeRubricDates(rubric: RtassRubricTemplate): RtassRubricTemplate {
+function normalizeRubricDates(
+  rubric: RtassRubricTemplate,
+): RtassRubricTemplate {
   return {
     ...rubric,
-    createdAt: rubric.createdAt instanceof Date ? rubric.createdAt : new Date(rubric.createdAt),
+    createdAt:
+      rubric.createdAt instanceof Date
+        ? rubric.createdAt
+        : new Date(rubric.createdAt),
     updatedAt:
       rubric.updatedAt instanceof Date
         ? rubric.updatedAt
@@ -44,7 +61,10 @@ function normalizeRubricDates(rubric: RtassRubricTemplate): RtassRubricTemplate 
 }
 
 function normalizeScorecardDates(scorecard: RtassScorecard): RtassScorecard {
-  const createdAt = scorecard.createdAt instanceof Date ? scorecard.createdAt : new Date(scorecard.createdAt);
+  const createdAt =
+    scorecard.createdAt instanceof Date
+      ? scorecard.createdAt
+      : new Date(scorecard.createdAt);
   const reviewedAt =
     scorecard.humanReview?.reviewedAt instanceof Date
       ? scorecard.humanReview.reviewedAt
@@ -65,9 +85,13 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function statusFromScore(score: number, rubric: RtassRubricTemplate): RtassScorecard["overall"]["status"] {
+function statusFromScore(
+  score: number,
+  rubric: RtassRubricTemplate,
+): RtassScorecard["overall"]["status"] {
   if (score >= rubric.scoring.thresholds.pass) return "pass";
-  if (score >= rubric.scoring.thresholds.needsImprovement) return "needs_improvement";
+  if (score >= rubric.scoring.thresholds.needsImprovement)
+    return "needs_improvement";
   return "fail";
 }
 
@@ -76,8 +100,10 @@ async function scoreSection(params: {
   rubric: RtassRubricTemplate;
   sectionId: string;
   signal: AbortSignal;
+  supplementalMaterial?: string;
 }): Promise<SectionScoreResponse> {
-  const { transcript, rubric, sectionId, signal } = params;
+  const { transcript, rubric, sectionId, signal, supplementalMaterial } =
+    params;
 
   const res = await fetch("/api/rtass/score/section", {
     method: "POST",
@@ -88,6 +114,7 @@ async function scoreSection(params: {
       transcript: { text: transcript.text, segments: transcript.segments },
       rubric,
       sectionId,
+      supplementalMaterial,
     }),
   });
 
@@ -106,13 +133,26 @@ export function ScorecardRunner({
   transcript: Transcript;
   onTimestampClick?: (seconds: number) => void;
 }) {
-  const { rubrics: allRubrics, customRubrics, isLoading: isLoadingRubrics, error: rubricsError } =
-    useAllRtassRubrics();
-  const [selectedRubricIds, setSelectedRubricIds] = React.useState<string[]>([]);
+  const {
+    rubrics: allRubrics,
+    customRubrics,
+    isLoading: isLoadingRubrics,
+    error: rubricsError,
+  } = useAllRtassRubrics();
+  const persistentDocs = useSupplementalDocsPersistent(transcript.id);
+  const [selectedRubricIds, setSelectedRubricIds] = React.useState<string[]>(
+    [],
+  );
   const [isRunning, setIsRunning] = React.useState(false);
-  const [activeScorecardId, setActiveScorecardId] = React.useState<string | null>(null);
-  const [compareScorecardId, setCompareScorecardId] = React.useState<string | null>(null);
-  const [activeRubric, setActiveRubric] = React.useState<RtassRubricTemplate | undefined>(undefined);
+  const [activeScorecardId, setActiveScorecardId] = React.useState<
+    string | null
+  >(null);
+  const [compareScorecardId, setCompareScorecardId] = React.useState<
+    string | null
+  >(null);
+  const [activeRubric, setActiveRubric] = React.useState<
+    RtassRubricTemplate | undefined
+  >(undefined);
   const abortRef = React.useRef<AbortController | null>(null);
 
   const [runProgress, setRunProgress] = React.useState<{
@@ -121,18 +161,17 @@ export function ScorecardRunner({
     label?: string;
   } | null>(null);
 
-  const scorecards = useLiveQuery<RtassScorecard[]>(
-    async () => {
-      const stored = await getRtassScorecardsByTranscript(transcript.id);
-      return stored.map(normalizeScorecardDates);
-    },
-    [transcript.id]
-  );
+  const scorecards = useLiveQuery<RtassScorecard[]>(async () => {
+    const stored = await getRtassScorecardsByTranscript(transcript.id);
+    return stored.map(normalizeScorecardDates);
+  }, [transcript.id]);
 
   const activeScorecard = React.useMemo(() => {
     if (!scorecards || scorecards.length === 0) return null;
     if (activeScorecardId) {
-      return scorecards.find((s) => s.id === activeScorecardId) ?? scorecards[0];
+      return (
+        scorecards.find((s) => s.id === activeScorecardId) ?? scorecards[0]
+      );
     }
     return scorecards[0];
   }, [scorecards, activeScorecardId]);
@@ -140,7 +179,8 @@ export function ScorecardRunner({
   React.useEffect(() => {
     if (selectedRubricIds.length > 0) return;
     const defaultRubricId =
-      allRubrics.find((r) => r.id === "rtass-afd-a1016-radio-compliance")?.id ?? allRubrics[0]?.id;
+      allRubrics.find((r) => r.id === "rtass-afd-a1016-radio-compliance")?.id ??
+      allRubrics[0]?.id;
     if (defaultRubricId) {
       setSelectedRubricIds([defaultRubricId]);
     }
@@ -162,12 +202,17 @@ export function ScorecardRunner({
     const controller = new AbortController();
     (async () => {
       try {
-        const res = await fetch(`/api/rtass/rubrics?id=${encodeURIComponent(rubricId)}`, {
-          signal: controller.signal,
-        });
+        const res = await fetch(
+          `/api/rtass/rubrics?id=${encodeURIComponent(rubricId)}`,
+          {
+            signal: controller.signal,
+          },
+        );
         const payload = await res.json();
         if (!res.ok) return;
-        setActiveRubric(normalizeRubricDates(payload.data as RtassRubricTemplate));
+        setActiveRubric(
+          normalizeRubricDates(payload.data as RtassRubricTemplate),
+        );
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
       }
@@ -190,18 +235,23 @@ export function ScorecardRunner({
     });
   }, []);
 
-  const resolveRubricTemplate = React.useCallback(async (rubric: RubricWithSource): Promise<RtassRubricTemplate> => {
-    if (!rubric.isBuiltIn) {
-      return rubric;
-    }
+  const resolveRubricTemplate = React.useCallback(
+    async (rubric: RubricWithSource): Promise<RtassRubricTemplate> => {
+      if (!rubric.isBuiltIn) {
+        return rubric;
+      }
 
-    const res = await fetch(`/api/rtass/rubrics?id=${encodeURIComponent(rubric.id)}`);
-    const payload = await res.json();
-    if (!res.ok) {
-      throw new Error(payload?.error || "Failed to load rubric");
-    }
-    return normalizeRubricDates(payload.data as RtassRubricTemplate);
-  }, []);
+      const res = await fetch(
+        `/api/rtass/rubrics?id=${encodeURIComponent(rubric.id)}`,
+      );
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload?.error || "Failed to load rubric");
+      }
+      return normalizeRubricDates(payload.data as RtassRubricTemplate);
+    },
+    [],
+  );
 
   const runScorecards = async () => {
     if (selectedRubricIds.length === 0) return;
@@ -215,8 +265,16 @@ export function ScorecardRunner({
 
     setIsRunning(true);
     try {
-      const rubricTemplates = await Promise.all(selectedRubrics.map(resolveRubricTemplate));
-      const totalSections = rubricTemplates.reduce((sum, r) => sum + r.sections.length, 0);
+      // Get supplemental material from persistent docs
+      const supplementalMaterial = await persistentDocs.getFormattedContent();
+
+      const rubricTemplates = await Promise.all(
+        selectedRubrics.map(resolveRubricTemplate),
+      );
+      const totalSections = rubricTemplates.reduce(
+        (sum, r) => sum + r.sections.length,
+        0,
+      );
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -226,7 +284,9 @@ export function ScorecardRunner({
 
       for (const rubric of rubricTemplates) {
         const concurrency = Math.max(1, Math.min(10, rubric.llm.concurrency));
-        const sectionOrder = new Map(rubric.sections.map((s, idx) => [s.id, idx]));
+        const sectionOrder = new Map(
+          rubric.sections.map((s, idx) => [s.id, idx]),
+        );
 
         const sectionResults: RtassScorecardSection[] = [];
         const warnings: string[] = [];
@@ -237,32 +297,54 @@ export function ScorecardRunner({
           const results = await Promise.all(
             batch.map(async (section) => {
               const label = `${rubric.name}: ${section.title}`;
-              setRunProgress((prev) => prev ? { ...prev, label } : prev);
+              setRunProgress((prev) => (prev ? { ...prev, label } : prev));
               const result = await scoreSection({
                 transcript,
                 rubric,
                 sectionId: section.id,
                 signal: controller.signal,
+                supplementalMaterial: supplementalMaterial || undefined,
               });
 
               modelInfo = modelInfo ?? result.modelInfo;
               if (result.warnings) warnings.push(...result.warnings);
               sectionResults.push(result.section);
 
-              setRunProgress((prev) => prev ? { ...prev, completedSections: prev.completedSections + 1 } : prev);
+              setRunProgress((prev) =>
+                prev
+                  ? { ...prev, completedSections: prev.completedSections + 1 }
+                  : prev,
+              );
               return result.section;
-            })
+            }),
           );
 
           // Preserve section ordering regardless of concurrency completion order
-          results.sort((a, b) => (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0));
+          results.sort(
+            (a, b) =>
+              (sectionOrder.get(a.sectionId) ?? 0) -
+              (sectionOrder.get(b.sectionId) ?? 0),
+          );
         }
 
-        sectionResults.sort((a, b) => (sectionOrder.get(a.sectionId) ?? 0) - (sectionOrder.get(b.sectionId) ?? 0));
+        sectionResults.sort(
+          (a, b) =>
+            (sectionOrder.get(a.sectionId) ?? 0) -
+            (sectionOrder.get(b.sectionId) ?? 0),
+        );
 
-        const overallNumerator = sectionResults.reduce((sum, s) => sum + (s.weight * s.score), 0);
-        const overallDenominator = sectionResults.reduce((sum, s) => sum + s.weight, 0);
-        const overallScore = overallDenominator > 0 ? clamp01(overallNumerator / overallDenominator) : 0;
+        const overallNumerator = sectionResults.reduce(
+          (sum, s) => sum + s.weight * s.score,
+          0,
+        );
+        const overallDenominator = sectionResults.reduce(
+          (sum, s) => sum + s.weight,
+          0,
+        );
+        const overallScore =
+          overallDenominator > 0
+            ? clamp01(overallNumerator / overallDenominator)
+            : 0;
 
         const scorecard: RtassScorecard = {
           id: crypto.randomUUID(),
@@ -276,7 +358,8 @@ export function ScorecardRunner({
             status: statusFromScore(overallScore, rubric),
           },
           sections: sectionResults,
-          warnings: warnings.length > 0 ? Array.from(new Set(warnings)) : undefined,
+          warnings:
+            warnings.length > 0 ? Array.from(new Set(warnings)) : undefined,
           humanReview: { reviewed: false },
         };
 
@@ -336,9 +419,10 @@ export function ScorecardRunner({
     return scorecards.find((s) => s.id === compareScorecardId) ?? null;
   }, [scorecards, compareScorecardId]);
 
-  const progressValue = runProgress && runProgress.totalSections > 0
-    ? (runProgress.completedSections / runProgress.totalSections) * 100
-    : 0;
+  const progressValue =
+    runProgress && runProgress.totalSections > 0
+      ? (runProgress.completedSections / runProgress.totalSections) * 100
+      : 0;
 
   return (
     <Stack gap="lg">
@@ -349,13 +433,16 @@ export function ScorecardRunner({
               Scorecard (RTASS)
             </Title>
             <Text size="sm" c="dimmed">
-              Run a rubric-based evaluation and generate an evidence-linked scorecard.
+              Run a rubric-based evaluation and generate an evidence-linked
+              scorecard.
             </Text>
           </Stack>
 
           <Group gap="sm">
             <Button
-              leftSection={isRunning ? <Loader size={16} /> : <Sparkles size={16} />}
+              leftSection={
+                isRunning ? <Loader size={16} /> : <Sparkles size={16} />
+              }
               onClick={runScorecards}
               loading={isRunning}
               disabled={isLoadingRubrics || selectedRubricIds.length === 0}
@@ -379,7 +466,12 @@ export function ScorecardRunner({
 
         <Stack gap="md" mt="md">
           {rubricsError && (
-            <Alert icon={<AlertCircle size={16} />} title="Rubrics unavailable" color="red" variant="light">
+            <Alert
+              icon={<AlertCircle size={16} />}
+              title="Rubrics unavailable"
+              color="red"
+              variant="light"
+            >
               {rubricsError.message}
             </Alert>
           )}
@@ -411,7 +503,8 @@ export function ScorecardRunner({
                   Generating scorecards
                 </Text>
                 <Text size="sm" c="dimmed">
-                  {runProgress.completedSections}/{runProgress.totalSections} sections
+                  {runProgress.completedSections}/{runProgress.totalSections}{" "}
+                  sections
                 </Text>
               </Group>
               <Progress value={progressValue} animated striped />
@@ -444,10 +537,12 @@ export function ScorecardRunner({
               placeholder="Optional"
               value={compareScorecardId}
               onChange={setCompareScorecardId}
-              data={(scorecards ?? []).filter((s) => s.id !== activeScorecard?.id).map((s) => ({
-                value: s.id,
-                label: `${new Date(s.createdAt).toLocaleString()} • ${rubricNameById.get(s.rubricTemplateId) ?? s.rubricTemplateId}`,
-              }))}
+              data={(scorecards ?? [])
+                .filter((s) => s.id !== activeScorecard?.id)
+                .map((s) => ({
+                  value: s.id,
+                  label: `${new Date(s.createdAt).toLocaleString()} • ${rubricNameById.get(s.rubricTemplateId) ?? s.rubricTemplateId}`,
+                }))}
               clearable
               styles={{ input: { minHeight: 44 } }}
               style={{ flex: 1, minWidth: 280 }}
@@ -466,11 +561,21 @@ export function ScorecardRunner({
       )}
 
       {!scorecards ? (
-        <Alert icon={<Loader size={16} />} title="Loading" color="blue" variant="light">
+        <Alert
+          icon={<Loader size={16} />}
+          title="Loading"
+          color="blue"
+          variant="light"
+        >
           Loading scorecards from this browser…
         </Alert>
       ) : scorecards.length === 0 ? (
-        <Alert icon={<AlertCircle size={16} />} title="No scorecards yet" color="gray" variant="light">
+        <Alert
+          icon={<AlertCircle size={16} />}
+          title="No scorecards yet"
+          color="gray"
+          variant="light"
+        >
           Generate your first scorecard to see results here.
         </Alert>
       ) : activeScorecard ? (
@@ -490,7 +595,12 @@ export function ScorecardRunner({
           />
         </Stack>
       ) : (
-        <Alert icon={<AlertCircle size={16} />} title="No scorecard selected" color="gray" variant="light">
+        <Alert
+          icon={<AlertCircle size={16} />}
+          title="No scorecard selected"
+          color="gray"
+          variant="light"
+        >
           Select a saved scorecard to view.
         </Alert>
       )}

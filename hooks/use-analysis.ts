@@ -15,35 +15,35 @@
  * This ensures the UI accurately reflects what the API is actually doing.
  */
 
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
-import React from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import type { Analysis, AnalysisProgress } from '@/types/analysis';
-import type { Transcript } from '@/types/transcript';
-import type { Template } from '@/types/template';
-import type { AnalysisStrategy } from '@/lib/analysis-strategy';
-import { normalizeEvidence } from '@/lib/analysis-utils';
-import { createLogger } from '@/lib/logger';
+import { useState, useCallback } from "react";
+import React from "react";
+import { v4 as uuidv4 } from "uuid";
+import type { Analysis, AnalysisProgress } from "@/types/analysis";
+import type { Transcript } from "@/types/transcript";
+import type { Template } from "@/types/template";
+import type { AnalysisStrategy } from "@/lib/analysis-strategy";
+import { normalizeEvidence } from "@/lib/analysis-utils";
+import { createLogger } from "@/lib/logger";
 import {
   saveAnalysis,
   getAnalysisByTranscript,
   getAnalysesPaginated,
   type PaginationOptions,
-  type PaginatedResult
-} from '@/lib/db';
+  type PaginatedResult,
+} from "@/lib/db";
 import {
   calculateEstimatedTime,
   getStrategyPhases,
   calculatePhaseProgress,
-} from '@/lib/analysis-progress-metadata';
+} from "@/lib/analysis-progress-metadata";
 import {
   getAnalysisModelPreference,
   getReasoningEffortPreference,
-} from '@/lib/storage';
+} from "@/lib/storage";
 
-const log = createLogger('useAnalysis');
+const log = createLogger("useAnalysis");
 
 /**
  * Analysis state interface
@@ -82,13 +82,16 @@ export interface UseAnalysisReturn {
   analyzeTranscript: (
     transcript: Transcript,
     template: Template,
-    strategy?: AnalysisStrategy | 'auto',
+    strategy?: AnalysisStrategy | "auto",
     runEvaluation?: boolean,
-    supplementalMaterial?: string
+    supplementalMaterial?: string,
   ) => Promise<Analysis | null>;
 
   /** Fetch all analyses for a transcript */
-  fetchAnalyses: (transcriptId: string, signal?: AbortSignal) => Promise<Analysis[]>;
+  fetchAnalyses: (
+    transcriptId: string,
+    signal?: AbortSignal,
+  ) => Promise<Analysis[]>;
 
   /** Cancel an in-progress analysis */
   cancelAnalysis: () => void;
@@ -154,42 +157,43 @@ export function useAnalysis(): UseAnalysisReturn {
    * Fetch all analyses for a transcript from IndexedDB
    * RACE CONDITION FIX: Added cancellation support for async operation
    */
-  const fetchAnalyses = useCallback(async (
-    transcriptId: string,
-    signal?: AbortSignal
-  ): Promise<Analysis[]> => {
-    try {
-      setState((prev) => ({ ...prev, loading: true, error: null }));
+  const fetchAnalyses = useCallback(
+    async (transcriptId: string, signal?: AbortSignal): Promise<Analysis[]> => {
+      try {
+        setState((prev) => ({ ...prev, loading: true, error: null }));
 
-      // Check if cancelled before async operation
-      if (signal?.aborted) {
+        // Check if cancelled before async operation
+        if (signal?.aborted) {
+          return [];
+        }
+
+        const analyses = await getAnalysisByTranscript(transcriptId);
+
+        // Check if cancelled after async operation
+        if (signal?.aborted) {
+          return [];
+        }
+
+        setState((prev) => ({ ...prev, analyses, loading: false }));
+        return analyses;
+      } catch (error) {
+        // Don't update state if operation was cancelled
+        if (signal?.aborted) {
+          return [];
+        }
+
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to fetch analyses";
+        setState((prev) => ({
+          ...prev,
+          error: errorMessage,
+          loading: false,
+        }));
         return [];
       }
-
-      const analyses = await getAnalysisByTranscript(transcriptId);
-
-      // Check if cancelled after async operation
-      if (signal?.aborted) {
-        return [];
-      }
-
-      setState((prev) => ({ ...prev, analyses, loading: false }));
-      return analyses;
-    } catch (error) {
-      // Don't update state if operation was cancelled
-      if (signal?.aborted) {
-        return [];
-      }
-
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch analyses';
-      setState((prev) => ({
-        ...prev,
-        error: errorMessage,
-        loading: false,
-      }));
-      return [];
-    }
-  }, []);
+    },
+    [],
+  );
 
   /**
    * Analyze a transcript using the specified template
@@ -211,13 +215,13 @@ export function useAnalysis(): UseAnalysisReturn {
     async (
       transcript: Transcript,
       template: Template,
-      strategy?: AnalysisStrategy | 'auto',
+      strategy?: AnalysisStrategy | "auto",
       runEvaluation?: boolean,
-      supplementalMaterial?: string
+      supplementalMaterial?: string,
     ): Promise<Analysis | null> => {
       // Guard against concurrent analyses
       if (state.loading) {
-        log.warn('Analysis already in progress');
+        log.warn("Analysis already in progress");
         return null;
       }
 
@@ -234,7 +238,7 @@ export function useAnalysis(): UseAnalysisReturn {
         // If user explicitly specified a strategy (not 'auto'), we know what they want.
         // Otherwise, show "determining..." until API confirms the actual strategy.
         const userSpecifiedStrategy: AnalysisStrategy | null =
-          strategy && strategy !== 'auto' ? strategy : null;
+          strategy && strategy !== "auto" ? strategy : null;
 
         setState((prev) => ({
           ...prev,
@@ -247,9 +251,9 @@ export function useAnalysis(): UseAnalysisReturn {
             progress: 0,
             message: userSpecifiedStrategy
               ? `Preparing ${userSpecifiedStrategy} analysis...`
-              : 'Determining optimal analysis strategy...',
+              : "Determining optimal analysis strategy...",
             complete: false,
-            currentSection: 'Initializing',
+            currentSection: "Initializing",
           },
         }));
 
@@ -259,13 +263,17 @@ export function useAnalysis(): UseAnalysisReturn {
 
         // If user specified a strategy, we can show strategy-specific progress.
         // Otherwise, show generic progress until API responds with the actual strategy.
-        if (userSpecifiedStrategy && userSpecifiedStrategy !== 'basic') {
+        if (userSpecifiedStrategy && userSpecifiedStrategy !== "basic") {
           // User explicitly chose hybrid/advanced - show their expected progress
-          const phases = getStrategyPhases(userSpecifiedStrategy, template, runEval);
+          const phases = getStrategyPhases(
+            userSpecifiedStrategy,
+            template,
+            runEval,
+          );
           const totalEstimatedTime = calculateEstimatedTime(
             userSpecifiedStrategy,
             sectionCount,
-            runEval
+            runEval,
           );
 
           // Track elapsed time and current phase
@@ -279,7 +287,7 @@ export function useAnalysis(): UseAnalysisReturn {
             const { progress: baseProgress, phase } = calculatePhaseProgress(
               elapsedSeconds,
               totalEstimatedTime,
-              phases
+              phases,
             );
 
             // Asymptotic progress:
@@ -303,17 +311,16 @@ export function useAnalysis(): UseAnalysisReturn {
             }
 
             // Determine message
-            let message = phase?.message || 'Processing...';
-            let currentSection = phase?.name || 'Processing';
+            let message = phase?.message || "Processing...";
+            let currentSection = phase?.name || "Processing";
 
             if (isOvertime) {
               const minutes = Math.floor(elapsedSeconds / 60);
               const seconds = Math.floor(elapsedSeconds % 60);
-              const timeStr = minutes > 0
-                ? `${minutes}m ${seconds}s`
-                : `${seconds}s`;
+              const timeStr =
+                minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
               message = `Still processing... (${timeStr} elapsed)`;
-              currentSection = 'Processing';
+              currentSection = "Processing";
             }
 
             updateProgress({
@@ -328,11 +335,13 @@ export function useAnalysis(): UseAnalysisReturn {
           const initialPhase = phases[0];
           updateProgress({
             progress: 5,
-            message: initialPhase?.message || `Starting ${userSpecifiedStrategy} analysis...`,
+            message:
+              initialPhase?.message ||
+              `Starting ${userSpecifiedStrategy} analysis...`,
             complete: false,
-            currentSection: initialPhase?.name || 'Initializing',
+            currentSection: initialPhase?.name || "Initializing",
           });
-        } else if (userSpecifiedStrategy === 'basic') {
+        } else if (userSpecifiedStrategy === "basic") {
           // User explicitly chose basic - add progress updates for extraction + enrichment
           // GPT-5.2 update: Basic now takes 2-4 min (~180s avg)
           const startTime = Date.now();
@@ -349,7 +358,7 @@ export function useAnalysis(): UseAnalysisReturn {
 
             if (elapsedSeconds <= estimatedTimeSeconds) {
               // Normal linear progression
-              progress = 5 + (70 * elapsedSeconds / estimatedTimeSeconds);
+              progress = 5 + (70 * elapsedSeconds) / estimatedTimeSeconds;
             } else {
               // Overtime: asymptotically approach 88%
               // Formula: 75 + 13 * (1 - e^(-overtime/120))
@@ -360,28 +369,27 @@ export function useAnalysis(): UseAnalysisReturn {
               progress = 75 + additionalProgress;
             }
 
-            let message = 'Processing with basic analysis...';
-            let currentSection = 'Extraction';
+            let message = "Processing with basic analysis...";
+            let currentSection = "Extraction";
 
             // Adjusted breakpoints for GPT-5.2 timing (60s, 120s instead of 15s, 30s)
             if (elapsedSeconds > 60) {
-              message = 'Running enrichment pass...';
-              currentSection = 'Enrichment';
+              message = "Running enrichment pass...";
+              currentSection = "Enrichment";
             }
             if (elapsedSeconds > 120) {
-              message = 'Finalizing results...';
-              currentSection = 'Finalizing';
+              message = "Finalizing results...";
+              currentSection = "Finalizing";
             }
 
             // When over estimated time, show elapsed time to indicate it's still working
             if (isOvertime) {
               const minutes = Math.floor(elapsedSeconds / 60);
               const seconds = Math.floor(elapsedSeconds % 60);
-              const timeStr = minutes > 0
-                ? `${minutes}m ${seconds}s`
-                : `${seconds}s`;
+              const timeStr =
+                minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
               message = `Still processing... (${timeStr} elapsed)`;
-              currentSection = 'Processing';
+              currentSection = "Processing";
             }
 
             updateProgress({
@@ -394,9 +402,9 @@ export function useAnalysis(): UseAnalysisReturn {
 
           updateProgress({
             progress: 5,
-            message: 'Processing with basic analysis...',
+            message: "Processing with basic analysis...",
             complete: false,
-            currentSection: 'Extraction',
+            currentSection: "Extraction",
           });
         } else {
           // Auto mode: Show generic progress with periodic updates until API responds
@@ -416,7 +424,8 @@ export function useAnalysis(): UseAnalysisReturn {
 
             if (elapsedSeconds <= estimatedStrategySelectionTime) {
               // Strategy selection phase: 5% to 40%
-              progress = 5 + (35 * elapsedSeconds / estimatedStrategySelectionTime);
+              progress =
+                5 + (35 * elapsedSeconds) / estimatedStrategySelectionTime;
             } else {
               // Waiting for API: asymptotically approach 75%
               isOvertime = true;
@@ -432,17 +441,16 @@ export function useAnalysis(): UseAnalysisReturn {
             if (isOvertime) {
               const minutes = Math.floor(elapsedSeconds / 60);
               const seconds = Math.floor(elapsedSeconds % 60);
-              const timeStr = minutes > 0
-                ? `${minutes}m ${seconds}s`
-                : `${seconds}s`;
+              const timeStr =
+                minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
               message = `Processing analysis... (${timeStr} elapsed)`;
-              currentSection = 'Processing';
+              currentSection = "Processing";
             } else if (progress < 20) {
-              message = 'Analyzing transcript complexity...';
-              currentSection = 'Strategy Selection';
+              message = "Analyzing transcript complexity...";
+              currentSection = "Strategy Selection";
             } else {
-              message = 'Selecting optimal analysis strategy...';
-              currentSection = 'Strategy Selection';
+              message = "Selecting optimal analysis strategy...";
+              currentSection = "Strategy Selection";
             }
 
             updateProgress({
@@ -455,9 +463,9 @@ export function useAnalysis(): UseAnalysisReturn {
 
           updateProgress({
             progress: 5,
-            message: 'Analyzing transcript complexity...',
+            message: "Analyzing transcript complexity...",
             complete: false,
-            currentSection: 'Strategy Selection',
+            currentSection: "Strategy Selection",
           });
         }
 
@@ -465,13 +473,16 @@ export function useAnalysis(): UseAnalysisReturn {
         const modelOverride = getAnalysisModelPreference();
         const reasoningEffort = getReasoningEffortPreference();
 
-        log.debug('Using analysis settings', { modelOverride, reasoningEffort });
+        log.debug("Using analysis settings", {
+          modelOverride,
+          reasoningEffort,
+        });
 
         // Call the analysis API endpoint with abort signal
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
+        const response = await fetch("/api/analyze", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             transcriptId: transcript.id,
@@ -481,7 +492,7 @@ export function useAnalysis(): UseAnalysisReturn {
               segments: transcript.segments,
             },
             template: template,
-            strategy: strategy || 'auto',
+            strategy: strategy || "auto",
             runEvaluation: runEvaluation !== false,
             // Include supplemental material if provided (from uploaded Word, PDF, PPT, or pasted text)
             ...(supplementalMaterial && { supplementalMaterial }),
@@ -501,7 +512,7 @@ export function useAnalysis(): UseAnalysisReturn {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(
-            errorData.error || `Analysis failed with status ${response.status}`
+            errorData.error || `Analysis failed with status ${response.status}`,
           );
         }
 
@@ -513,7 +524,7 @@ export function useAnalysis(): UseAnalysisReturn {
           responseData.data?.analysisStrategy ||
           responseData.analysisStrategy ||
           userSpecifiedStrategy ||
-          'basic';
+          "basic";
 
         // Update resolvedStrategy state to reflect what the API actually used
         // This is the single source of truth for strategy after API responds
@@ -526,16 +537,16 @@ export function useAnalysis(): UseAnalysisReturn {
         if (runEval) {
           updateProgress({
             progress: 78,
-            message: 'Running quality review and self-evaluation...',
+            message: "Running quality review and self-evaluation...",
             complete: false,
-            currentSection: 'Quality Review',
+            currentSection: "Quality Review",
           });
         } else {
           updateProgress({
             progress: 80,
-            message: 'Processing analysis results...',
+            message: "Processing analysis results...",
             complete: false,
-            currentSection: 'Finalizing',
+            currentSection: "Finalizing",
           });
         }
 
@@ -560,9 +571,9 @@ export function useAnalysis(): UseAnalysisReturn {
 
         updateProgress({
           progress: 90,
-          message: 'Saving analysis...',
+          message: "Saving analysis...",
           complete: false,
-          currentSection: 'Saving',
+          currentSection: "Saving",
         });
 
         // Save to IndexedDB
@@ -572,20 +583,21 @@ export function useAnalysis(): UseAnalysisReturn {
         // This generates "View Supporting Evidence" using a small model (e.g. gpt-4.1-mini).
         let finalAnalysis: Analysis = analysis;
         let citationsAborted = false;
-        if (actualStrategy === 'advanced') {
+        if (actualStrategy === "advanced") {
           try {
-            const citationsEnabled = process.env.NEXT_PUBLIC_CITATIONS_ENABLED !== 'false';
+            const citationsEnabled =
+              process.env.NEXT_PUBLIC_CITATIONS_ENABLED !== "false";
             if (citationsEnabled) {
               updateProgress({
                 progress: 95,
-                message: 'Selecting supporting evidence...',
+                message: "Selecting supporting evidence...",
                 complete: false,
-                currentSection: 'Citations',
+                currentSection: "Citations",
               });
 
-              const citationsResponse = await fetch('/api/citations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+              const citationsResponse = await fetch("/api/citations", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   transcript: { segments: transcript.segments },
                   templateSections: template.sections,
@@ -601,20 +613,24 @@ export function useAnalysis(): UseAnalysisReturn {
               if (citationsResponse.ok) {
                 const citationsData = await citationsResponse.json();
                 const evidenceByName = new Map<string, unknown>(
-                  (citationsData?.data?.sections || []).map((s: { name: string; evidence: unknown }) => [
-                    s.name,
-                    s.evidence,
-                  ])
+                  (citationsData?.data?.sections || []).map(
+                    (s: { name: string; evidence: unknown }) => [
+                      s.name,
+                      s.evidence,
+                    ],
+                  ),
                 );
 
-                const mergedSections = finalAnalysis.results.sections.map((section) => {
-                  const llmEvidence = evidenceByName.get(section.name);
-                  const normalized = normalizeEvidence(llmEvidence);
-                  if (normalized.length > 0) {
-                    return { ...section, evidence: normalized };
-                  }
-                  return section;
-                });
+                const mergedSections = finalAnalysis.results.sections.map(
+                  (section) => {
+                    const llmEvidence = evidenceByName.get(section.name);
+                    const normalized = normalizeEvidence(llmEvidence);
+                    if (normalized.length > 0) {
+                      return { ...section, evidence: normalized };
+                    }
+                    return section;
+                  },
+                );
 
                 finalAnalysis = {
                   ...finalAnalysis,
@@ -627,32 +643,33 @@ export function useAnalysis(): UseAnalysisReturn {
                 // Persist the refined evidence.
                 await saveAnalysis(finalAnalysis);
               } else {
-                log.warn('Citations generation failed', { status: citationsResponse.status });
+                log.warn("Citations generation failed", {
+                  status: citationsResponse.status,
+                });
               }
             }
           } catch (error) {
             // If citations fail (or are cancelled), keep the analysis without supporting evidence.
-            if (error instanceof Error && error.name === 'AbortError') {
+            if (error instanceof Error && error.name === "AbortError") {
               citationsAborted = true;
-              log.info('Supporting evidence selection cancelled');
+              log.info("Supporting evidence selection cancelled");
             } else {
-              log.warn('Failed to generate supporting evidence', {
+              log.warn("Failed to generate supporting evidence", {
                 message: error instanceof Error ? error.message : String(error),
               });
             }
           }
         }
 
-        const completionMessage =
-          citationsAborted
-            ? 'Analysis complete (supporting evidence skipped)'
-            : 'Analysis complete!';
+        const completionMessage = citationsAborted
+          ? "Analysis complete (supporting evidence skipped)"
+          : "Analysis complete!";
 
         updateProgress({
           progress: 100,
           message: completionMessage,
           complete: true,
-          currentSection: 'Complete',
+          currentSection: "Complete",
         });
 
         setState((prev) => ({
@@ -666,34 +683,61 @@ export function useAnalysis(): UseAnalysisReturn {
             progress: 100,
             message: completionMessage,
             complete: true,
-            currentSection: 'Complete',
+            currentSection: "Complete",
           },
         }));
 
         return finalAnalysis;
       } catch (error) {
         // Check if error was due to cancellation
-        if (error instanceof Error && error.name === 'AbortError') {
-          log.info('Analysis cancelled by user');
+        if (error instanceof Error && error.name === "AbortError") {
+          log.info("Analysis cancelled by user");
           setState((prev) => ({
             ...prev,
             loading: false,
-            error: 'Analysis cancelled',
+            error: "Analysis cancelled",
             abortController: null,
             progress: {
               progress: 0,
-              message: 'Analysis cancelled',
+              message: "Analysis cancelled",
               complete: false,
-              error: 'Analysis cancelled',
+              error: "Analysis cancelled",
             },
           }));
           return null;
         }
 
-        log.error('Analysis error', {
-          message: error instanceof Error ? error.message : String(error),
-        });
-        const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
+        // Extract error message from various error structures
+        // OpenAI SDK errors may have nested error.error.message
+        const extractErrorMessage = (err: unknown): string => {
+          if (err instanceof Error) {
+            // Check for OpenAI API error structure (error.error.message)
+            const apiError = err as Error & { error?: { message?: string } };
+            if (apiError.error?.message) {
+              return apiError.error.message;
+            }
+            if (err.message) {
+              return err.message;
+            }
+          }
+          if (err && typeof err === "object") {
+            const obj = err as Record<string, unknown>;
+            // Handle plain objects with error or message properties
+            if (typeof obj.error === "string") return obj.error;
+            if (typeof obj.message === "string") return obj.message;
+            if (obj.error && typeof obj.error === "object") {
+              const nested = obj.error as Record<string, unknown>;
+              if (typeof nested.message === "string") return nested.message;
+            }
+          }
+          const str = String(err);
+          return str === "[object Object]" ? "Unknown analysis error" : str;
+        };
+
+        const errorMsg = extractErrorMessage(error);
+        log.error("Analysis error", { message: errorMsg });
+        // Use the extracted message for the UI error display
+        const errorMessage = errorMsg || "Analysis failed";
 
         setState((prev) => ({
           ...prev,
@@ -717,7 +761,7 @@ export function useAnalysis(): UseAnalysisReturn {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally omitting state.loading to prevent callback recreation during analysis
-    [updateProgress]
+    [updateProgress],
   );
 
   /**
@@ -726,7 +770,7 @@ export function useAnalysis(): UseAnalysisReturn {
    */
   const cancelAnalysis = useCallback(() => {
     setState((prev) => {
-      const isInCitationsPhase = prev.progress?.currentSection === 'Citations';
+      const isInCitationsPhase = prev.progress?.currentSection === "Citations";
       if (prev.abortController) {
         prev.abortController.abort();
       }
@@ -740,11 +784,11 @@ export function useAnalysis(): UseAnalysisReturn {
           progress: {
             ...(prev.progress ?? {
               progress: 95,
-              message: 'Skipping supporting evidence...',
+              message: "Skipping supporting evidence...",
               complete: false,
-              currentSection: 'Citations',
+              currentSection: "Citations",
             }),
-            message: 'Skipping supporting evidence...',
+            message: "Skipping supporting evidence...",
           },
         };
       }
@@ -753,12 +797,12 @@ export function useAnalysis(): UseAnalysisReturn {
         ...prev,
         loading: false,
         abortController: null,
-        error: 'Analysis cancelled by user',
+        error: "Analysis cancelled by user",
         progress: {
           progress: 0,
-          message: 'Analysis cancelled',
+          message: "Analysis cancelled",
           complete: false,
-          error: 'Analysis cancelled by user',
+          error: "Analysis cancelled by user",
         },
       };
     });
@@ -889,14 +933,14 @@ export function useAnalysisLoader(transcriptId: string) {
  */
 export function useAnalysisLoaderPaginated(
   transcriptId: string,
-  options: PaginationOptions = {}
+  options: PaginationOptions = {},
 ) {
   const [result, setResult] = React.useState<PaginatedResult<Analysis>>({
     items: [],
     total: 0,
     hasMore: false,
     offset: 0,
-    limit: 20
+    limit: 20,
   });
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -919,7 +963,10 @@ export function useAnalysisLoaderPaginated(
           return;
         }
 
-        const paginatedResult = await getAnalysesPaginated(transcriptId, options);
+        const paginatedResult = await getAnalysesPaginated(
+          transcriptId,
+          options,
+        );
 
         // Check if cancelled after async operation
         if (abortController.signal.aborted) {
@@ -934,7 +981,8 @@ export function useAnalysisLoaderPaginated(
           return;
         }
 
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load analyses';
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to load analyses";
         setError(errorMessage);
         setLoading(false);
       }
